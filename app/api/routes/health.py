@@ -1,30 +1,39 @@
-from fastapi import APIRouter, Depends, Request
-from app.api.schemas import HealthResponse, ReadinessResponse
-from app.config import get_settings
+import sys
+from datetime import datetime, timezone
+from typing import Any, Dict
+from fastapi import APIRouter, Request, status
 import psycopg2
 
-router = APIRouter(prefix="/health", tags=["Health"])
+from app.config import get_settings
+from app.services.cache_service import CacheService
+from app.services.query_cache_service import QueryCacheService
+
+router = APIRouter(tags=["System Diagnostics"])
+
+# Instantiate services locally to check operational statuses
+doc_cache = CacheService()
+query_cache = QueryCacheService()
 
 
-@router.get("", response_model=HealthResponse, summary="Liveness check")
-async def liveness() -> HealthResponse:
+@router.get("/health", status_code=status.HTTP_200_OK, summary="Enhanced Health Check")
+async def health_check(request: Request) -> Dict[str, Any]:
+    """
+    Enhanced Health check endpoint to verify the API is running and check service connectivity.
+    Queries Qdrant, PostgreSQL, Upstash Redis, S3/local backends, and external LLM/Search provider keys.
+    """
     settings = get_settings()
-    return HealthResponse(
-        status="healthy",
-        version=settings.app_version
-    )
 
+    # 1. Check Qdrant Connection
+    qdrant_connected = False
+    collection_info = {}
+    try:
+        vector_store = request.app.state.vector_store
+        qdrant_connected = vector_store.health_check()
+        collection_info = vector_store.get_collection_info()
+    except Exception:
+        pass
 
-@router.get("/ready", response_model=ReadinessResponse, summary="Readiness check")
-async def readiness(request: Request) -> ReadinessResponse:
-    settings = get_settings()
-
-    # Check Qdrant Connection
-    vector_store = request.app.state.vector_store
-    qdrant_connected = vector_store.health_check()
-    collection_info = vector_store.get_collection_info()
-
-    # Check Postgres Connection
+    # 2. Check Postgres Connection
     postgres_connected = False
     try:
         conn = psycopg2.connect(settings.database_url)
@@ -35,11 +44,197 @@ async def readiness(request: Request) -> ReadinessResponse:
     except Exception:
         pass
 
-    status = "ready" if (qdrant_connected and postgres_connected) else "degraded"
+    # 3. Check cache availability
+    query_cache_status = query_cache.enabled if query_cache else False
 
-    return ReadinessResponse(
-        status=status,
-        qdrant_connected=qdrant_connected,
-        postgres_connected=postgres_connected,
-        collection_info=collection_info
-    )
+    # Check overall liveness / readiness state
+    services_status = {
+        "postgres_database": postgres_connected,
+        "qdrant_vector_store": qdrant_connected,
+        "query_cache_redis": query_cache_status,
+        "document_cache": doc_cache is not None,
+    }
+
+    any_service_available = any(services_status.values())
+    health_status = "healthy" if (postgres_connected and qdrant_connected) else "degraded" if any_service_available else "unhealthy"
+
+    return {
+        "status": health_status,
+        "service": "IDOP — Intelligent Data Operations Platform API",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": settings.app_version,
+        "services": services_status,
+        "features_available": {
+            "text_to_sql": True,       # Always configured out-of-the-box
+            "excel_mutations": True,   # Governed transactional mutations active
+            "advanced_rag": qdrant_connected,
+            "query_routing": True,      # 5-path router
+        },
+        "configuration": {
+            "openai_configured": bool(settings.openai_api_key),
+            "voyage_configured": bool(settings.voyage_api_key),
+            "tavily_configured": bool(settings.tavily_api_key),
+            "database_configured": bool(settings.database_url),
+            "redis_cache_configured": bool(settings.upstash_redis_url and settings.upstash_redis_token),
+            "s3_cache_configured": settings.storage_backend == "s3",
+        },
+        "qdrant_info": collection_info,
+        "redis_cache": (
+            query_cache.get_stats()
+            if query_cache_status
+            else {"status": "disabled_or_offline"}
+        ),
+    }
+
+
+@router.get("/health/ready", summary="Readiness check")
+async def readiness(request: Request) -> Dict[str, Any]:
+    """
+    Readiness probe validating underlying Qdrant and PostgreSQL connections.
+    """
+    settings = get_settings()
+
+    # Qdrant Check
+    vector_store = request.app.state.vector_store
+    qdrant_connected = vector_store.health_check()
+    collection_info = vector_store.get_collection_info()
+
+    # Postgres Check
+    postgres_connected = False
+    try:
+        conn = psycopg2.connect(settings.database_url)
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+        conn.close()
+        postgres_connected = True
+    except Exception:
+        pass
+
+    status = "ready" if (qdrant_connected and postgres_connected) else "not_ready"
+
+    return {
+        "status": status,
+        "qdrant_connected": qdrant_connected,
+        "postgres_connected": postgres_connected,
+        "collection_info": collection_info
+    }
+
+
+@router.get("/info", status_code=status.HTTP_200_OK, summary="Get system layout and documentation info")
+async def get_info() -> Dict[str, Any]:
+    """
+    Get system layout, design manuals, operational project phases, and detailed platform endpoint mappings.
+    """
+    settings = get_settings()
+    return {
+        "application": {
+            "name": settings.app_name,
+            "version": settings.app_version,
+            "environment": settings.environment,
+        },
+        "phases": {
+            "Phase 1: Foundation": "Completed - Configs, Logging, and Dual-Tier Cache",
+            "Phase 2: Text-to-SQL": "Completed - Schema preparation, SQLValidator, LLMJudge, and single-use ApprovalGate",
+            "Phase 3: Spreadsheet Mutations": "Completed - OpClassifier, pandas parsing, RuleValidator confirmation gates, and transaction executors",
+            "Phase 4: Advanced CSRAG": "Completed - QdrantBM25 hybrid search, HyDE hypothetical query expansion, Reranking, CRAG relevance evaluating, and SRAG verifiers",
+            "Phase 5: State Machine Graph": "Completed - 5-path router compilation compiled with local Postgres Saver (STM) and Postgres Store (LTM)",
+            "Phase 6: Deployment & Monitoring": "Completed - Production-grade Docker Compose, zero-touch CD orchestration, dynamic Nginx proxying, and Auto-SSL Certbot mapping",
+        },
+        "features": {
+            "router_pathways": ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"],
+            "cache_tier_1": "Upstash Redis query-level caching",
+            "cache_tier_2": "S3 / Local filesystem document chunk caching with SHA-256 deduplication",
+        },
+        "system": {
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        },
+        "endpoints": {
+            "docs": "/docs (Interactive Swagger documentation)",
+            "redoc": "/redoc (Alternate ReDoc documentation)",
+            "health": "GET /health (Detailed liveness checks)",
+            "readiness": "GET /health/ready (Underlying database probes)",
+            "info": "GET /info (Comprehensive system layout manual)",
+            "stats": "GET /stats (Real-time performance and savings diagnostics)",
+            "chat": "POST /chat (Unified 5-path routing conversation endpoint)",
+            "upload_doc": "POST /documents/upload (Hybrid ingestion, chunking, and dual-vector indexing)",
+            "doc_info": "GET /documents/info (Get Qdrant collection size and details)",
+            "sql_generate": "POST /sql/generate (NL-to-SQL Golden Schema prompt generation with pending transaction queue)",
+            "sql_approve": "POST /sql/approve (Execute or cancel pending SQL read queries)",
+            "mutation_upload": "POST /mutation/upload (Sheet mutation file upload, rule audits, and mapped row preview)",
+            "mutation_approve": "POST /mutation/approve (Execute bulk spreadsheet changes inside an all-or-nothing rollback transaction)",
+            "cache_stats": "GET /cache/stats (Check document and query cache sizes)",
+            "cache_clear": "DELETE /cache/clear (Clear specific document chunks or purge Redis values)",
+        },
+    }
+
+
+@router.get("/stats", status_code=status.HTTP_200_OK, summary="Get platform statistics and query cache savings")
+async def get_stats(request: Request) -> Dict[str, Any]:
+    """
+    Get system statistics, document ingestion sizes, vector count profiles, and query cache savings estimates.
+    """
+    settings = get_settings()
+    vector_store = request.app.state.vector_store
+    collection_info = vector_store.get_collection_info()
+    vector_count = collection_info.get("points_count", 0)
+
+    # Fetch document cache stats
+    doc_stats = doc_cache.get_cache_stats()
+
+    # Get query cache Redis metrics
+    cache_stats = {"enabled": False, "total_estimated_savings": "$0.0000", "overall_hit_rate": "0.0%"}
+    if query_cache and query_cache.enabled:
+        try:
+            stats = query_cache.get_stats()
+            total_cost_saved = 0.0
+
+            # Dynamic retail cost estimations
+            cost_estimates = {
+                "rag": 0.05,        # $0.05 per GPT-4/RAG query
+                "embeddings": 0.0001, # $0.0001 per embedding check
+                "sql_gen": 0.08,    # $0.08 per Golden Text-to-SQL query
+                "sql_result": 0.01, # $0.01 database transaction cost
+            }
+
+            for cache_type, cache_data in stats.get("cache_types", {}).items():
+                if cache_type in cost_estimates:
+                    savings = cache_data.get("hits", 0) * cost_estimates[cache_type]
+                    cache_data["estimated_cost_saved"] = f"${savings:.4f}"
+                    total_cost_saved += savings
+
+            total_queries = sum(c.get("total_queries", 0) for c in stats.get("cache_types", {}).values())
+            total_hits = sum(c.get("hits", 0) for c in stats.get("cache_types", {}).values())
+            hit_rate = (total_hits / max(total_queries, 1)) * 100
+
+            cache_stats = {
+                "enabled": True,
+                "by_type": stats.get("cache_types", {}),
+                "total_estimated_savings": f"${total_cost_saved:.4f}",
+                "overall_hit_rate": f"{hit_rate:.1f}%",
+            }
+        except Exception as e:
+            cache_stats = {"enabled": True, "error": f"Failed to retrieve stats: {str(e)}"}
+
+    return {
+        "indexing": {
+            "total_vectors_in_qdrant": vector_count,
+            "cached_documents_count": doc_stats.get("total_documents", 0),
+            "cached_documents_size": doc_stats.get("total_size_human", "0 Bytes"),
+            "cached_documents_size_bytes": doc_stats.get("total_size_bytes", 0),
+        },
+        "query_cache": cache_stats,
+        "system": {
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        },
+        "configuration": {
+            "chunk_size": settings.chunk_size,
+            "chunk_overlap": settings.chunk_overlap,
+            "cache_ttl": {
+                "embeddings": f"{settings.cache_ttl_embeddings}s",
+                "rag": f"{settings.cache_ttl_rag}s",
+                "sql_generation": f"{settings.cache_ttl_sql_gen}s",
+                "sql_results": f"{settings.cache_ttl_sql_result}s",
+            },
+        },
+    }
