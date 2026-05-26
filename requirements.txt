@@ -21,3 +21,4 @@ voyageai>=0.2.0
 tavily-python>=0.3.0
 pypdf>=3.0.0
 python-multipart>=0.0.12
+langgraph-checkpoint-postgres>=0.1.0
