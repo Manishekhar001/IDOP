@@ -84,9 +84,13 @@ def mock_settings():
     """
     Auto-applied fixture that patches get_settings() globally,
     so no test ever needs a real .env or external credentials.
+    Also patches database connections for SQL and Mutation approval gates
+    to return None, preventing TCP handshake socket timeout delays.
     """
     mock = MockSettings()
-    with patch("app.config.get_settings", return_value=mock):
+    with patch("app.config.get_settings", return_value=mock), \
+         patch("app.core.feature1_sql.approval_gate.ApprovalGate._get_connection", return_value=None), \
+         patch("app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection", return_value=None):
         yield mock
 
 
