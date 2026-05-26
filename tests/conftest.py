@@ -15,6 +15,14 @@ from unittest.mock import patch, MagicMock
 # Ensure the IDOP project root is on sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Set dummy environment variables to prevent Pydantic ValidationError on Settings instantiation
+os.environ.setdefault("OPENAI_API_KEY", "sk-test-fake-key-for-unit-tests")
+os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
+os.environ.setdefault("QDRANT_API_KEY", "test-qdrant-key")
+os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/idop_test")
+os.environ.setdefault("TAVILY_API_KEY", "tvly-test-fake-key")
+
+
 
 # ---------------------------------------------------------------------------
 # Mock Settings — avoids needing a real .env file during tests

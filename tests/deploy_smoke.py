@@ -17,7 +17,8 @@ import time
 import requests
 
 # Retrieve API base target URL from environment variable (injected by cd.yml)
-API_URL = os.getenv("API_TARGET_URL", "http://localhost:8000")
+API_URL = os.getenv("API_TARGET_URL", "http://localhost:8000").rstrip("/")
+
 
 # Global variables for testing flow
 test_filename = f"smoke-test-{uuid.uuid4().hex[:8]}.txt"
@@ -197,7 +198,8 @@ def run_tests():
         print("❌ ERROR: API_TARGET_URL environment variable is not set!")
         sys.exit(1)
         
-    API_URL = os.getenv("API_TARGET_URL")
+    API_URL = os.getenv("API_TARGET_URL").rstrip("/")
+
     
     print("==================================================")
     print("🚀 STARTING IDOP POST-DEPLOYMENT SMOKE TEST SUITE")
