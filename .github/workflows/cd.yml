@@ -156,6 +156,25 @@ jobs:
       - name: "Step 2/12: Checkout code"
         uses: actions/checkout@v4
 
+      - name: "Step 2b/12: Resolve ECR Registry Variables"
+        run: |
+          echo "=========================================="
+          echo "🔍 RESOLVING ECR REGISTRY AND REPOSITORY"
+          echo "=========================================="
+          REGISTRY_VAL="${{ secrets.ECR_REGISTRY }}"
+          if [[ "$REGISTRY_VAL" == *"/"* ]]; then
+            ECR_REGISTRY_HOST=$(echo "$REGISTRY_VAL" | cut -d'/' -f1)
+            ECR_REPO_NAME=$(echo "$REGISTRY_VAL" | cut -d'/' -f2-)
+          else
+            ECR_REGISTRY_HOST="$REGISTRY_VAL"
+            ECR_REPO_NAME="${{ env.ECR_REPOSITORY }}"
+          fi
+          echo "RESOLVED_ECR_REGISTRY=$ECR_REGISTRY_HOST" >> $GITHUB_ENV
+          echo "RESOLVED_ECR_REPOSITORY=$ECR_REPO_NAME" >> $GITHUB_ENV
+          echo "  Resolved Registry Host : $ECR_REGISTRY_HOST"
+          echo "  Resolved Repository    : $ECR_REPO_NAME"
+          echo "=========================================="
+
       # ─────────────────────────────────────────────────────────────────────
       # STEP 3: PRINT DEPLOYMENT METADATA & CONFIGURATION
       # ─────────────────────────────────────────────────────────────────────
@@ -176,8 +195,8 @@ jobs:
           echo ""
           echo "📋 Target Deployment Configuration:"
           echo "  AWS Region   : ${{ env.AWS_REGION }}"
-          echo "  ECR Repo     : ${{ env.ECR_REPOSITORY }}"
-          echo "  ECR Registry : ${{ secrets.ECR_REGISTRY }}"
+          echo "  ECR Repo     : ${{ env.RESOLVED_ECR_REPOSITORY }}"
+          echo "  ECR Registry : ${{ env.RESOLVED_ECR_REGISTRY }}"
           echo "  EC2 Host     : ${{ secrets.EC2_HOST }}"
           echo "  Host Path    : ${{ env.EC2_PROJECT_PATH }}"
           echo "  Platform     : linux/amd64"
@@ -241,8 +260,8 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-            ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
+            ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }}
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 10: PRINT BUILD & ECR PUBLICATION SUMMARY
@@ -252,8 +271,8 @@ jobs:
           echo "=========================================="
           echo "✅ DOCKER IMAGE PUBLISHED TO AWS ECR"
           echo "=========================================="
-          echo "  Registry     : ${{ secrets.ECR_REGISTRY }}"
-          echo "  Repository   : ${{ env.ECR_REPOSITORY }}"
+          echo "  Registry     : ${{ env.RESOLVED_ECR_REGISTRY }}"
+          echo "  Repository   : ${{ env.RESOLVED_ECR_REPOSITORY }}"
           echo "  Tags         : latest, ${{ github.sha }}"
           echo "  Architecture : linux/amd64"
           echo "  AWS Region   : ${{ env.AWS_REGION }}"
@@ -436,7 +455,8 @@ jobs:
 
             # Runtime state
             ENV_STATE=production
-            ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}
+            ECR_REGISTRY=${{ env.RESOLVED_ECR_REGISTRY }}
+            ECR_REPOSITORY=${{ env.RESOLVED_ECR_REPOSITORY }}
             AWS_REGION=${{ env.AWS_REGION }}
 
             # Internal PostgreSQL (LangGraph checkpointing)
@@ -482,7 +502,7 @@ jobs:
 
             services:
               app:
-                image: ${ECR_REGISTRY}/idop-app:latest
+                image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
                 container_name: idop-app
                 restart: always
                 ports:
@@ -522,15 +542,15 @@ jobs:
             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             export AWS_DEFAULT_REGION="${{ env.AWS_REGION }}"
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-              $DOCKER_CMD login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+              $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }}
             echo "✅ Docker authenticated with ECR"
             echo ""
 
             echo "=========================================="
             echo "💾 Step 11g: Backing up current stable image"
             echo "=========================================="
-            $DOCKER_CMD tag ${{ secrets.ECR_REGISTRY }}/idop-app:latest \
-              ${{ secrets.ECR_REGISTRY }}/idop-app:stable 2>/dev/null || \
+            $DOCKER_CMD tag ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest \
+              ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable 2>/dev/null || \
               echo "ℹ️ No existing image to backup (first deployment)"
             echo ""
 
@@ -592,8 +612,8 @@ jobs:
               # Automatic rollback to stable image
               echo "🔄 Rolling back to stable image..."
               $COMPOSE_CMD down
-              $DOCKER_CMD tag ${{ secrets.ECR_REGISTRY }}/idop-app:stable \
-                ${{ secrets.ECR_REGISTRY }}/idop-app:latest 2>/dev/null || true
+              $DOCKER_CMD tag ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable \
+                ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest 2>/dev/null || true
               $COMPOSE_CMD up -d
               echo "✅ Rollback complete. Stable state restored."
               exit 1
@@ -645,7 +665,7 @@ jobs:
           echo "📋 Deployment Summary:"
           echo "  Commit      : ${{ github.sha }}"
           echo "  Author      : ${{ github.actor }}"
-          echo "  ECR Image   : ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
+          echo "  ECR Image   : ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest"
           echo "  EC2 Host    : ${{ secrets.EC2_HOST }}"
           echo "  Region      : ${{ env.AWS_REGION }}"
           echo "  Status      : ✅ LIVE"
