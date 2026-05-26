@@ -65,6 +65,18 @@ class VectorStoreService:
                 logger.info(f"Created hybrid collection: {self.collection_name}")
             else:
                 logger.info(f"Collection '{self.collection_name}' exists")
+
+            # Ensure payload indexes exist for duplicate checks and RAG filtering
+            for field, schema in [("content_hash", "keyword"), ("source", "keyword"), ("index", "integer")]:
+                try:
+                    self.client.create_payload_index(
+                        collection_name=self.collection_name,
+                        field_name=field,
+                        field_schema=schema,
+                    )
+                    logger.info(f"Ensured Qdrant payload index for '{field}' ({schema})")
+                except Exception as index_err:
+                    logger.debug(f"Payload index for '{field}' already exists or failed: {index_err}")
         except Exception as e:
             logger.error(f"Collection creation error: {e}")
             raise

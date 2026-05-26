@@ -41,12 +41,50 @@ async def upload_mutation(
     table_name: str = Form(..., description="Target database table name"),
     request_intent: str = Form(..., description="Description of mutation intent (e.g. Add products, Update stock)"),
     file: UploadFile = File(..., description="Excel/CSV spreadsheet containing payload data"),
-    max_bulk_rows: Optional[int] = Form(None, description="Custom maximum allowed rows to prevent resource exhaustion"),
+    max_bulk_rows: Optional[str] = Form(None, description="Custom maximum allowed rows to prevent resource exhaustion"),
     primary_key: Optional[str] = Form("id", description="Primary key column for UPDATE and DELETE operations"),
-    auto_map: Optional[bool] = Form(True, description="Enable automatic column mapping using LLM"),
-    skip_validation: Optional[bool] = Form(False, description="Skip business rules validation"),
+    auto_map: Optional[str] = Form("true", description="Enable automatic column mapping using LLM"),
+    skip_validation: Optional[str] = Form("false", description="Skip business rules validation"),
 ) -> MutationResponse:
-    logger.info(f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {auto_map}")
+    # Safely parse max_bulk_rows
+    parsed_max_bulk_rows = None
+    if max_bulk_rows is not None:
+        val = str(max_bulk_rows).strip()
+        if val:
+            try:
+                parsed_max_bulk_rows = int(val)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="max_bulk_rows must be an integer.")
+
+    # Safely parse auto_map
+    parsed_auto_map = True
+    if auto_map is not None:
+        val = str(auto_map).strip().lower()
+        if val == "false":
+            parsed_auto_map = False
+        elif val == "true" or val == "":
+            parsed_auto_map = True
+        else:
+            try:
+                parsed_auto_map = bool(int(val))
+            except ValueError:
+                parsed_auto_map = True
+
+    # Safely parse skip_validation
+    parsed_skip_validation = False
+    if skip_validation is not None:
+        val = str(skip_validation).strip().lower()
+        if val == "true":
+            parsed_skip_validation = True
+        elif val == "false" or val == "":
+            parsed_skip_validation = False
+        else:
+            try:
+                parsed_skip_validation = bool(int(val))
+            except ValueError:
+                parsed_skip_validation = False
+
+    logger.info(f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {parsed_auto_map}")
 
     from typing import Optional
 
@@ -59,7 +97,7 @@ async def upload_mutation(
         if not rows:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-        limit = max_bulk_rows or 1000
+        limit = parsed_max_bulk_rows or 1000
         if len(rows) > limit:
             raise HTTPException(
                 status_code=400,
@@ -68,7 +106,7 @@ async def upload_mutation(
 
         # 2. Column Mapping
         headers = list(rows[0].keys())
-        if auto_map:
+        if parsed_auto_map:
             col_mappings = mapper.get_semantic_mapping(table_name, headers)
         else:
             col_mappings = {h: h for h in headers}
@@ -84,7 +122,7 @@ async def upload_mutation(
 
         # 3. Business Rule Validation
         validation_errors = []
-        if not skip_validation:
+        if not parsed_skip_validation:
             is_valid, validation_errors = validator.validate_rows(table_name, mapped_rows)
 
         # 4. Classify Mutation Type (INSERT, UPDATE, DELETE)
