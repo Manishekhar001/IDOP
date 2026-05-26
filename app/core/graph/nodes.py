@@ -27,13 +27,6 @@ from app.core.feature1_sql.llm_judge import LLMJudge
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
 
-from app.core.feature2_mutation.op_classifier import OpClassifier
-from app.core.feature2_mutation.file_parser import FileParser
-from app.core.feature2_mutation.column_mapper import ColumnMapper
-from app.core.feature2_mutation.rule_validator import RuleValidator
-from app.core.feature2_mutation.mutation_generator import MutationGenerator
-from app.core.feature2_mutation.llm_judge import MutationLLMJudge
-from app.core.feature2_mutation.approval_gate import MutationApprovalGate
 
 from app.utils.logger import get_logger
 
@@ -160,8 +153,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
 async def mutation_node(state: CSRAGState) -> dict:
     """Validates mutation rules, column mappings, and formats approval token."""
-    question = state["question"]
-    logger.info(f"Feature 2 Mutation Node triggered")
+    logger.info("Feature 2 Mutation Node triggered")
 
     # This node is triggered if a user asks for updates.
     # Normally file uploads are handled at FastAPI route level.
@@ -569,7 +561,6 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
 
     sql_service = TextToSQLService()
     validator = SQLValidator()
-    judge = LLMJudge()
     executor = SQLExecutor()
     
     # 1. SQL Generation & Execution

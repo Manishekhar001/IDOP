@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.api.schemas import MutationResponse, MutationApprovalRequest, MutationExecuteResponse, ErrorResponse
 
@@ -85,9 +85,6 @@ async def upload_mutation(
                 parsed_skip_validation = False
 
     logger.info(f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {parsed_auto_map}")
-
-    from typing import Optional
-
     try:
         content = await file.read()
         filename = file.filename

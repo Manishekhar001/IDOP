@@ -1,7 +1,7 @@
 import secrets
 import logging
 import psycopg2
-from typing import Dict, Any
+from typing import Dict
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.mutation_approval_gate")

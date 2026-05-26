@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -60,6 +59,25 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logger.addHandler(error_handler)
+
+    # Optional CloudWatch Logs Integration via Watchtower
+    import os
+    cloudwatch_group = os.getenv("CLOUDWATCH_LOG_GROUP")
+    if cloudwatch_group:
+        try:
+            import watchtower
+            cw_handler = watchtower.CloudWatchLogHandler(
+                log_group_name=cloudwatch_group,
+                log_stream_name=os.getenv("CLOUDWATCH_LOG_STREAM", "idop-api-stream"),
+                send_interval=10,
+                create_log_group=True,
+            )
+            cw_handler.setLevel(logging.INFO)
+            cw_handler.setFormatter(detailed_formatter)
+            logger.addHandler(cw_handler)
+            logger.info(f"AWS CloudWatch logs handler added successfully to group: '{cloudwatch_group}'")
+        except Exception as cw_err:
+            logger.warning(f"Could not initialize AWS CloudWatch logging stream: {cw_err}")
 
     # Suppress verbose loggers from libraries
     logging.getLogger("httpx").setLevel(logging.WARNING)

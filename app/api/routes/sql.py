@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from app.api.schemas import SQLApprovalRequest, SQLResponse, SQLExecuteResponse, ErrorResponse, SQLGenerationRequest
 from app.core.feature1_sql.vanna_service import TextToSQLService
-from app.core.feature1_sql.approval_gate import ApprovalGate
+from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
 from app.utils.logger import get_logger
 
@@ -10,7 +10,6 @@ router = APIRouter(prefix="/sql", tags=["SQL Operations"])
 
 # Shared services
 sql_service = TextToSQLService()
-from app.core.feature1_sql.approval_gate import approval_gate as gate
 executor = SQLExecutor()
 
 

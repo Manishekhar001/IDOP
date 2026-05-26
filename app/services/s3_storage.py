@@ -19,7 +19,6 @@ class S3StorageBackend(StorageBackend):
         try:
             import boto3
             from botocore.config import Config
-            from botocore.exceptions import ClientError
         except ImportError:
             logger.warning("boto3 not installed. S3StorageBackend will not work properly.")
             self.enabled = False

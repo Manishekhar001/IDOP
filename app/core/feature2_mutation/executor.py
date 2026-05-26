@@ -1,6 +1,6 @@
 import logging
 import psycopg2
-from typing import List, Dict, Any, Tuple
+from typing import List, Any, Tuple
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.mutation_executor")

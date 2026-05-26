@@ -9,17 +9,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.store.postgres.aio import AsyncPostgresStore
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver  # noqa: E402
+from langgraph.store.postgres.aio import AsyncPostgresStore  # noqa: E402
 
-from app.api.routes import chat, documents, health, memory, sql, mutation, cache
-from app.config import get_settings
-from app.core.csrag_engine import CSRAGEngine
-from app.core.vector_store import VectorStoreService
-from app.utils.logger import get_logger, setup_logging
+from app.api.routes import chat, documents, health, memory, sql, mutation, cache  # noqa: E402
+from app.config import get_settings  # noqa: E402
+from app.core.csrag_engine import CSRAGEngine  # noqa: E402
+from app.core.vector_store import VectorStoreService  # noqa: E402
+from app.utils.logger import get_logger, setup_logging  # noqa: E402
 
 settings = get_settings()
 __version__ = "0.1.0"

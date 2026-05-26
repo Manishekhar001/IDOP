@@ -1,14 +1,13 @@
 from functools import lru_cache
-from typing import Any, List, Optional, Tuple, Dict
+from typing import Optional
 from uuid import uuid4
 
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
     Filter, FieldCondition, MatchValue,
-    SparseVector, SparseVectorParams,
+    SparseVectorParams,
     Prefetch, FusionQuery, Fusion
 )
 

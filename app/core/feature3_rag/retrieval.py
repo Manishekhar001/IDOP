@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List
 from langchain_core.documents import Document
 from app.core.vector_store import VectorStoreService
 from app.core.embeddings import get_embeddings

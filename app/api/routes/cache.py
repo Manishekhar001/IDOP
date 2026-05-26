@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from typing import Dict, Any, Optional
 from app.services.cache_service import CacheService
 from app.services.query_cache_service import QueryCacheService
