@@ -33,7 +33,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
     except Exception:
         pass
 
-    # 2. Check Postgres Connection
+    # 2. Check Postgres Connection (checkpointer)
     postgres_connected = False
     try:
         conn = psycopg2.connect(settings.database_url)
@@ -44,19 +44,31 @@ async def health_check(request: Request) -> Dict[str, Any]:
     except Exception:
         pass
 
+    # Check Supabase Connection (company data)
+    supabase_connected = False
+    try:
+        conn = psycopg2.connect(settings.supabase_db_url)
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+        conn.close()
+        supabase_connected = True
+    except Exception:
+        pass
+
     # 3. Check cache availability
     query_cache_status = query_cache.enabled if query_cache else False
 
     # Check overall liveness / readiness state
     services_status = {
-        "postgres_database": postgres_connected,
+        "postgres_checkpointer": postgres_connected,
+        "supabase_company_db": supabase_connected,
         "qdrant_vector_store": qdrant_connected,
         "query_cache_redis": query_cache_status,
         "document_cache": doc_cache is not None,
     }
 
     any_service_available = any(services_status.values())
-    health_status = "healthy" if (postgres_connected and qdrant_connected) else "degraded" if any_service_available else "unhealthy"
+    health_status = "healthy" if (postgres_connected and supabase_connected and qdrant_connected) else "degraded" if any_service_available else "unhealthy"
 
     return {
         "status": health_status,
@@ -75,6 +87,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
             "voyage_configured": bool(settings.voyage_api_key),
             "tavily_configured": bool(settings.tavily_api_key),
             "database_configured": bool(settings.database_url),
+            "supabase_configured": bool(settings.supabase_db_url),
             "redis_cache_configured": bool(settings.upstash_redis_url and settings.upstash_redis_token),
             "s3_cache_configured": settings.storage_backend == "s3",
         },
@@ -90,7 +103,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
 @router.get("/health/ready", summary="Readiness check")
 async def readiness(request: Request) -> Dict[str, Any]:
     """
-    Readiness probe validating underlying Qdrant and PostgreSQL connections.
+    Readiness probe validating underlying Qdrant, PostgreSQL, and Supabase connections.
     """
     settings = get_settings()
 
@@ -99,7 +112,7 @@ async def readiness(request: Request) -> Dict[str, Any]:
     qdrant_connected = vector_store.health_check()
     collection_info = vector_store.get_collection_info()
 
-    # Postgres Check
+    # Postgres Check (checkpointer)
     postgres_connected = False
     try:
         conn = psycopg2.connect(settings.database_url)
@@ -110,12 +123,24 @@ async def readiness(request: Request) -> Dict[str, Any]:
     except Exception:
         pass
 
-    status = "ready" if (qdrant_connected and postgres_connected) else "not_ready"
+    # Supabase Check (company data)
+    supabase_connected = False
+    try:
+        conn = psycopg2.connect(settings.supabase_db_url)
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+        conn.close()
+        supabase_connected = True
+    except Exception:
+        pass
+
+    status = "ready" if (qdrant_connected and postgres_connected and supabase_connected) else "not_ready"
 
     return {
         "status": status,
         "qdrant_connected": qdrant_connected,
         "postgres_connected": postgres_connected,
+        "supabase_connected": supabase_connected,
         "collection_info": collection_info
     }
 

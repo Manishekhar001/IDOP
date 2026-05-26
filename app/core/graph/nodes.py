@@ -80,7 +80,7 @@ async def router_node(state: CSRAGState) -> dict:
     )
     question = last_human.content if last_human else ""
     router = QueryRouter()
-    query_type = router.route_query(question)
+    query_type = await asyncio.to_thread(router.route_query, question)
     return {"query_type": query_type, "question": question}
 
 
@@ -114,7 +114,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             }
 
         # Run semantic audit judge
-        is_correct, explanation = judge.judge_sql(question, sql)
+        is_correct, explanation = await asyncio.to_thread(judge.judge_sql, question, sql)
         if not is_correct:
             logger.warning(f"SQL semantic failure: {explanation}")
             # Still offer with warning or mark rejected
@@ -288,12 +288,8 @@ async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreServ
         except Exception as e:
             logger.error(f"HyDE pipeline in node failed: {e}")
             
-    loop = asyncio.get_event_loop()
-    
     # Call vector store search with k and search_mode!
-    docs = await loop.run_in_executor(
-        None, lambda: vector_store.search(retrieval_query, k=top_k, mode=search_mode)
-    )
+    docs = await asyncio.to_thread(vector_store.search, retrieval_query, k=top_k, mode=search_mode)
     
     # Reranking if enabled!
     reranking_used = False
@@ -638,12 +634,8 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
         settings = get_settings()
         vector_store = VectorStoreService()
         
-        # Call vector store hybrid search (runs synchronously under loop.run_in_executor)
-        import asyncio
-        loop = asyncio.get_event_loop()
-        docs = await loop.run_in_executor(
-            None, lambda: vector_store.search(retrieval_query, k=top_k, mode=search_mode)
-        )
+        # Call vector store hybrid search (runs synchronously under asyncio.to_thread)
+        docs = await asyncio.to_thread(vector_store.search, retrieval_query, k=top_k, mode=search_mode)
         
         # Reranking if enabled!
         reranking_used = False

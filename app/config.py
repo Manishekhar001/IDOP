@@ -7,9 +7,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     @model_validator(mode="after")
     def normalize_database_url(self) -> "Settings":
-        if hasattr(self, "database_url") and self.database_url and self.database_url.startswith("postgresql+psycopg://"):
-            self.database_url = self.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+        if not getattr(self, "supabase_db_url", None):
+            self.supabase_db_url = self.database_url or ""
+            
+        for attr in ["database_url", "supabase_db_url"]:
+            if hasattr(self, attr):
+                val = getattr(self, attr)
+                if val and val.startswith("postgresql+psycopg://"):
+                    setattr(self, attr, val.replace("postgresql+psycopg://", "postgresql://", 1))
         return self
+
+
 
 
     model_config = SettingsConfigDict(
@@ -43,6 +51,7 @@ class Settings(BaseSettings):
 
     # Relational Database Configuration
     database_url: str
+    supabase_db_url: str = ""
 
     # Storage Backend Configuration (for bulk document ingestion cache)
     storage_backend: str = "local"  # 'local' or 's3'

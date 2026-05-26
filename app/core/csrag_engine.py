@@ -6,10 +6,12 @@ from langgraph.store.postgres.aio import AsyncPostgresStore
 from app.config import get_settings
 from app.core.graph.builder import build_graph
 from app.core.vector_store import VectorStoreService
+from app.services.query_cache_service import QueryCacheService
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
+query_cache = QueryCacheService()
 
 _RECURSION_LIMIT = 80
 
@@ -111,6 +113,14 @@ class CSRAGEngine:
             f"async query — thread={thread_id}, user={user_id}, "
             f"q='{question[:80]}'"
         )
+        
+        cache_key = query_cache.get_rag_key(question, top_k)
+        if (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
+            cached_result = query_cache.get(cache_key, cache_type="rag")
+            if cached_result:
+                logger.info(f"RAG Cache HIT for: '{question[:50]}'")
+                return {**cached_result, "cache_hit": True, "cost_saved": "$0.05"}
+
         config = self._build_config(thread_id, user_id)
         init_state = self._initial_state(
             question=question,
@@ -120,7 +130,21 @@ class CSRAGEngine:
             enable_reranking=enable_reranking
         )
         result = await self._graph.ainvoke(init_state, config)
-        return self._format_result(result)
+        formatted = self._format_result(result)
+
+        # Check post-verification gates before writing to Redis/local cache
+        if (query_cache.enabled or query_cache.use_local) and formatted.get("query_type") == "RAG":
+            crag_verdict = formatted.get("crag_verdict")
+            issup = formatted.get("issup")
+            isuse = formatted.get("isuse")
+            
+            if crag_verdict == "CORRECT" and issup == "fully_supported" and isuse == "useful":
+                query_cache.set(cache_key, formatted, ttl=settings.cache_ttl_rag, cache_type="rag")
+                logger.info("✓ RAG Cache MISS - passed 3-tier quality gates and cached successfully.")
+            else:
+                logger.info(f"✗ RAG Cache write skipped - failed quality gates (crag={crag_verdict}, sup={issup}, use={isuse})")
+
+        return formatted
 
     async def astream(
         self,

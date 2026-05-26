@@ -152,7 +152,7 @@ class TextToSQLService:
         query_cache_service=None,
     ):
         settings = get_settings()
-        self.database_url = database_url or settings.database_url
+        self.database_url = database_url or settings.supabase_db_url
         self.openai_api_key = openai_api_key or settings.openai_api_key
         self.query_cache_service = query_cache_service
 

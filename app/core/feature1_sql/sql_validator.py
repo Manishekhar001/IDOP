@@ -9,7 +9,7 @@ class SQLValidator:
     Prevents execution of forbidden operations.
     """
 
-    # Forbidden SQL commands to prevent destructive operations in query pipeline
+    # Forbidden SQL commands to prevent destructive/write operations in query pipeline
     FORBIDDEN_COMMANDS = {
         "DROP",
         "TRUNCATE",
@@ -18,6 +18,11 @@ class SQLValidator:
         "REVOKE",
         "CREATE",
         "REPLACE",
+        "DELETE",
+        "UPDATE",
+        "INSERT",
+        "EXECUTE",
+        "EXEC",
     }
 
     def __init__(self):
@@ -25,7 +30,7 @@ class SQLValidator:
 
     def validate(self, sql: str) -> tuple[bool, str]:
         """
-        Validate the safety of the SQL string.
+        Validate the safety and read-only nature of the SQL string.
 
         Returns:
             Tuple of (is_valid, error_message)
@@ -40,10 +45,15 @@ class SQLValidator:
             # Check for command as separate word to avoid false positives
             if command in cleaned_sql.split():
                 logger.warning(f"Validation failed: forbidden command '{command}' detected")
-                return False, f"Destructive SQL command '{command}' is strictly forbidden."
+                return False, f"Destructive or mutating SQL command '{command}' is strictly forbidden."
 
         # Verify transaction safety
         if "COMMIT" in cleaned_sql.split() or "ROLLBACK" in cleaned_sql.split():
             return False, "Explicit transaction control (COMMIT/ROLLBACK) is not permitted inside user queries."
+
+        # Enforce that all user SQL queries must start with SELECT
+        if not cleaned_sql.startswith("SELECT"):
+            logger.warning("Validation failed: query does not begin with SELECT (read-only enforcement)")
+            return False, "Only read-only SELECT queries are permitted in Feature 1 NL-to-SQL."
 
         return True, ""

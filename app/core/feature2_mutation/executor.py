@@ -13,7 +13,7 @@ class MutationExecutor:
 
     def __init__(self):
         settings = get_settings()
-        self.conn_str = settings.database_url
+        self.conn_str = settings.supabase_db_url
 
     def _ensure_audit_table(self, conn) -> None:
         create_sql = """

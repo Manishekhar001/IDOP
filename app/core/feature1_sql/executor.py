@@ -14,7 +14,7 @@ class SQLExecutor:
 
     def __init__(self):
         settings = get_settings()
-        self.conn_str = settings.database_url
+        self.conn_str = settings.supabase_db_url
 
     def _ensure_audit_table(self, conn) -> None:
         """Create audit log table if not exists"""

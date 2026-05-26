@@ -133,20 +133,23 @@ class TestSQLValidator:
         is_valid, error = validator.validate("   ")
         assert is_valid is False
 
-    def test_insert_is_allowed(self, validator):
-        """Test that INSERT is NOT in the forbidden list (mutations use a separate pipeline)."""
+    def test_insert_is_blocked(self, validator):
+        """Test that INSERT is blocked in the read-only query pipeline."""
         is_valid, error = validator.validate("INSERT INTO products VALUES (1, 'Widget', 9.99)")
-        assert is_valid is True
+        assert is_valid is False
+        assert "SELECT" in error or "INSERT" in error
 
-    def test_update_is_allowed(self, validator):
-        """Test that UPDATE is NOT in the forbidden list."""
+    def test_update_is_blocked(self, validator):
+        """Test that UPDATE is blocked in the read-only query pipeline."""
         is_valid, error = validator.validate("UPDATE products SET price = 10.99 WHERE id = 1")
-        assert is_valid is True
+        assert is_valid is False
+        assert "SELECT" in error or "UPDATE" in error
 
-    def test_delete_is_allowed(self, validator):
-        """Test that DELETE is NOT in the forbidden list (handled by mutation pipeline)."""
+    def test_delete_is_blocked(self, validator):
+        """Test that DELETE is blocked in the read-only query pipeline."""
         is_valid, error = validator.validate("DELETE FROM orders WHERE status = 'Cancelled'")
-        assert is_valid is True
+        assert is_valid is False
+        assert "SELECT" in error or "DELETE" in error
 
 
 # ═══════════════════════════════════════════════════════════════════════
