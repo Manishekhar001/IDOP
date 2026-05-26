@@ -56,10 +56,11 @@ Respond strictly in the following JSON format:
                 response_format={"type": "json_object"}
             )
             import json
-            result = json.loads(response.choices[0].message.content)
-            verdict = result.get("query_type", "CHAT").upper()
+            result_dict = json.loads(response.choices[0].message.content)
+            decision = RouteDecision.model_validate(result_dict)
+            verdict = decision.query_type.upper()
             if verdict in ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"]:
-                logger.info(f"Router classified question as {verdict}. Reason: {result.get('reason')}")
+                logger.info(f"Router classified question as {verdict}. Reason: {decision.reason}")
                 return verdict
             return "CHAT"
         except Exception as e:

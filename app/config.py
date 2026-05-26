@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     crag_lower_threshold: float = 0.3
     srag_max_retries: int = 2
     max_rewrite_tries: int = 2
+    retrieval_k: int = 5
 
     # Chunking settings
     chunk_size: int = 512

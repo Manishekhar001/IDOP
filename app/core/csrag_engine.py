@@ -236,6 +236,17 @@ class CSRAGEngine:
             "sql_results": state.get("sql_results", []),
             "approval_token": state.get("approval_token", ""),
             
+            # Mutation execution details
+            "mutation_id": state.get("mutation_id", ""),
+            "mutation_table": state.get("mutation_table", ""),
+            "mutation_op": state.get("mutation_op", ""),
+            "mutation_status": state.get("mutation_status", ""),
+            "mutation_error": state.get("mutation_error", ""),
+            "mutation_result_count": state.get("mutation_result_count", 0),
+            
+            # Context and Memories
+            "ltm_context": state.get("ltm_context", ""),
+            
             # Advanced Corrective RAG Config outputs
             "hyde_used": state.get("hyde_used", False),
             "hyde_hypotheses": state.get("hyde_hypotheses", []),

@@ -28,13 +28,19 @@ async def generate_sql(question: str) -> SQLResponse:
         # Crypto gate generation
         token = gate.generate_session(res["query_id"])
         
+        # Update the pending register with the token
+        query_id = res["query_id"]
+        if query_id in sql_service.pending_queries:
+            sql_service.pending_queries[query_id]["token"] = token
+            
         return SQLResponse(
             query_id=res["query_id"],
             question=res["question"],
             sql=res["sql"],
             explanation=res["explanation"],
             status=res["status"],
-            cache_hit=res["cache_hit"]
+            cache_hit=res["cache_hit"],
+            token=token
         )
     except Exception as e:
         logger.error(f"SQL generation endpoint failed: {e}")

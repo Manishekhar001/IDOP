@@ -57,7 +57,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    servers=[{"url": "/", "description": "Current server"}],
     description="""
 ## IDOP — Intelligent Data Operations Platform
 

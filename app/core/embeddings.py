@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 def get_embeddings() -> OpenAIEmbeddings:
     settings = get_settings()
     logger.info(
-        f"Initializing OpenAI embeddings: model={settings.llm_model} standard embedding dimensions"
+        "Initializing OpenAI embeddings: model=text-embedding-3-small standard embedding dimensions"
     )
     embeddings = OpenAIEmbeddings(
         openai_api_key=settings.openai_api_key,

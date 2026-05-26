@@ -113,7 +113,8 @@ async def upload_mutation(
             row_count=len(rows),
             status="pending_approval" if not validation_errors else "failed_validation",
             mappings=col_mappings,
-            errors=validation_errors
+            errors=validation_errors,
+            token=token
         )
 
     except ValueError as val_err:

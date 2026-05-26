@@ -100,6 +100,17 @@ async def chat(
         hyde_used=result.get("hyde_used", False),
         hyde_hypotheses=result.get("hyde_hypotheses") if result.get("hyde_hypotheses") else None,
         reranking_used=result.get("reranking_used", False),
+        
+        # New rich operational detail fields
+        query_type=result.get("query_type") if result.get("query_type") else None,
+        ltm_context=result.get("ltm_context") if result.get("ltm_context") else None,
+        mutation_id=result.get("mutation_id") if result.get("mutation_id") else None,
+        mutation_table=result.get("mutation_table") if result.get("mutation_table") else None,
+        mutation_op=result.get("mutation_op") if result.get("mutation_op") else None,
+        mutation_status=result.get("mutation_status") if result.get("mutation_status") else None,
+        mutation_error=result.get("mutation_error") if result.get("mutation_error") else None,
+        mutation_result_count=result.get("mutation_result_count") if result.get("mutation_result_count") else None,
+        approval_token=result.get("approval_token") if result.get("approval_token") else None,
     )
 
 
