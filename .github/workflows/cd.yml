@@ -461,7 +461,7 @@ jobs:
 
             # Internal PostgreSQL (LangGraph checkpointing)
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            DATABASE_URL=postgresql+psycopg://postgres:${{ secrets.POSTGRES_PASSWORD }}@checkpoint-db:5432/idop_memories
+            DATABASE_URL=postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@checkpoint-db:5432/idop_memories
 
             # OpenAI (Agent reasoning + embeddings)
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}

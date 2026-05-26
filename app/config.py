@@ -1,9 +1,17 @@
 from functools import lru_cache
 from typing import Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    @model_validator(mode="after")
+    def normalize_database_url(self) -> "Settings":
+        if hasattr(self, "database_url") and self.database_url and self.database_url.startswith("postgresql+psycopg://"):
+            self.database_url = self.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+        return self
+
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
