@@ -46,6 +46,10 @@ class CSRAGEngine:
         top_k: int = 4,
         enable_hyde: bool = False,
         enable_reranking: bool = False,
+        explain: bool = True,
+        vanna_temperature: float = 0.0,
+        vanna_seed: int = 42,
+        vanna_top_p: float = 0.1,
     ) -> dict:
         return {
             "messages": [HumanMessage(content=question, id=str(uuid.uuid4()))],
@@ -96,7 +100,13 @@ class CSRAGEngine:
             "mutation_status": "",
             "mutation_error": "",
             "mutation_result_count": 0,
-            "approval_token": ""
+            "approval_token": "",
+
+            # SQL generation overrides
+            "explain": explain,
+            "vanna_temperature": vanna_temperature,
+            "vanna_seed": vanna_seed,
+            "vanna_top_p": vanna_top_p,
         }
 
     async def aquery(
@@ -108,6 +118,10 @@ class CSRAGEngine:
         top_k: int = 4,
         enable_hyde: bool = False,
         enable_reranking: bool = False,
+        explain: bool = True,
+        vanna_temperature: float = 0.0,
+        vanna_seed: int = 42,
+        vanna_top_p: float = 0.1,
     ) -> dict:
         logger.info(
             f"async query — thread={thread_id}, user={user_id}, "
@@ -127,7 +141,11 @@ class CSRAGEngine:
             search_mode=search_mode,
             top_k=top_k,
             enable_hyde=enable_hyde,
-            enable_reranking=enable_reranking
+            enable_reranking=enable_reranking,
+            explain=explain,
+            vanna_temperature=vanna_temperature,
+            vanna_seed=vanna_seed,
+            vanna_top_p=vanna_top_p,
         )
         result = await self._graph.ainvoke(init_state, config)
         formatted = self._format_result(result)
@@ -155,6 +173,10 @@ class CSRAGEngine:
         top_k: int = 4,
         enable_hyde: bool = False,
         enable_reranking: bool = False,
+        explain: bool = True,
+        vanna_temperature: float = 0.0,
+        vanna_seed: int = 42,
+        vanna_top_p: float = 0.1,
     ):
         logger.info(
             f"streaming query — thread={thread_id}, user={user_id}, "
@@ -166,7 +188,11 @@ class CSRAGEngine:
             search_mode=search_mode,
             top_k=top_k,
             enable_hyde=enable_hyde,
-            enable_reranking=enable_reranking
+            enable_reranking=enable_reranking,
+            explain=explain,
+            vanna_temperature=vanna_temperature,
+            vanna_seed=vanna_seed,
+            vanna_top_p=vanna_top_p,
         )
 
         _ANSWER_NODES = {"generate_answer", "generate_direct"}

@@ -63,3 +63,9 @@ class CSRAGState(TypedDict):
 
     # Cryptographic Approval Token
     approval_token: str
+
+    # SQL generation overrides
+    explain: bool
+    vanna_temperature: float
+    vanna_seed: int
+    vanna_top_p: float

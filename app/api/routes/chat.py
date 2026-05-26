@@ -55,6 +55,10 @@ async def chat(
             top_k=body.top_k,
             enable_hyde=body.enable_hyde,
             enable_reranking=body.enable_reranking,
+            explain=body.explain,
+            vanna_temperature=body.vanna_temperature,
+            vanna_seed=body.vanna_seed,
+            vanna_top_p=body.vanna_top_p,
         )
     except Exception as e:
         logger.error(f"Chat query failed: {e}", exc_info=True)
@@ -141,6 +145,10 @@ async def chat_stream(
                 top_k=body.top_k,
                 enable_hyde=body.enable_hyde,
                 enable_reranking=body.enable_reranking,
+                explain=body.explain,
+                vanna_temperature=body.vanna_temperature,
+                vanna_seed=body.vanna_seed,
+                vanna_top_p=body.vanna_top_p,
             ):
                 yield chunk
         except Exception as e:

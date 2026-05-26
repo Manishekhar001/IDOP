@@ -1,6 +1,7 @@
 import asyncio
 import io
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from typing import Optional
 from app.api.schemas import CollectionInfoResponse, DocumentUploadResponse, ErrorResponse
 from app.core.document_processor import DocumentProcessor
 from app.core.vector_store import VectorStoreService
@@ -25,9 +26,11 @@ def get_vector_store(request: Request) -> VectorStoreService:
 )
 async def upload_document(
     file: UploadFile = File(..., description="Document to upload (PDF, TXT, CSV)"),
+    chunk_size: Optional[int] = Form(None, description="Custom target chunk size for parsing"),
+    chunk_overlap: Optional[int] = Form(None, description="Custom chunk overlap"),
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> DocumentUploadResponse:
-    logger.info(f"Document upload: {file.filename}")
+    logger.info(f"Document upload: {file.filename} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})")
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required.")
@@ -37,7 +40,7 @@ async def upload_document(
         filename = file.filename
 
         loop = asyncio.get_event_loop()
-        processor = DocumentProcessor()
+        processor = DocumentProcessor(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
         def _process():
             return processor.process_upload(io.BytesIO(file_bytes), filename)
@@ -51,6 +54,8 @@ async def upload_document(
             filename=filename,
             chunks_created=len(chunks),
             document_ids=document_ids,
+            chunk_size_applied=processor.chunk_size,
+            chunk_overlap_applied=processor.chunk_overlap,
         )
     except ValueError as e:
         logger.warning(f"Invalid upload: {e}")

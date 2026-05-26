@@ -76,8 +76,8 @@ class TestSQLApiEndpoints:
         mock_token = "mock-crypto-approval-token-999"
         mock_gate.generate_session.return_value = mock_token
         
-        # Call the endpoint
-        response = client.post("/sql/generate?question=Show all customers")
+        # Call the endpoint with the new Pydantic body
+        response = client.post("/sql/generate", json={"question": "Show all customers", "vanna_temperature": 0.0})
         
         assert response.status_code == 200
         data = response.json()

@@ -90,6 +90,14 @@ class DocumentUploadResponse(BaseModel):
         ..., 
         description="A list of unique UUID string hashes created for each chunk stored in Qdrant."
     )
+    chunk_size_applied: Optional[int] = Field(
+        None, 
+        description="The chunk size used during document parsing and chunking."
+    )
+    chunk_overlap_applied: Optional[int] = Field(
+        None, 
+        description="The chunk overlap used during document parsing and chunking."
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -101,7 +109,9 @@ class DocumentUploadResponse(BaseModel):
                     "document_ids": [
                         "8f8e8b0a-7f6c-5b4a-3a2b-1a0f9e8d7c6b",
                         "7f7e7b0b-6f5c-4b3a-2a1b-0a9f8e7d6c5b"
-                    ]
+                    ],
+                    "chunk_size_applied": 512,
+                    "chunk_overlap_applied": 50
                 }
             ]
         }
@@ -182,6 +192,22 @@ class ChatRequest(BaseModel):
         default=False, 
         description="Use cross-encoder reranking for improved precision"
     )
+    explain: bool = Field(
+        default=True, 
+        description="Whether the judge should perform a semantic audit and explanation if a SQL query is generated."
+    )
+    vanna_temperature: float = Field(
+        default=0.0, 
+        description="Temperature for SQL generation LLM if SQL query is generated."
+    )
+    vanna_seed: int = Field(
+        default=42, 
+        description="Random seed for SQL generation LLM if SQL query is generated."
+    )
+    vanna_top_p: float = Field(
+        default=0.1, 
+        description="Top-p for SQL generation LLM if SQL query is generated."
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -190,7 +216,11 @@ class ChatRequest(BaseModel):
                     "question": "Show all SMB customers in Canada and check if their segment aligns with our sales strategy PDF.",
                     "thread_id": "thread-abc-123-uuid",
                     "user_id": "user-sales-manager-456",
-                    "include_sources": True
+                    "include_sources": True,
+                    "explain": True,
+                    "vanna_temperature": 0.0,
+                    "vanna_seed": 42,
+                    "vanna_top_p": 0.1
                 }
             ]
         }
@@ -500,6 +530,50 @@ class DeleteMemoryResponse(BaseModel):
 
 
 # ==================== IDOP SQL Endpoints (Feature 1) ====================
+
+class SQLGenerationRequest(BaseModel):
+    """Pydantic model for dynamic SQL query generation from natural language."""
+    question: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=2000, 
+        description="The natural language question about the database schema to convert to SQL."
+    )
+    explain: bool = Field(
+        default=True, 
+        description="Whether the judge should perform a semantic audit and explanation of the generated SQL."
+    )
+    vanna_temperature: float = Field(
+        default=0.0, 
+        ge=0.0, 
+        le=1.0, 
+        description="Temperature setting for the SQL generation LLM. 0.0 is deterministic, 1.0 is creative."
+    )
+    vanna_seed: int = Field(
+        default=42, 
+        description="Random seed value for deterministic and reproducible SQL generation."
+    )
+    vanna_top_p: float = Field(
+        default=0.1, 
+        ge=0.0, 
+        le=1.0, 
+        description="Nucleus sampling threshold. Lower values concentrate probability mass."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "question": "How many customers are located in Canada?",
+                    "explain": True,
+                    "vanna_temperature": 0.0,
+                    "vanna_seed": 42,
+                    "vanna_top_p": 0.1
+                }
+            ]
+        }
+    }
+
 
 class SQLApprovalRequest(BaseModel):
     """Pydantic model for human-in-the-loop SQL execution approval."""

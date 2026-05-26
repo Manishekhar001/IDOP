@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.api.schemas import SQLApprovalRequest, SQLResponse, SQLExecuteResponse, ErrorResponse
+from app.api.schemas import SQLApprovalRequest, SQLResponse, SQLExecuteResponse, ErrorResponse, SQLGenerationRequest
 from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.approval_gate import ApprovalGate
 from app.core.feature1_sql.executor import SQLExecutor
@@ -20,10 +20,16 @@ executor = SQLExecutor()
     responses={500: {"model": ErrorResponse}},
     summary="Generate SQL for approval",
 )
-async def generate_sql(question: str) -> SQLResponse:
-    logger.info(f"SQL generation request: {question}")
+async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
+    logger.info(f"SQL generation request: {body.question} (temp={body.vanna_temperature})")
     try:
-        res = await sql_service.generate_sql_for_approval(question)
+        res = await sql_service.generate_sql_for_approval(
+            question=body.question,
+            explain=body.explain,
+            vanna_temperature=body.vanna_temperature,
+            vanna_seed=body.vanna_seed,
+            vanna_top_p=body.vanna_top_p,
+        )
         
         # Crypto gate generation
         token = gate.generate_session(res["query_id"])

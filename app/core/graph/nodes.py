@@ -99,7 +99,14 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
     try:
         # Generate raw SQL
-        gen_res = await sql_service.generate_sql_for_approval(question)
+        # Generate raw SQL
+        gen_res = await sql_service.generate_sql_for_approval(
+            question=question,
+            explain=state.get("explain", True),
+            vanna_temperature=state.get("vanna_temperature", None),
+            vanna_seed=state.get("vanna_seed", None),
+            vanna_top_p=state.get("vanna_top_p", None),
+        )
         sql = gen_res["sql"]
         query_id = gen_res["query_id"]
 
@@ -574,7 +581,14 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
     try:
         # Generate raw SQL
         logger.info("Hybrid: Generating SQL query...")
-        gen_res = await sql_service.generate_sql_for_approval(question)
+        # Generate raw SQL
+        gen_res = await sql_service.generate_sql_for_approval(
+            question=question,
+            explain=state.get("explain", True),
+            vanna_temperature=state.get("vanna_temperature", None),
+            vanna_seed=state.get("vanna_seed", None),
+            vanna_top_p=state.get("vanna_top_p", None),
+        )
         sql = gen_res["sql"]
         query_id = gen_res["query_id"]
         

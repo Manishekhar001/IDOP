@@ -39,13 +39,17 @@ class VannaAgentWrapper:
             f"temperature={settings.llm_temperature}"
         )
 
+        self.current_temperature = settings.llm_temperature
+        self.current_top_p = 0.1
+        self.current_seed = 42
+
         original_build_payload = self.llm._build_payload
 
         def deterministic_build_payload(request):
             payload = original_build_payload(request)
-            payload["temperature"] = settings.llm_temperature
-            payload["top_p"] = 0.1
-            payload["seed"] = 42
+            payload["temperature"] = self.current_temperature
+            payload["top_p"] = self.current_top_p
+            payload["seed"] = self.current_seed
             payload["max_tokens"] = 2000
             logger.debug(f"SQL LLM payload: {payload}")
             return payload
@@ -269,10 +273,33 @@ class TextToSQLService:
 
         return "\n".join(schema_parts)
 
-    async def generate_sql_for_approval(self, question: str) -> Dict[str, Any]:
+    async def generate_sql_for_approval(
+        self,
+        question: str,
+        explain: bool = True,
+        vanna_temperature: Optional[float] = None,
+        vanna_seed: Optional[int] = None,
+        vanna_top_p: Optional[float] = None,
+    ) -> Dict[str, Any]:
         settings = get_settings()
         if not self.is_trained:
             self.complete_training()
+
+        # Set dynamic overrides for this generation call
+        if vanna_temperature is not None:
+            self.vanna.current_temperature = vanna_temperature
+        else:
+            self.vanna.current_temperature = settings.llm_temperature
+
+        if vanna_seed is not None:
+            self.vanna.current_seed = vanna_seed
+        else:
+            self.vanna.current_seed = 42
+
+        if vanna_top_p is not None:
+            self.vanna.current_top_p = vanna_top_p
+        else:
+            self.vanna.current_top_p = 0.1
 
         if self.query_cache_service and self.query_cache_service.enabled:
             cache_key = self.query_cache_service.get_sql_gen_key(question)
@@ -295,7 +322,7 @@ class TextToSQLService:
                     "explanation": cached_result.get(
                         "explanation",
                         "This SQL will retrieve data from your database. Please review before approving.",
-                    ),
+                    ) if explain else "Explanation omitted by request.",
                     "status": "pending_approval",
                     "generated_at": pd.Timestamp.now().isoformat(),
                     "cache_hit": True,
@@ -307,7 +334,7 @@ class TextToSQLService:
                 sql = await self.vanna.generate_sql_async(
                     question=question, schema_context=self.schema_context
                 )
-                explanation = "This SQL will retrieve data from your database. Please review before approving."
+                explanation = "This SQL will retrieve data from your database. Please review before approving." if explain else "Explanation omitted by request."
             except Exception as vanna_err:
                 logger.warning(f"Vanna SQL generation failed: {vanna_err}. Falling back to direct LLM SQL generation...")
                 from openai import OpenAI
@@ -327,7 +354,9 @@ Do not include any additional text outside the code block.
                 response = client.chat.completions.create(
                     model=settings.llm_model,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.0,
+                    temperature=vanna_temperature if vanna_temperature is not None else 0.0,
+                    seed=vanna_seed if vanna_seed is not None else 42,
+                    top_p=vanna_top_p if vanna_top_p is not None else 0.1,
                 )
                 content = response.choices[0].message.content
                 # Extract SQL
@@ -341,7 +370,7 @@ Do not include any additional text outside the code block.
                     sql = content.strip()
                 
                 logger.info(f"Direct LLM SQL generation fallback succeeded! Generated SQL: {sql[:100]}...")
-                explanation = "⚠️ Direct LLM Fallback: Generated directly using OpenAI GPT-4o as the core Vanna agent was unavailable."
+                explanation = "⚠️ Direct LLM Fallback: Generated directly using OpenAI GPT-4o as the core Vanna agent was unavailable." if explain else "Explanation omitted by request."
 
             if self.query_cache_service and self.query_cache_service.enabled:
                 cache_key = self.query_cache_service.get_sql_gen_key(question)

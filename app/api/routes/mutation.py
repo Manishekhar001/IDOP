@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.api.schemas import MutationResponse, MutationApprovalRequest, MutationExecuteResponse, ErrorResponse
 
@@ -41,21 +41,37 @@ async def upload_mutation(
     table_name: str = Form(..., description="Target database table name"),
     request_intent: str = Form(..., description="Description of mutation intent (e.g. Add products, Update stock)"),
     file: UploadFile = File(..., description="Excel/CSV spreadsheet containing payload data"),
+    max_bulk_rows: Optional[int] = Form(None, description="Custom maximum allowed rows to prevent resource exhaustion"),
+    primary_key: Optional[str] = Form("id", description="Primary key column for UPDATE and DELETE operations"),
+    auto_map: Optional[bool] = Form(True, description="Enable automatic column mapping using LLM"),
+    skip_validation: Optional[bool] = Form(False, description="Skip business rules validation"),
 ) -> MutationResponse:
-    logger.info(f"Mutation upload request. Table: {table_name}, Intent: {request_intent}")
+    logger.info(f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {auto_map}")
+
+    from typing import Optional
 
     try:
         content = await file.read()
         filename = file.filename
 
-        # 1. Parse File rows
+        # 1. Parse File rows and validate size limits
         rows = parser.parse_file(content, filename)
         if not rows:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-        # 2. Semantic Column Mapping
+        limit = max_bulk_rows or 1000
+        if len(rows) > limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Spreadsheet contains {len(rows)} rows, which exceeds the allowed maximum of {limit} rows."
+            )
+
+        # 2. Column Mapping
         headers = list(rows[0].keys())
-        col_mappings = mapper.get_semantic_mapping(table_name, headers)
+        if auto_map:
+            col_mappings = mapper.get_semantic_mapping(table_name, headers)
+        else:
+            col_mappings = {h: h for h in headers}
 
         # Map spreadsheet rows to database keys
         mapped_rows = []
@@ -67,7 +83,9 @@ async def upload_mutation(
             mapped_rows.append(mapped_row)
 
         # 3. Business Rule Validation
-        is_valid, validation_errors = validator.validate_rows(table_name, mapped_rows)
+        validation_errors = []
+        if not skip_validation:
+            is_valid, validation_errors = validator.validate_rows(table_name, mapped_rows)
 
         # 4. Classify Mutation Type (INSERT, UPDATE, DELETE)
         classifier = OpClassifier()
@@ -79,12 +97,13 @@ async def upload_mutation(
         updates = []
         ids = []
 
+        pk = primary_key or "id"
         if op_type == "INSERT":
             sql, params = generator.generate_insert(table_name, mapped_rows)
         elif op_type == "UPDATE":
-            updates = generator.generate_update(table_name, mapped_rows, primary_key="id")
+            updates = generator.generate_update(table_name, mapped_rows, primary_key=pk)
         elif op_type == "DELETE":
-            sql, ids = generator.generate_delete(table_name, mapped_rows, primary_key="id")
+            sql, ids = generator.generate_delete(table_name, mapped_rows, primary_key=pk)
 
         # 5. LLM Judge Audit Check
         is_approved, explanation = judge.audit_mutation(request_intent, table_name, op_type)
