@@ -261,9 +261,9 @@ jobs:
           echo ""
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 11: DEPLOY TO EC2 VIA SSH (WRITE FILES + PULL + COMPOSE UP)
+      # STEP 11: DEPLOY TO EC2 VIA SSH (AUTO-PROVISION + WRITE FILES + ORCHESTRATE)
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 11/12: Deploy to EC2 via SSH"
+      - name: "Step 11/13: Deploy to EC2 via SSH"
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -279,7 +279,147 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "🔐 Step 11b: Writing production .env file"
+            echo "🛠️ Step 11b: Verifying System Dependencies"
+            echo "=========================================="
+            # Install general system dependencies
+            echo "📦 Updating package lists..."
+            sudo apt-get update -y
+            echo "📦 Installing zip, unzip, curl, gnupg, ca-certificates, lsb-release..."
+            sudo apt-get install -y zip unzip curl gnupg ca-certificates lsb-release
+            echo ""
+
+            # Check and install Docker if missing
+            if ! command -v docker &> /dev/null; then
+              echo "🐳 Docker not found. Installing Docker Engine..."
+              sudo mkdir -p /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              sudo apt-get update -y
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+              sudo usermod -aG docker ubuntu
+              echo "✅ Docker installed successfully!"
+            else
+              echo "🐳 Docker already installed: $(docker --version)"
+            fi
+
+            # Check and install Docker Compose plugin if missing
+            if ! docker compose version &> /dev/null && ! sudo docker compose version &> /dev/null; then
+              echo "🐳 Docker Compose plugin not found. Installing..."
+              sudo apt-get update -y
+              sudo apt-get install -y docker-compose-plugin
+              echo "✅ Docker Compose plugin installed!"
+            else
+              echo "🐳 Docker Compose is available!"
+            fi
+
+            # Determine docker command wrapper (handles group permissions delay)
+            DOCKER_CMD="docker"
+            if ! docker ps &> /dev/null; then
+              echo "⚠️ Current shell does not have docker permissions. Using 'sudo docker' wrapper."
+              DOCKER_CMD="sudo docker"
+            fi
+
+            COMPOSE_CMD="$DOCKER_CMD compose"
+            if ! $COMPOSE_CMD version &> /dev/null; then
+              echo "⚠️ 'docker compose' syntax not supported. Using 'docker-compose'."
+              if command -v docker-compose &> /dev/null; then
+                COMPOSE_CMD="docker-compose"
+              else
+                COMPOSE_CMD="sudo docker-compose"
+              fi
+            fi
+
+            echo "🐳 Using Docker Command: $DOCKER_CMD"
+            echo "🐳 Using Compose Command: $COMPOSE_CMD"
+            echo ""
+
+            # Check and install AWS CLI if missing
+            if ! command -v aws &> /dev/null; then
+              echo "📦 AWS CLI not found. Installing AWS CLI v2..."
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -o awscliv2.zip &> /dev/null
+              sudo ./aws/install --update
+              rm -rf aws awscliv2.zip
+              echo "✅ AWS CLI installed successfully: $(aws --version)"
+            else
+              echo "📦 AWS CLI already installed: $(aws --version)"
+            fi
+            echo ""
+
+            echo "=========================================="
+            echo "🌐 Step 11c: Setup Nginx Reverse Proxy"
+            echo "=========================================="
+            # Check and install Nginx
+            if ! command -v nginx &> /dev/null; then
+              echo "🌐 Nginx not found. Installing Nginx..."
+              sudo apt-get update -y
+              sudo apt-get install -y nginx
+            fi
+
+            # Write clean reverse proxy configuration
+            if [ ! -f /etc/nginx/sites-available/idop.conf ]; then
+              echo "🌐 Configuring Nginx server block..."
+              sudo rm -f /etc/nginx/sites-enabled/default
+              
+              # Get public IP dynamically
+              EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || curl -s https://api.ipify.org || echo "_")
+              echo "🌐 Dynamic Public IP: $EC2_PUBLIC_IP"
+
+              sudo tee /etc/nginx/sites-available/idop.conf <<EOF
+server {
+    listen 80;
+    server_name $EC2_PUBLIC_IP;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # Enable SSE Streaming support
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding on;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 24h;
+    }
+}
+EOF
+              sudo ln -sf /etc/nginx/sites-available/idop.conf /etc/nginx/sites-enabled/
+              sudo systemctl restart nginx
+              echo "✅ Nginx reverse proxy configured successfully!"
+            else
+              echo "🌐 Nginx configuration already exists."
+            fi
+
+            # Optional Domain Setup & Let's Encrypt SSL
+            DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
+            if [ -n "$DOMAIN_NAME" ]; then
+              echo "🌐 Domain Name secret detected: $DOMAIN_NAME"
+              # Read current server_name
+              CURRENT_SERVER_NAME=$(grep "server_name" /etc/nginx/sites-available/idop.conf | awk '{print $2}' | tr -d ';')
+              if [ "$CURRENT_SERVER_NAME" != "$DOMAIN_NAME" ]; then
+                echo "🌐 Updating Nginx server_name from $CURRENT_SERVER_NAME to $DOMAIN_NAME..."
+                sudo sed -i "s/server_name .*/server_name $DOMAIN_NAME;/" /etc/nginx/sites-available/idop.conf
+                sudo systemctl restart nginx
+              fi
+
+              # Secure with Certbot SSL if not already secured
+              if ! sudo test -f "/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"; then
+                echo "🔒 Certbot SSL not found for $DOMAIN_NAME. Acquiring Let's Encrypt certificate..."
+                sudo apt-get install -y certbot python3-certbot-nginx
+                # Acquire SSL certificate (non-interactive)
+                sudo certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --email webmaster@$DOMAIN_NAME || echo "⚠️ Let's Encrypt acquisition failed. Checking DNS propagation or firewall settings."
+              else
+                echo "🔒 Let's Encrypt SSL certificate is active!"
+              fi
+            fi
+            echo ""
+
+            echo "=========================================="
+            echo "🔐 Step 11d: Writing production .env file"
             echo "=========================================="
             # Write all secrets into a secure .env file on the host.
             # The CD pipeline injects each GitHub Secret as an environment variable.
@@ -332,7 +472,7 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "📝 Step 11c: Writing production docker-compose.yml"
+            echo "📝 Step 11e: Writing production docker-compose.yml"
             echo "=========================================="
             # Write the production docker-compose.yml directly on the EC2 host.
             # This ensures the compose file is always in sync with the pipeline.
@@ -375,48 +515,50 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "🐳 Step 11d: Authenticating Docker with ECR"
+            echo "🐳 Step 11f: Authenticating Docker with ECR"
             echo "=========================================="
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export AWS_DEFAULT_REGION="${{ env.AWS_REGION }}"
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-              docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+              $DOCKER_CMD login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             echo "✅ Docker authenticated with ECR"
             echo ""
 
             echo "=========================================="
-            echo "💾 Step 11e: Backing up current stable image"
+            echo "💾 Step 11g: Backing up current stable image"
             echo "=========================================="
-            # Tag current running image as "stable" for rollback protection
-            docker tag ${{ secrets.ECR_REGISTRY }}/idop-app:latest \
+            $DOCKER_CMD tag ${{ secrets.ECR_REGISTRY }}/idop-app:latest \
               ${{ secrets.ECR_REGISTRY }}/idop-app:stable 2>/dev/null || \
               echo "ℹ️ No existing image to backup (first deployment)"
             echo ""
 
             echo "=========================================="
-            echo "📥 Step 11f: Pulling latest image from ECR"
+            echo "📥 Step 11h: Pulling latest image from ECR"
             echo "=========================================="
-            docker compose pull app
+            $COMPOSE_CMD pull app
             echo "✅ Latest image pulled successfully"
             echo ""
 
             echo "=========================================="
-            echo "🚀 Step 11g: Orchestrating containers"
+            echo "🚀 Step 11i: Orchestrating containers"
             echo "=========================================="
             # Stop existing containers gracefully
-            docker compose down
+            $COMPOSE_CMD down
             echo "   ✅ Old containers stopped"
 
             # Start updated containers in detached mode
-            docker compose up -d
+            $COMPOSE_CMD up -d
             echo "   ✅ New containers launched"
             echo ""
 
             # Show running containers
             echo "📋 Running containers:"
-            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
             echo ""
 
             echo "=========================================="
-            echo "🧪 Step 11h: Health check with retry logic"
+            echo "🧪 Step 11j: Health check with retry logic"
             echo "=========================================="
             API_URL="http://localhost:8000"
             echo "🏥 Testing health endpoint: $API_URL/health"
@@ -443,17 +585,15 @@ jobs:
               echo "=========================================="
               echo ""
               echo "📋 Container logs (last 50 lines):"
-              docker logs --tail 50 idop-app 2>&1 || true
+              $DOCKER_CMD logs --tail 50 idop-app 2>&1 || true
               echo ""
-
-              logger "⚠️ IDOP DEPLOY FAILED: Health check failed after $MAX_RETRIES retries"
 
               # Automatic rollback to stable image
               echo "🔄 Rolling back to stable image..."
-              docker compose down
-              docker tag ${{ secrets.ECR_REGISTRY }}/idop-app:stable \
+              $COMPOSE_CMD down
+              $DOCKER_CMD tag ${{ secrets.ECR_REGISTRY }}/idop-app:stable \
                 ${{ secrets.ECR_REGISTRY }}/idop-app:latest 2>/dev/null || true
-              docker compose up -d
+              $COMPOSE_CMD up -d
               echo "✅ Rollback complete. Stable state restored."
               exit 1
             fi
@@ -469,9 +609,33 @@ jobs:
             echo ""
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 12: DEPLOYMENT COMPLETION SUMMARY
+      # STEP 12: DEPLOYMENT INTEGRATION SMOKE TESTS
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 12/12: Deployment summary"
+      - name: "Step 12/13: Run post-deployment integration tests"
+        run: |
+          echo "=========================================="
+          echo "🧪 DEPLOYMENT INTEGRATION SMOKE TESTS"
+          echo "=========================================="
+          echo "   Target Host: ${{ secrets.EC2_HOST }}"
+          echo ""
+          python -m pip install --upgrade pip
+          pip install requests pydantic
+          
+          if [ -n "${{ secrets.DOMAIN_NAME }}" ]; then
+            export API_TARGET_URL="https://${{ secrets.DOMAIN_NAME }}"
+          else
+            export API_TARGET_URL="http://${{ secrets.EC2_HOST }}"
+          fi
+          
+          echo "📡 API Target URL: $API_TARGET_URL"
+          echo ""
+          python tests/deploy_smoke.py
+
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 13: DEPLOYMENT COMPLETION SUMMARY
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 13/13: Deployment summary"
         run: |
           echo "=========================================="
           echo "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY"

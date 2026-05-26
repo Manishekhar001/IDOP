@@ -607,7 +607,14 @@ aws ec2 associate-address \
 
 ## 7. Docker & Environment Setup on EC2
 
-### 7.1 Connect to EC2 via SSH
+> [!NOTE]
+> **🚀 100% AUTOMATED STEP**
+> You do **NOT** need to perform the SSH connection, Docker installation, Compose installation, AWS CLI setup, or directory creations manually anymore!
+> The IDOP Continuous Deployment pipeline (`cd.yml`) automatically connects to your EC2 instance over SSH, checks for these dependencies, installs them if missing, configures your AWS ECR credentials dynamically, and writes your project directories/compose stacks on every deployment.
+> 
+> These manual instructions are provided below strictly for administrative reference, local maintenance, and custom server troubleshooting.
+
+### 7.1 Connect to EC2 via SSH (Administrative Reference)
 
 ```bash
 ssh -i "idop-key.pem" ubuntu@<EC2_HOST_IP>
@@ -755,7 +762,14 @@ chmod 600 .env
 
 ## 8. Nginx Reverse Proxy & SSL
 
-### 8.1 Install Nginx & Certbot
+> [!NOTE]
+> **🚀 100% AUTOMATED STEP**
+> You do **NOT** need to manually install Nginx, write reverse proxy configuration blocks, or set up Certbot!
+> The IDOP Continuous Deployment pipeline (`cd.yml`) automatically installs Nginx, configures the reverse proxy pointing to port 8000 with full SSE streaming support, binds to the EC2 Public IP address by default, and—if a `DOMAIN_NAME` repository secret is provided—installs Certbot and automatically acquires Let's Encrypt SSL certificates dynamically!
+> 
+> These manual instructions are provided below strictly for administrative reference, manual SSL adjustments, or DNS configuration troubleshooting.
+
+### 8.1 Install Nginx & Certbot (Administrative Reference)
 
 ```bash
 sudo apt-get install -y nginx certbot python3-certbot-nginx
