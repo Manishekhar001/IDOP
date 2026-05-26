@@ -1,0 +1,491 @@
+name: IDOP Continuous Deployment (CD)
+
+on:
+  push:
+    branches: [ main ]
+
+# =========================================================================
+# GLOBAL ENVIRONMENT VARIABLES
+# =========================================================================
+env:
+  AWS_REGION: us-east-1                 # Target AWS region matching your ECR repository
+  ECR_REPOSITORY: idop-app               # Name of your ECR repository
+  EC2_PROJECT_PATH: /home/ubuntu/IDOP    # Directory path on the EC2 host containing docker-compose.yml
+
+# =========================================================================
+# REQUIRED REPOSITORY SECRETS
+# =========================================================================
+# Navigate to: GitHub → Repository → Settings → Secrets and variables → Actions
+# Click "New repository secret" for each entry below.
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ 🔐 CATEGORY 1: AWS / ECR CLOUD CREDENTIALS                            │
+# ├──────────────────────────┬─────────────────────────────────────────────┤
+# │ AWS_ACCESS_KEY_ID        │ IAM User Access Key (starts with AKIA...)   │
+# │                          │ Source: IAM → Users → Security credentials  │
+# │                          │ Permissions: ECR read/write, S3 access      │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ AWS_SECRET_ACCESS_KEY    │ IAM User Secret Access Key                  │
+# │                          │ Source: IAM → Users → Security credentials  │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ ECR_REGISTRY             │ ECR Registry ROOT URL (no repo name!)       │
+# │                          │ Example: 221691784496.dkr.ecr.us-east-1.     │
+# │                          │          amazonaws.com                      │
+# │                          │ ⚠️ Do NOT include /idop-app at the end      │
+# │                          │ Source: aws ecr describe-repositories       │
+# └──────────────────────────┴─────────────────────────────────────────────┘
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ 🔐 CATEGORY 2: EC2 SERVER CONNECTION                                   │
+# ├──────────────────────────┬─────────────────────────────────────────────┤
+# │ EC2_HOST                 │ Public IPv4 address or Elastic IP of EC2    │
+# │                          │ Example: 13.233.14.23                       │
+# │                          │ Source: EC2 Console → Instances              │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ EC2_SSH_KEY              │ FULL contents of your .pem key file         │
+# │                          │ Must include -----BEGIN/END RSA PRIVATE     │
+# │                          │ KEY----- headers and all base64 lines       │
+# │                          │ ⚠️ Paste raw PEM, no extra whitespace       │
+# └──────────────────────────┴─────────────────────────────────────────────┘
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ 🔐 CATEGORY 3: INTERNAL DATABASE CREDENTIALS                           │
+# ├──────────────────────────┬─────────────────────────────────────────────┤
+# │ POSTGRES_PASSWORD        │ Password for the internal Postgres Docker   │
+# │                          │ container (LangGraph checkpointing)         │
+# │                          │ Example: MyStr0ng!P@ssw0rd2026              │
+# │                          │ Source: You choose this password            │
+# └──────────────────────────┴─────────────────────────────────────────────┘
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ 🔐 CATEGORY 4: APPLICATION API KEYS & INTEGRATIONS                     │
+# ├──────────────────────────┬─────────────────────────────────────────────┤
+# │ OPENAI_API_KEY           │ OpenAI API Key (sk-proj-...)                │
+# │                          │ Source: https://platform.openai.com/api-keys│
+# │                          │ Used for: Agent reasoning, routing, LLM     │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ VOYAGE_API_KEY           │ Voyage AI API Key                           │
+# │                          │ Source: https://dash.voyageai.com/           │
+# │                          │ Used for: Rerank-2.5 context scoring        │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ TAVILY_API_KEY           │ Tavily Search API Key (tvly-...)            │
+# │                          │ Source: https://tavily.com/                  │
+# │                          │ Used for: Corrective RAG web search fallback│
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ QDRANT_URL               │ Qdrant Cloud cluster endpoint URL           │
+# │                          │ Example: https://xyz.aws.cloud.qdrant.io    │
+# │                          │ Source: https://cloud.qdrant.io/ → Cluster  │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ QDRANT_API_KEY           │ Qdrant Cloud authorization token            │
+# │                          │ Source: Qdrant Dashboard → API Keys         │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ SUPABASE_DB_URL          │ Supabase PostgreSQL connection URL          │
+# │                          │ Format: postgresql+psycopg://postgres.ref:  │
+# │                          │         pass@host:5432/postgres             │
+# │                          │ Source: Supabase → Project Settings →       │
+# │                          │         Database → Session Pooler           │
+# │                          │ ⚠️ Use Session Pooler, NOT Direct connection│
+# └──────────────────────────┴─────────────────────────────────────────────┘
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ ⬜ CATEGORY 5: OPTIONAL CACHING SECRETS                                │
+# ├──────────────────────────┬─────────────────────────────────────────────┤
+# │ UPSTASH_REDIS_URL        │ Upstash Redis REST connection URL           │
+# │                          │ Example: https://suited-mantis-12345.       │
+# │                          │          upstash.io                         │
+# │                          │ Source: https://console.upstash.com/        │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ UPSTASH_REDIS_TOKEN      │ Upstash Redis authentication token         │
+# │                          │ Source: Upstash Console → Database → Token  │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ S3_CACHE_BUCKET          │ AWS S3 bucket name for document cache       │
+# │                          │ Example: idop-cache-221691784496            │
+# │                          │ Source: aws s3 ls                           │
+# └──────────────────────────┴─────────────────────────────────────────────┘
+# =========================================================================
+
+jobs:
+  # =========================================================================
+  # JOB 1: BUILD, PUBLISH TO ECR, AND DEPLOY TO EC2 WITH VERIFIED RETRIES
+  # =========================================================================
+  deploy:
+    name: Build → ECR → Deploy EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 1: DISK SPACE OPTIMIZATION
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 1/12: Free up disk space"
+        run: |
+          echo "=========================================="
+          echo "🧹 DISK SPACE OPTIMIZATION"
+          echo "=========================================="
+          echo ""
+          echo "📊 Disk space BEFORE cleanup:"
+          df -h /
+          echo ""
+
+          # Remove heavy pre-installed runner software
+          echo "🗑️ Removing unnecessary runner libraries..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+          # Clean Docker system caches
+          echo "🐳 Pruning Docker system..."
+          docker system prune -af --volumes || true
+
+          # Clean package manager
+          echo "📦 Cleaning package caches..."
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+
+          echo ""
+          echo "📊 Disk space AFTER cleanup:"
+          df -h /
+          echo "✅ Runner disk space optimization complete!"
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 2: CHECKOUT SOURCE CODE
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 2/12: Checkout code"
+        uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 3: PRINT DEPLOYMENT METADATA & CONFIGURATION
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 3/12: Print deployment metadata"
+        run: |
+          echo "=========================================="
+          echo "🚀 IDOP CD PIPELINE — DEPLOYMENT INITIATED"
+          echo "=========================================="
+          echo ""
+          echo "📋 Git & Trigger Info:"
+          echo "  Trigger      : Push/Merge to main branch"
+          echo "  Commit SHA   : ${{ github.sha }}"
+          echo "  Short SHA    : $(echo '${{ github.sha }}' | cut -c1-7)"
+          echo "  Author       : ${{ github.actor }}"
+          echo "  Repository   : ${{ github.repository }}"
+          echo "  Workflow     : ${{ github.workflow }}"
+          echo "  Run Number   : ${{ github.run_number }}"
+          echo ""
+          echo "📋 Target Deployment Configuration:"
+          echo "  AWS Region   : ${{ env.AWS_REGION }}"
+          echo "  ECR Repo     : ${{ env.ECR_REPOSITORY }}"
+          echo "  ECR Registry : ${{ secrets.ECR_REGISTRY }}"
+          echo "  EC2 Host     : ${{ secrets.EC2_HOST }}"
+          echo "  Host Path    : ${{ env.EC2_PROJECT_PATH }}"
+          echo "  Platform     : linux/amd64"
+          echo "=========================================="
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 4: CONFIGURE AWS CREDENTIALS
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 4/12: Configure AWS credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 5: VERIFY AWS IDENTITY VIA STS
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 5/12: Verify AWS identity (STS)"
+        run: |
+          echo "🔍 Verifying AWS IAM connection identity..."
+          aws sts get-caller-identity
+          echo ""
+          echo "✅ AWS credentials verified successfully!"
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 6: LOGIN TO AMAZON ECR
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 6/12: Login to Amazon ECR"
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: "Step 6b/12: Verify ECR login"
+        run: |
+          echo "✅ Successfully authenticated with Amazon ECR!"
+          echo "  Registry: ${{ steps.login-ecr.outputs.registry }}"
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 7: SETUP QEMU (MULTI-PLATFORM SUPPORT)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 7/12: Set up QEMU"
+        uses: docker/setup-qemu-action@v3
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 8: SETUP DOCKER BUILDX
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 8/12: Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v3
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 9: BUILD, TAG, AND PUSH DOCKER IMAGE TO ECR
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 9/12: Build, tag, and push Docker image to ECR"
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 10: PRINT BUILD & ECR PUBLICATION SUMMARY
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 10/12: Print build summary"
+        run: |
+          echo "=========================================="
+          echo "✅ DOCKER IMAGE PUBLISHED TO AWS ECR"
+          echo "=========================================="
+          echo "  Registry     : ${{ secrets.ECR_REGISTRY }}"
+          echo "  Repository   : ${{ env.ECR_REPOSITORY }}"
+          echo "  Tags         : latest, ${{ github.sha }}"
+          echo "  Architecture : linux/amd64"
+          echo "  AWS Region   : ${{ env.AWS_REGION }}"
+          echo "=========================================="
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 11: DEPLOY TO EC2 VIA SSH (WRITE FILES + PULL + COMPOSE UP)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 11/12: Deploy to EC2 via SSH"
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "=========================================="
+            echo "📂 Step 11a: Preparing deployment directory"
+            echo "=========================================="
+            mkdir -p ${{ env.EC2_PROJECT_PATH }}
+            cd ${{ env.EC2_PROJECT_PATH }}
+            echo "✅ Working directory: $(pwd)"
+            echo ""
+
+            echo "=========================================="
+            echo "🔐 Step 11b: Writing production .env file"
+            echo "=========================================="
+            # Write all secrets into a secure .env file on the host.
+            # The CD pipeline injects each GitHub Secret as an environment variable.
+            # docker-compose.yml reads this .env file and passes values to containers.
+            cat << 'ENVEOF' | sed 's/^[ \t]*//' > .env
+            # ─────────────────────────────────────────────────────────
+            # IDOP RUNTIME PRODUCTION SECRETS
+            # Auto-generated by GitHub Actions CD Pipeline
+            # Commit: ${{ github.sha }}
+            # Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            # ⚠️ DO NOT EDIT MANUALLY — will be overwritten on next deploy
+            # ─────────────────────────────────────────────────────────
+
+            # Runtime state
+            ENV_STATE=production
+            ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}
+            AWS_REGION=${{ env.AWS_REGION }}
+
+            # Internal PostgreSQL (LangGraph checkpointing)
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DATABASE_URL=postgresql+psycopg://postgres:${{ secrets.POSTGRES_PASSWORD }}@checkpoint-db:5432/idop_memories
+
+            # OpenAI (Agent reasoning + embeddings)
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+
+            # Voyage AI (Rerank-2.5 context scoring)
+            VOYAGE_API_KEY=${{ secrets.VOYAGE_API_KEY }}
+
+            # Tavily (Corrective RAG web search fallback)
+            TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}
+
+            # Qdrant Cloud (Vector database)
+            QDRANT_URL=${{ secrets.QDRANT_URL }}
+            QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
+
+            # Upstash Redis (Query-level caching — optional)
+            UPSTASH_REDIS_URL=${{ secrets.UPSTASH_REDIS_URL }}
+            UPSTASH_REDIS_TOKEN=${{ secrets.UPSTASH_REDIS_TOKEN }}
+
+            # Supabase (Relational database)
+            SUPABASE_DB_URL=${{ secrets.SUPABASE_DB_URL }}
+
+            # AWS S3 (Document chunk caching — optional)
+            S3_CACHE_BUCKET=${{ secrets.S3_CACHE_BUCKET }}
+            ENVEOF
+
+            chmod 600 .env
+            echo "✅ .env file created and secured (chmod 600)"
+            echo "   Variables written: $(grep -c '=' .env) entries"
+            echo ""
+
+            echo "=========================================="
+            echo "📝 Step 11c: Writing production docker-compose.yml"
+            echo "=========================================="
+            # Write the production docker-compose.yml directly on the EC2 host.
+            # This ensures the compose file is always in sync with the pipeline.
+            cat << 'COMPOSEEOF' > docker-compose.yml
+            version: '3.8'
+
+            services:
+              app:
+                image: ${ECR_REGISTRY}/idop-app:latest
+                container_name: idop-app
+                restart: always
+                ports:
+                  - "127.0.0.1:8000:8000"
+                env_file:
+                  - .env
+                depends_on:
+                  checkpoint-db:
+                    condition: service_healthy
+
+              checkpoint-db:
+                image: postgres:15-alpine
+                container_name: idop-checkpoint-db
+                restart: always
+                environment:
+                  POSTGRES_USER: postgres
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+                  POSTGRES_DB: idop_memories
+                volumes:
+                  - pgdata:/var/lib/postgresql/data
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U postgres"]
+                  interval: 5s
+                  timeout: 5s
+                  retries: 5
+
+            volumes:
+              pgdata:
+            COMPOSEEOF
+            echo "✅ docker-compose.yml written successfully"
+            echo ""
+
+            echo "=========================================="
+            echo "🐳 Step 11d: Authenticating Docker with ECR"
+            echo "=========================================="
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+              docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            echo "✅ Docker authenticated with ECR"
+            echo ""
+
+            echo "=========================================="
+            echo "💾 Step 11e: Backing up current stable image"
+            echo "=========================================="
+            # Tag current running image as "stable" for rollback protection
+            docker tag ${{ secrets.ECR_REGISTRY }}/idop-app:latest \
+              ${{ secrets.ECR_REGISTRY }}/idop-app:stable 2>/dev/null || \
+              echo "ℹ️ No existing image to backup (first deployment)"
+            echo ""
+
+            echo "=========================================="
+            echo "📥 Step 11f: Pulling latest image from ECR"
+            echo "=========================================="
+            docker compose pull app
+            echo "✅ Latest image pulled successfully"
+            echo ""
+
+            echo "=========================================="
+            echo "🚀 Step 11g: Orchestrating containers"
+            echo "=========================================="
+            # Stop existing containers gracefully
+            docker compose down
+            echo "   ✅ Old containers stopped"
+
+            # Start updated containers in detached mode
+            docker compose up -d
+            echo "   ✅ New containers launched"
+            echo ""
+
+            # Show running containers
+            echo "📋 Running containers:"
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+            echo ""
+
+            echo "=========================================="
+            echo "🧪 Step 11h: Health check with retry logic"
+            echo "=========================================="
+            API_URL="http://localhost:8000"
+            echo "🏥 Testing health endpoint: $API_URL/health"
+            echo ""
+
+            RETRY=0
+            MAX_RETRIES=5
+            WAIT_SECONDS=5
+
+            # Wait for initial cold start
+            echo "⏳ Waiting 10 seconds for cold start..."
+            sleep 10
+
+            until curl -f -s "$API_URL/health" > /dev/null 2>&1 || [ $RETRY -eq $MAX_RETRIES ]; do
+              RETRY=$((RETRY+1))
+              echo "   ⚠️ Attempt $RETRY/$MAX_RETRIES failed, retrying in ${WAIT_SECONDS}s..."
+              sleep $WAIT_SECONDS
+            done
+
+            if [ $RETRY -eq $MAX_RETRIES ]; then
+              echo ""
+              echo "=========================================="
+              echo "❌ HEALTH CHECK FAILED — TRIGGERING ROLLBACK"
+              echo "=========================================="
+              echo ""
+              echo "📋 Container logs (last 50 lines):"
+              docker logs --tail 50 idop-app 2>&1 || true
+              echo ""
+
+              logger "⚠️ IDOP DEPLOY FAILED: Health check failed after $MAX_RETRIES retries"
+
+              # Automatic rollback to stable image
+              echo "🔄 Rolling back to stable image..."
+              docker compose down
+              docker tag ${{ secrets.ECR_REGISTRY }}/idop-app:stable \
+                ${{ secrets.ECR_REGISTRY }}/idop-app:latest 2>/dev/null || true
+              docker compose up -d
+              echo "✅ Rollback complete. Stable state restored."
+              exit 1
+            fi
+
+            echo ""
+            echo "   ✅ Health endpoint responding!"
+            echo ""
+            echo "📋 Health Check Response:"
+            echo "─────────────────────────"
+            curl -s "$API_URL/health" | python3 -m json.tool 2>/dev/null || curl -s "$API_URL/health"
+            echo ""
+            echo "─────────────────────────"
+            echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP 12: DEPLOYMENT COMPLETION SUMMARY
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 12/12: Deployment summary"
+        run: |
+          echo "=========================================="
+          echo "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY"
+          echo "=========================================="
+          echo ""
+          echo "📋 Deployment Summary:"
+          echo "  Commit      : ${{ github.sha }}"
+          echo "  Author      : ${{ github.actor }}"
+          echo "  ECR Image   : ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
+          echo "  EC2 Host    : ${{ secrets.EC2_HOST }}"
+          echo "  Region      : ${{ env.AWS_REGION }}"
+          echo "  Status      : ✅ LIVE"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "  • Verify: curl -f https://your-domain.com/health"
+          echo "  • Logs:   ssh ubuntu@${{ secrets.EC2_HOST }} 'docker logs -f idop-app'"
+          echo "=========================================="
