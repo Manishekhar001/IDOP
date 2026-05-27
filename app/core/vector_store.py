@@ -87,10 +87,35 @@ class VectorStoreService:
             return []
 
         import hashlib
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
 
         texts = [doc.page_content for doc in documents]
         hashes = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
+
+        new_documents, new_texts, new_hashes, doc_ids = self._deduplicate_chunks(documents, texts, hashes)
+
+        if not new_documents:
+            logger.info("All chunks already exist in Qdrant — skipped embedding entirely")
+            return doc_ids
+
+        logger.info(f"Embedding {len(new_documents)}/{len(documents)} new chunks (skipped {len(documents) - len(new_documents)} duplicates)")
+        dense_embeddings = self.embeddings.embed_documents(new_texts)
+
+        points = self._build_points(new_documents, dense_embeddings, new_texts, new_hashes, doc_ids)
+
+        try:
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
+            logger.info(f"Successfully upserted {len(points)} new chunks with dual vectors")
+            return doc_ids
+        except Exception as e:
+            logger.error(f"Failed to upsert chunks: {e}")
+            raise
+
+    def _deduplicate_chunks(self, documents, texts, hashes):
+        """Deduplicate chunks by content_hash against Qdrant."""
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
 
         new_documents = []
         new_texts = []
@@ -98,7 +123,6 @@ class VectorStoreService:
         doc_ids = []
 
         for doc, text, content_hash in zip(documents, texts, hashes):
-            # Scroll Qdrant for this hash
             try:
                 scroll_filter = Filter(must=[
                     FieldCondition(key="content_hash", match=MatchValue(value=content_hash))
@@ -123,15 +147,14 @@ class VectorStoreService:
             new_texts.append(text)
             new_hashes.append(content_hash)
 
-        if not new_documents:
-            logger.info("All chunks already exist in Qdrant — skipped embedding entirely")
-            return doc_ids
+        return new_documents, new_texts, new_hashes, doc_ids
 
-        logger.info(f"Embedding {len(new_documents)}/{len(documents)} new chunks (skipped {len(documents) - len(new_documents)} duplicates)")
-        dense_embeddings = self.embeddings.embed_documents(new_texts)
+    def _build_points(self, documents, dense_embeddings, texts, hashes, doc_ids):
+        """Build Qdrant PointStruct list from documents and embeddings."""
+        from qdrant_client.models import PointStruct
 
         points = []
-        for doc, dense, text, content_hash in zip(new_documents, dense_embeddings, new_texts, new_hashes):
+        for doc, dense, text, content_hash in zip(documents, dense_embeddings, texts, hashes):
             chunk_id = str(uuid4())
             doc_ids.append(chunk_id)
 
@@ -151,15 +174,47 @@ class VectorStoreService:
                 payload=payload
             ))
 
+        return points
+
+    def add_documents_with_embeddings(self, documents: list[Document], dense_embeddings: list[list[float]]) -> list[str]:
+        """
+        Insert documents with pre-computed dense embeddings (useful for cache-based uploads).
+        Skips the embedding step and directly upserts to Qdrant with dual vectors.
+        """
+        if not documents:
+            logger.warning("add_documents_with_embeddings called with empty list")
+            return []
+
+        if len(documents) != len(dense_embeddings):
+            raise ValueError(
+                f"Chunk/embedding mismatch: {len(documents)} chunks, {len(dense_embeddings)} embeddings"
+            )
+
+        import hashlib
+
+        texts = [doc.page_content for doc in documents]
+        hashes = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
+
+        new_documents, new_texts, new_hashes, doc_ids = self._deduplicate_chunks(documents, texts, hashes)
+        new_embeddings = [emb for doc, emb in zip(documents, dense_embeddings) if doc.metadata.get("content_hash") in new_hashes]
+
+        if not new_documents:
+            logger.info("All chunks already exist in Qdrant — skipped upsert entirely")
+            return doc_ids
+
+        logger.info(f"Upserting {len(new_documents)}/{len(documents)} cached chunks (skipped {len(documents) - len(new_documents)} duplicates)")
+
+        points = self._build_points(new_documents, new_embeddings, new_texts, new_hashes, doc_ids)
+
         try:
             self.client.upsert(
                 collection_name=self.collection_name,
                 points=points
             )
-            logger.info(f"Successfully upserted {len(points)} new chunks with dual vectors")
+            logger.info(f"Successfully upserted {len(points)} cached chunks with dual vectors")
             return doc_ids
         except Exception as e:
-            logger.error(f"Failed to upsert chunks: {e}")
+            logger.error(f"Failed to upsert cached chunks: {e}")
             raise
 
     def search_dense(

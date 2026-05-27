@@ -1,18 +1,41 @@
 import asyncio
-import io
+import hashlib
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from typing import Optional
 from app.api.schemas import CollectionInfoResponse, DocumentUploadResponse, ErrorResponse
 from app.core.document_processor import DocumentProcessor
 from app.core.vector_store import VectorStoreService
+from app.services.cache_service import CacheService
 from app.utils.logger import get_logger
+from app.utils.validators import FileValidator, ValidationError
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
+# Document cache service (local/S3-based chunk + embedding cache)
+doc_cache = CacheService()
+
 
 def get_vector_store(request: Request) -> VectorStoreService:
     return request.app.state.vector_store
+
+
+def _get_extension(filename: str) -> str:
+    """Extract the file extension without the leading dot."""
+    import os
+    _, ext = os.path.splitext(filename)
+    return ext.lstrip(".") if ext else "bin"
+
+
+def _validate_file_size(file_bytes: bytes) -> None:
+    """Validate file size against the configured maximum."""
+    max_size = FileValidator.MAX_FILE_SIZE  # 50MB by default
+    if len(file_bytes) > max_size:
+        max_mb = max_size / (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds maximum allowed size of {max_mb:.0f} MB",
+        )
 
 
 @router.post(
@@ -20,6 +43,7 @@ def get_vector_store(request: Request) -> VectorStoreService:
     response_model=DocumentUploadResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Unsupported file format"},
+        413: {"description": "File too large"},
         500: {"model": ErrorResponse, "description": "Processing error"},
     },
     summary="Upload a document",
@@ -34,6 +58,12 @@ async def upload_document(
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required.")
+
+    # Validate file extension early using FileValidator
+    try:
+        FileValidator.validate_file(file)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Safely parse chunk_size
     parsed_chunk_size = None
@@ -58,15 +88,98 @@ async def upload_document(
     try:
         file_bytes = await file.read()
         filename = file.filename
+        file_ext = _get_extension(filename)
+
+        # Validate file size before any processing
+        _validate_file_size(file_bytes)
+
+        # Compute document ID (SHA-256 of file content)
+        doc_id = hashlib.sha256(file_bytes).hexdigest()
+        logger.info(f"Computed doc_id={doc_id[:12]}... for {filename} ({len(file_bytes) / 1024:.1f} KB)")
 
         loop = asyncio.get_event_loop()
+
+        # --- Cache Check ---
+        cache_hit = doc_cache.cache_exists(doc_id, file_ext)
+        if cache_hit:
+            logger.info(f"Cache HIT for {filename} (doc_id={doc_id[:12]}...)")
+            cached = doc_cache.load_chunks_and_embeddings(doc_id, file_ext)
+            if cached is not None:
+                # Reconstruct Document objects from cached chunks
+                chunks = [
+                    DocumentProcessor._dict_to_document(chunk)
+                    for chunk in cached["chunks"]
+                ]
+                embeddings = cached["embeddings"]
+
+                document_ids = await loop.run_in_executor(
+                    None, vector_store.add_documents_with_embeddings, chunks, embeddings
+                )
+
+                logger.info(f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs")
+                return DocumentUploadResponse(
+                    message="Document uploaded and indexed successfully (from cache)",
+                    filename=filename,
+                    chunks_created=len(chunks),
+                    document_ids=document_ids,
+                    chunk_size_applied=cached["metadata"].get("chunk_size", parsed_chunk_size),
+                    chunk_overlap_applied=cached["metadata"].get("chunk_overlap", parsed_chunk_overlap),
+                    cache_hit=True,
+                )
+            else:
+                logger.warning(f"Cache load returned None for doc_id={doc_id[:12]}... despite cache_exists=True — re-processing")
+
+        # --- Cache MISS: Process document normally ---
+        logger.info(f"Cache MISS for {filename} (doc_id={doc_id[:12]}...) — processing from scratch")
+
         processor = DocumentProcessor(chunk_size=parsed_chunk_size, chunk_overlap=parsed_chunk_overlap)
 
+        # Process file from bytes directly (avoids redundant BytesIO wrapper)
         def _process():
-            return processor.process_upload(io.BytesIO(file_bytes), filename)
+            return processor.process_upload_bytes(file_bytes, filename)
 
         chunks = await loop.run_in_executor(None, _process)
-        document_ids = await loop.run_in_executor(None, vector_store.add_documents, chunks)
+
+        # Compute embeddings ONCE for both Qdrant upsert and cache storage
+        texts = [doc.page_content for doc in chunks]
+        if not texts:
+            raise HTTPException(status_code=400, detail="No text content could be extracted from the document.")
+
+        logger.info(f"Embedding {len(chunks)} chunks ({sum(len(t) for t in texts)} chars) via OpenAI...")
+        embeddings = await loop.run_in_executor(
+            None, vector_store.embeddings.embed_documents, texts
+        )
+
+        # Upsert to Qdrant with the pre-computed embeddings
+        document_ids = await loop.run_in_executor(
+            None, vector_store.add_documents_with_embeddings, chunks, embeddings
+        )
+
+        # --- Save to cache for future requests ---
+        try:
+            chunk_dicts = [
+                {"text": doc.page_content, "metadata": doc.metadata}
+                for doc in chunks
+            ]
+            metadata = {
+                "filename": filename,
+                "chunk_size": processor.chunk_size,
+                "chunk_overlap": processor.chunk_overlap,
+                "total_chunks": len(chunks),
+            }
+
+            await loop.run_in_executor(
+                None,
+                doc_cache.save_chunks_and_embeddings,
+                doc_id,
+                file_ext,
+                chunk_dicts,
+                embeddings,
+                metadata,
+            )
+            logger.info(f"Cached {len(chunks)} chunks for {filename}")
+        except Exception as cache_err:
+            logger.warning(f"Failed to cache document {filename}: {cache_err}")
 
         logger.info(f"Indexed {filename}: {len(chunks)} chunks, {len(document_ids)} IDs")
         return DocumentUploadResponse(
@@ -76,10 +189,13 @@ async def upload_document(
             document_ids=document_ids,
             chunk_size_applied=processor.chunk_size,
             chunk_overlap_applied=processor.chunk_overlap,
+            cache_hit=False,
         )
     except ValueError as e:
         logger.warning(f"Invalid upload: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")

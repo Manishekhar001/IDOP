@@ -117,20 +117,25 @@ class TestEnhancedApiEndpoints:
         mock_processor_class.return_value = mock_processor
         mock_processor.chunk_size = 512
         mock_processor.chunk_overlap = 50
-        mock_processor.process_upload.return_value = [] # no chunks
-        
+        # Return a non-empty Document so the route's "if not texts" check passes
+        from langchain_core.documents import Document
+        mock_processor.process_upload_bytes.return_value = [
+            Document(page_content="Hello testing world content", metadata={"source": "test.txt"})
+        ]
+
         mock_vector_store = MagicMock()
-        mock_vector_store.add_documents.return_value = ["id1", "id2"]
-        
+        mock_vector_store.embeddings.embed_documents.return_value = [[0.1, 0.2, 0.3]]
+        mock_vector_store.add_documents_with_embeddings.return_value = ["id1"]
+
         from app.api.routes.documents import get_vector_store
         app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
-        
+
         try:
             file_data = {"file": ("test.txt", b"Hello testing world", "text/plain")}
             form_data = {"chunk_size": "512", "chunk_overlap": "50"}
-            
+
             response = client.post("/documents/upload", files=file_data, data=form_data)
-            assert response.status_code == 200
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
             data = response.json()
             assert data["filename"] == "test.txt"
             assert data["chunk_size_applied"] == 512

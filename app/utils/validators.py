@@ -6,14 +6,11 @@ class ValidationError(Exception):
 
 
 class FileValidator:
+    # Must stay in sync with DocumentProcessor.SUPPORTED_EXTENSIONS
     ALLOWED_EXTENSIONS = {
         ".pdf": "application/pdf",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".doc": "application/msword",
         ".csv": "text/csv",
-        ".json": "application/json",
         ".txt": "text/plain",
-        ".html": "text/html",
     }
 
     MAX_FILE_SIZE = 50 * 1024 * 1024

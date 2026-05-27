@@ -98,6 +98,10 @@ class DocumentUploadResponse(BaseModel):
         None, 
         description="The chunk overlap used during document parsing and chunking."
     )
+    cache_hit: bool = Field(
+        default=False, 
+        description="True if the document was served from the chunk/embedding cache instead of being re-processed."
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -111,7 +115,8 @@ class DocumentUploadResponse(BaseModel):
                         "7f7e7b0b-6f5c-4b3a-2a1b-0a9f8e7d6c5b"
                     ],
                     "chunk_size_applied": 512,
-                    "chunk_overlap_applied": 50
+                    "chunk_overlap_applied": 50,
+                    "cache_hit": False
                 }
             ]
         }

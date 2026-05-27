@@ -3,13 +3,15 @@ from app.api.schemas import SQLApprovalRequest, SQLResponse, SQLExecuteResponse,
 from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
+from app.services.query_cache_service import QueryCacheService
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/sql", tags=["SQL Operations"])
 
 # Shared services
-sql_service = TextToSQLService()
+query_cache = QueryCacheService()
+sql_service = TextToSQLService(query_cache_service=query_cache)
 executor = SQLExecutor()
 
 

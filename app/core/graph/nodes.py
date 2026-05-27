@@ -26,11 +26,14 @@ from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature1_sql.llm_judge import LLMJudge
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
-
+from app.services.query_cache_service import QueryCacheService
 
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Shared query cache service for SQL generation caching in graph nodes
+_query_cache = QueryCacheService()
 
 
 @lru_cache
@@ -86,12 +89,11 @@ async def sql_generation_node(state: CSRAGState) -> dict:
     question = state["question"]
     logger.info(f"Feature 1 SQL Node triggered: '{question}'")
 
-    sql_service = TextToSQLService()
+    sql_service = TextToSQLService(query_cache_service=_query_cache)
     validator = SQLValidator()
     judge = LLMJudge()
 
     try:
-        # Generate raw SQL
         # Generate raw SQL
         gen_res = await sql_service.generate_sql_for_approval(
             question=question,
@@ -559,7 +561,7 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
     question = state["question"]
     logger.info(f"Hybrid SQL + RAG node triggered for question: '{question}'")
 
-    sql_service = TextToSQLService()
+    sql_service = TextToSQLService(query_cache_service=_query_cache)
     validator = SQLValidator()
     executor = SQLExecutor()
     

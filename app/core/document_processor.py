@@ -101,6 +101,43 @@ class DocumentProcessor:
         logger.info(f"Created {len(chunks)} chunks with index tracking metadata")
         return chunks
 
+    @staticmethod
+    def _dict_to_document(chunk_dict: dict) -> Document:
+        """
+        Reconstruct a langchain Document from a cached chunk dictionary.
+        
+        The dictionary is expected to have 'text' and 'metadata' keys,
+        as stored by CacheService.save_chunks_and_embeddings.
+        """
+        return Document(
+            page_content=chunk_dict.get("text", ""),
+            metadata=chunk_dict.get("metadata", {}),
+        )
+
     def process_upload(self, file: BinaryIO, filename: str) -> list[Document]:
+        """Process a file upload from a BinaryIO stream."""
         docs = self.load_from_upload(file, filename)
         return self.split_documents(docs)
+
+    def process_upload_bytes(self, file_bytes: bytes, filename: str) -> list[Document]:
+        """
+        Process a file upload from raw bytes, avoiding redundant BytesIO wrapping.
+        Writes to a single temp file for the underlying loader to read.
+        """
+        ext = Path(filename).suffix.lower()
+        if ext not in self.SUPPORTED_EXTENSIONS:
+            raise ValueError(
+                f"Unsupported extension '{ext}'. "
+                f"Supported: {self.SUPPORTED_EXTENSIONS}"
+            )
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+
+        try:
+            docs = self.load_file(tmp_path)
+            for doc in docs:
+                doc.metadata["source"] = filename
+            return self.split_documents(docs)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
