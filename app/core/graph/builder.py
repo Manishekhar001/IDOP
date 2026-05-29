@@ -148,5 +148,5 @@ def build_graph(
         store=store,
     )
 
-    logger.info("IDOP 4-path LangGraph state machine compiled successfully")
+    logger.info("IDOP 5-path LangGraph state machine compiled successfully")
     return graph

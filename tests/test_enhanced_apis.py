@@ -28,6 +28,7 @@ class TestStorageBackendDefault:
         mock_settings = MagicMock()
         mock_settings.storage_backend = "s3"
         mock_settings.app_version = "0.1.0"
+        mock_settings.git_commit_sha = "unknown"
         mock_settings.openai_api_key = "sk-test"
         mock_settings.voyage_api_key = "va-test"
         mock_settings.tavily_api_key = "tvly-test"
@@ -51,6 +52,7 @@ class TestStorageBackendDefault:
         mock_settings = MagicMock()
         mock_settings.storage_backend = "local"
         mock_settings.app_version = "0.1.0"
+        mock_settings.git_commit_sha = "unknown"
         mock_settings.openai_api_key = "sk-test"
         mock_settings.voyage_api_key = "va-test"
         mock_settings.tavily_api_key = "tvly-test"

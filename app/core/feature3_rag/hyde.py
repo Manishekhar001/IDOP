@@ -79,26 +79,17 @@ class HydeService:
         Generate hypothetical answers to improve retrieval (sync wrapper).
         """
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If running inside an existing event loop, run as threadsafe future to avoid blockages
-                future = asyncio.run_coroutine_threadsafe(
-                    self.generate_hypothetical_documents_async(query, num_hypotheses), loop
-                )
-                return future.result()
-            else:
-                return loop.run_until_complete(
-                    self.generate_hypothetical_documents_async(query, num_hypotheses)
-                )
+            loop = asyncio.get_running_loop()
+            # If running inside an existing event loop, run as threadsafe future to avoid blockages
+            future = asyncio.run_coroutine_threadsafe(
+                self.generate_hypothetical_documents_async(query, num_hypotheses), loop
+            )
+            return future.result()
+        except RuntimeError:
+            # No running loop — use asyncio.run() which handles loop creation/cleanup
+            return asyncio.run(
+                self.generate_hypothetical_documents_async(query, num_hypotheses)
+            )
         except Exception as e:
-            logger.warning(f"HyDE sync execution exception: {e}. Retrying with new event loop...")
-            try:
-                new_loop = asyncio.new_event_loop()
-                res = new_loop.run_until_complete(
-                    self.generate_hypothetical_documents_async(query, num_hypotheses)
-                )
-                new_loop.close()
-                return res
-            except Exception as e2:
-                logger.error(f"HyDE sync execution completely failed: {e2}")
-                return [query]
+            logger.warning(f"HyDE sync execution exception: {e}. Falling back to original query.")
+            return [query]

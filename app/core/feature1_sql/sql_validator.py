@@ -1,4 +1,5 @@
 import logging
+import re
 
 logger = logging.getLogger("idop_app.sql_validator")
 
@@ -40,15 +41,14 @@ class SQLValidator:
 
         cleaned_sql = sql.strip().upper()
 
-        # Simple security parsing
+        # Simple security parsing — use word-boundary regex to avoid false positives
         for command in self.FORBIDDEN_COMMANDS:
-            # Check for command as separate word to avoid false positives
-            if command in cleaned_sql.split():
+            if re.search(r'\b' + re.escape(command) + r'\b', cleaned_sql):
                 logger.warning(f"Validation failed: forbidden command '{command}' detected")
                 return False, f"Destructive or mutating SQL command '{command}' is strictly forbidden."
 
-        # Verify transaction safety
-        if "COMMIT" in cleaned_sql.split() or "ROLLBACK" in cleaned_sql.split():
+        # Verify transaction safety — use word-boundary regex
+        if re.search(r'\bCOMMIT\b', cleaned_sql) or re.search(r'\bROLLBACK\b', cleaned_sql):
             return False, "Explicit transaction control (COMMIT/ROLLBACK) is not permitted inside user queries."
 
         # Enforce that all user SQL queries must start with SELECT

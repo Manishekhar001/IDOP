@@ -3,6 +3,7 @@ import logging
 from openai import OpenAI
 from typing import Dict, List
 from app.config import get_settings
+from app.core.schema_registry import TABLE_SCHEMAS
 
 logger = logging.getLogger("idop_app.column_mapper")
 
@@ -21,14 +22,8 @@ class ColumnMapper:
         """
         Map spreadsheet headers to target DB table column names using semantic matching.
         """
-        # Hardcoded schema definitions matching complete description
-        db_schemas = {
-            "products": ["id", "name", "category", "price", "stock_quantity", "description"],
-            "customers": ["id", "name", "email", "segment", "country"],
-            "orders": ["id", "customer_id", "order_date", "total_amount", "status", "shipping_address"]
-        }
-
-        db_columns = db_schemas.get(table_name, [])
+        # Schema definitions from central registry — add new tables in schema_registry.py
+        db_columns = TABLE_SCHEMAS.get(table_name, [])
         if not db_columns:
             raise ValueError(f"Target table '{table_name}' is not supported for mutations.")
 

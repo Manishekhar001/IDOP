@@ -67,7 +67,7 @@ def _build_system_prompt(ltm_context: str, summary: str) -> str:
 # ---------------------------------------------------------------------------
 
 async def router_node(state: CSRAGState) -> dict:
-    """Classifies user input into SQL, MUTATION, RAG, or CHAT."""
+    """Classifies user input into SQL, MUTATION, RAG, CHAT, or HYBRID."""
     last_human = next(
         (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
         None,

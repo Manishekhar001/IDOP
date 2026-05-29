@@ -28,7 +28,7 @@ class CSRAGEngine:
             store=store,
             checkpointer=checkpointer,
         )
-        logger.info("CSRAGEngine initialized with IDOP 4-path router")
+        logger.info("CSRAGEngine initialized with IDOP 5-path router")
 
     def _build_config(self, thread_id: str, user_id: str) -> dict:
         return {

@@ -89,10 +89,12 @@ _raw_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.stri
 allowed_origins: list[str] = _raw_origins if _raw_origins != ["*"] else ["*"]
 
 if allowed_origins == ["*"]:
+    # Wildcard origin — credentials MUST be False per CORS spec
+    # https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS/Errors/CORSNotSupportingCredentials
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"https?://.*",
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

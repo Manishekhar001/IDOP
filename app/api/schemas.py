@@ -197,6 +197,9 @@ class DetailedHealthResponse(BaseModel):
     version: str = Field(
         ..., description="Semantic version string of the currently deployed IDOP backend."
     )
+    git_commit_sha: str = Field(
+        ..., description="Git commit SHA of the currently deployed build."
+    )
     services: ServiceStatus = Field(
         ..., description="Per-service connectivity status flags."
     )
@@ -221,6 +224,7 @@ class DetailedHealthResponse(BaseModel):
                     "service": "IDOP — Intelligent Data Operations Platform API",
                     "timestamp": "2026-05-25T12:00:00Z",
                     "version": "0.1.0",
+                    "git_commit_sha": "abc123def",
                     "services": {
                         "postgres_checkpointer": True,
                         "supabase_company_db": True,

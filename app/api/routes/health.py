@@ -139,7 +139,9 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "document_cache_error": doc_cache_error,
     }
 
-    any_service_available = any(services_status.values())
+    # Only check boolean values — string entries like "disabled" or "local" are always truthy
+    boolean_statuses = [v for v in services_status.values() if isinstance(v, bool)]
+    any_service_available = any(boolean_statuses)
     health_status = "healthy" if (postgres_connected and supabase_connected and qdrant_connected) else "degraded" if any_service_available else "unhealthy"
 
     return {
