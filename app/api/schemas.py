@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Any, Literal, List, Optional, Dict
 from pydantic import BaseModel, Field
 
@@ -28,6 +27,9 @@ class ServiceStatus(BaseModel):
     document_cache_backend: str = Field(
         ..., description="Runtime document cache backend type: 's3', 's3_disabled', 'local', or 'unknown'."
     )
+    document_cache_error: Optional[str] = Field(
+        None, description="S3 initialization error detail when document cache fell back to local storage."
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -40,6 +42,7 @@ class ServiceStatus(BaseModel):
                     "query_cache_mode": "redis",
                     "document_cache": True,
                     "document_cache_backend": "s3",
+                    "document_cache_error": None,
                 }
             ]
         }

@@ -115,14 +115,14 @@ def run_security_group_check():
                             port_443_open = True
 
         if port_80_open:
-            print(f"   ✅ Port 80 (HTTP) is open to 0.0.0.0/0")
+            print("   ✅ Port 80 (HTTP) is open to 0.0.0.0/0")
         else:
-            print(f"   ❌ Port 80 (HTTP) is NOT open to 0.0.0.0/0")
+            print("   ❌ Port 80 (HTTP) is NOT open to 0.0.0.0/0")
             print(f"   📋 Fix: Edit security group(s) {sg_ids} and add inbound rule:")
-            print(f"      Type: HTTP | Port: 80 | Source: 0.0.0.0/0")
+            print("      Type: HTTP | Port: 80 | Source: 0.0.0.0/0")
 
         if port_443_open:
-            print(f"   ✅ Port 443 (HTTPS) is open to 0.0.0.0/0")
+            print("   ✅ Port 443 (HTTPS) is open to 0.0.0.0/0")
 
         if port_80_open:
             print("")
@@ -168,10 +168,10 @@ def run_health_check():
             print(f"   ⚠️  S3 Initialization Error: {doc_cache_error}")
 
         if doc_cache_backend == "s3":
-            print(f"   ✅ Document cache backend is S3")
+            print("   ✅ Document cache backend is S3")
         elif doc_cache_backend == "local":
-            print(f"   ⚠️ Document cache fell back to local storage (S3 unavailable)")
-            print(f"   📋 Expected S3 — check S3_CACHE_BUCKET secret, bucket existence, and IAM permissions")
+            print("   ⚠️ Document cache fell back to local storage (S3 unavailable)")
+            print("   📋 Expected S3 — check S3_CACHE_BUCKET secret, bucket existence, and IAM permissions")
             # Don't fail — app is still functional with local fallback
         else:
             print(f"   ❌ Document cache backend is '{doc_cache_backend}', expected 's3'")
@@ -183,7 +183,7 @@ def run_health_check():
         if query_cache_mode != "redis":
             print(f"   ❌ Query cache mode is '{query_cache_mode}', expected 'redis'")
             return False
-        print(f"   ✅ Query cache is connected to Redis")
+        print("   ✅ Query cache is connected to Redis")
 
         if status == "healthy":
             print(f"   ✅ Health endpoint verified! [Version: {version}]")
@@ -299,7 +299,7 @@ def run_cache_stats():
             print("")
             return True
         else:
-            print(f"   ⚠️ Document cache is empty (no cached documents yet)")
+            print("   ⚠️ Document cache is empty (no cached documents yet)")
             print("   (This may be expected if the upload failed earlier or cache was cleared)")
             print("")
             # Don't fail the test suite — the upload may not have actually hit the cache

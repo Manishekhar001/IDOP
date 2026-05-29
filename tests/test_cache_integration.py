@@ -11,7 +11,6 @@ Validates:
 
 import pytest
 from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 from app.services.cache_init import get_doc_cache, get_query_cache, reset_caches
 from app.services.cache_service import CacheService

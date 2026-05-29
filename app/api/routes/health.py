@@ -11,11 +11,6 @@ from app.services.cache_init import get_doc_cache, get_query_cache
 from app.api.schemas import (
     DetailedHealthResponse,
     DetailedReadinessResponse,
-    ServiceStatus,
-    FeaturesAvailable,
-    ConfigurationStatus,
-    QdrantInfo,
-    RedisCacheStatus,
     SystemInfoResponse,
     SystemStatsResponse,
 )
@@ -152,6 +147,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "service": "IDOP — Intelligent Data Operations Platform API",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": settings.app_version,
+        "git_commit_sha": settings.git_commit_sha,
         "services": services_status,
         "features_available": {
             "text_to_sql": True,

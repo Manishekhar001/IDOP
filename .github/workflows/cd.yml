@@ -540,6 +540,9 @@ jobs:
 
             # Correct runtime state flag (maps to Settings.environment)
             ENVIRONMENT=production
+
+            # Git commit SHA for deploy verification
+            GIT_COMMIT_SHA=${{ github.sha }}
             ENVEOF
 
             chmod 600 .env
@@ -602,13 +605,31 @@ jobs:
             aws sts get-caller-identity 2>&1 || echo "⚠️ AWS identity check failed — will still attempt ECR login"
             echo ""
 
-            echo "🔐 Logging Docker into ECR..."
+            echo "🔐 Logging Docker into ECR (IAM user)..."
             ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }} 2>&1)
             ECR_LOGIN_EXIT=$?
             if [ $ECR_LOGIN_EXIT -ne 0 ]; then
               echo "❌ ECR get-login-password failed (exit $ECR_LOGIN_EXIT)"
               echo "   Error: $ECR_PASSWORD"
-              echo "   ⚠️ Will continue using cached images if available"
+              echo ""
+              echo "🔐 Trying ECR login via EC2 instance role as fallback..."
+              unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+              ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }} 2>&1)
+              ECR_LOGIN_EXIT=$?
+              if [ $ECR_LOGIN_EXIT -ne 0 ]; then
+                echo "❌ Instance role ECR login also failed (exit $ECR_LOGIN_EXIT)"
+                echo "   Error: $ECR_PASSWORD"
+                echo "   ⚠️ Will continue using cached images if available"
+              else
+                echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }} 2>&1
+                DOCKER_LOGIN_EXIT=$?
+                if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
+                  echo "❌ Docker login to ECR via instance role failed (exit $DOCKER_LOGIN_EXIT)"
+                  echo "   ⚠️ Will continue using cached images if available"
+                else
+                  echo "✅ Docker authenticated with ECR via instance role!"
+                fi
+              fi
             else
               echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }} 2>&1
               DOCKER_LOGIN_EXIT=$?
@@ -658,6 +679,11 @@ jobs:
             # First bring down (doesn't remove named volumes) then spin up
             echo "♻️ Recreating containers via docker compose..."
             $COMPOSE_CMD down 2>&1 || echo "   ℹ️ compose down minor issue (continuing)"
+            # ── Always pull the latest image before recreating ──
+            echo "📥 Ensuring latest image is pulled..."
+            $COMPOSE_CMD pull 2>&1 || echo "   ⚠️ compose pull had issues (check ECR auth above)"
+
+            # ── Recreate containers with --pull always to force fresh image ──
             $COMPOSE_CMD up -d 2>&1
             COMPOSE_EXIT=$?
             if [ $COMPOSE_EXIT -ne 0 ]; then
@@ -680,11 +706,6 @@ jobs:
             else
               echo "   ✅ Docker compose orchestration successful!"
             fi
-            echo ""
-
-            # Show running containers
-            echo "📋 Running containers:"
-            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
             echo ""
 
             # Show running containers
@@ -730,6 +751,7 @@ jobs:
               $COMPOSE_CMD down
               $DOCKER_CMD tag ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable \
                 ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest 2>/dev/null || true
+              $COMPOSE_CMD pull 2>&1 || true
               $COMPOSE_CMD up -d
               echo "✅ Rollback complete. Stable state restored."
               exit 1

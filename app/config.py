@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     allowed_origins: str = "*"
+    git_commit_sha: str = "unknown"
 
     # OpenAI API Configuration
     openai_api_key: str

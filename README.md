@@ -217,9 +217,9 @@ The graph shifts execution flows based on five dynamic routing functions:
 │   ├── test_graph.py            # LangGraph Wiring tests
 │   ├── test_router.py           # 5-Path Router tests
 │   └── test_storage_backends.py # Local and S3 (moto) Storage tests
-├── workflows/                   # Comprehensive Architectural Manuals
+├── docs/design/                # Comprehensive Architectural Manuals
 │   ├── 00-index.md              # Documentation Directory Map
-│   └── 01-14-workflows.md       # Detailed Subsystem Documents
+│   └── 01-16-workflows.md       # Detailed Subsystem Documents
 ├── Dockerfile                   # Container Configurations
 ├── docker-compose.yml           # Local Multi-Container Services
 ├── requirements.txt             # Project Dependencies
@@ -300,21 +300,21 @@ Run the entire test suite:
 
 ## 📖 Architectural Manuals Directory
 
-A comprehensive library of 14 highly structured workflow manuals is compiled under the `/workflows` directory for detailed subsystem inspections:
+A comprehensive library of 16 highly structured workflow manuals is compiled under the `docs/design/` directory for detailed subsystem inspections:
 
-*   **[01-System Architecture](./workflows/01-system-architecture.md)**: Physical components map, FastAPI routing, Voyage/Qdrant/OpenAI stack.
-*   **[02-Unified Query Flow](./workflows/02-unified-query-flow.md)**: 5-path router structured classification, schemas, and availability.
-*   **[03-Document Upload Pipeline](./workflows/03-document-upload-pipeline.md)**: Chunking, dual-vector generation, and caching.
-*   **[04-Feature 1: SQL Execution](./workflows/04-feature1-sql-execution.md)**: Text2SQL generate, validate, audit judge, and token approval gates.
-*   **[05-Feature 2: Mutation Pipeline](./workflows/05-feature2-mutation-pipeline.md)**: Parsing, business rules.json mapping, safety judges, and Postgres transactions.
-*   **[06-Feature 3: RAG Pipeline](./workflows/06-feature3-rag-pipeline.md)**: Complete CSRAG workflow (LTM, HyDE, RRF, Rerank, CRAG Tavily web search, SRAG verifier support/usefulness).
-*   **[07-LangGraph State Machine](./workflows/07-langgraph-state-machine.md)**: LangGraph compiler, complete `CSRAGState` fields, active routing functions, checkpointers.
-*   **[08-Hybrid Search Mechanics](./workflows/08-hybrid-search.md)**: Dual-vector dense + sparse search mathematical modeling and RRF rank fusion formula.
-*   **[09-CRAG Pipeline](./workflows/09-crag-pipeline.md)**: Corrective RAG scoring thresholds and Tavily Web Search loops.
-*   **[10-SRAG Pipeline](./workflows/10-srag-pipeline.md)**: Self-Reflective RAG verifier support/usefulness loops and retry policies.
-*   **[11-Memory System](./workflows/11-memory-system.md)**: Short-term checkpoints (STM) and long-term PostgreSQL stores (LTM) facts extraction.
-*   **[12-Multi-Level Caching](./workflows/12-multi-level-cache.md)**: Multi-tier Upstash Redis TTL namespaces, S3 document caching, and LRU fallbacks.
-*   **[13-Service Lifespan & Initialization](./workflows/13-service-initialization.md)**: FastAPI lifecycle startup chronological ordering, graceful degradation statuses.
-*   **[14-Production Deployment](./workflows/14-deployment.md)**: Docker Compose orchestration, production secret variables mapping, CI/CD, and Serverless analysis.
-*   **[15-Design Decisions & Interview Narrative](./workflows/15-design-decisions-interview.md)**: Deep-dive model routing rationales, persistent checkpoint ACID pooling, and comprehensive stakeholder defense Q&A.
-*   **[16-Step-by-Step EC2 Setup](./workflows/16-production-deployment-guide.md)**: Detailed step-by-step virtual machine provisioning, Docker installs, SSL Certbot configurations, Nginx proxies, and log inspections.
+*   **[01-System Architecture](./docs/design/01-system-architecture.md)**: Physical components map, FastAPI routing, Voyage/Qdrant/OpenAI stack.
+*   **[02-Unified Query Flow](./docs/design/02-unified-query-flow.md)**: 5-path router structured classification, schemas, and availability.
+*   **[03-Document Upload Pipeline](./docs/design/03-document-upload-pipeline.md)**: Chunking, dual-vector generation, and caching.
+*   **[04-Feature 1: SQL Execution](./docs/design/04-feature1-sql-execution.md)**: Text2SQL generate, validate, audit judge, and token approval gates.
+*   **[05-Feature 2: Mutation Pipeline](./docs/design/05-feature2-mutation-pipeline.md)**: Parsing, business rules.json mapping, safety judges, and Postgres transactions.
+*   **[06-Feature 3: RAG Pipeline](./docs/design/06-feature3-rag-pipeline.md)**: Complete CSRAG workflow (LTM, HyDE, RRF, Rerank, CRAG Tavily web search, SRAG verifier support/usefulness).
+*   **[07-LangGraph State Machine](./docs/design/07-langgraph-state-machine.md)**: LangGraph compiler, complete `CSRAGState` fields, active routing functions, checkpointers.
+*   **[08-Hybrid Search Mechanics](./docs/design/08-hybrid-search.md)**: Dual-vector dense + sparse search mathematical modeling and RRF rank fusion formula.
+*   **[09-CRAG Pipeline](./docs/design/09-crag-pipeline.md)**: Corrective RAG scoring thresholds and Tavily Web Search loops.
+*   **[10-SRAG Pipeline](./docs/design/10-srag-pipeline.md)**: Self-Reflective RAG verifier support/usefulness loops and retry policies.
+*   **[11-Memory System](./docs/design/11-memory-system.md)**: Short-term checkpoints (STM) and long-term PostgreSQL stores (LTM) facts extraction.
+*   **[12-Multi-Level Caching](./docs/design/12-multi-level-cache.md)**: Multi-tier Upstash Redis TTL namespaces, S3 document caching, and LRU fallbacks.
+*   **[13-Service Lifespan & Initialization](./docs/design/13-service-initialization.md)**: FastAPI lifecycle startup chronological ordering, graceful degradation statuses.
+*   **[14-Production Deployment](./docs/design/14-deployment.md)**: Docker Compose orchestration, production secret variables mapping, CI/CD, and Serverless analysis.
+*   **[15-Design Decisions & Interview Narrative](./docs/design/15-design-decisions-interview.md)**: Deep-dive model routing rationales, persistent checkpoint ACID pooling, and comprehensive stakeholder defense Q&A.
+*   **[16-Step-by-Step EC2 Setup](./docs/design/16-production-deployment-guide.md)**: Detailed step-by-step virtual machine provisioning, Docker installs, SSL Certbot configurations, Nginx proxies, and log inspections.
