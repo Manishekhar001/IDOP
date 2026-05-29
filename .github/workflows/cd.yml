@@ -303,8 +303,8 @@ jobs:
             # Install general system dependencies
             echo "📦 Updating package lists..."
             sudo apt-get update -y
-            echo "📦 Installing zip, unzip, curl, gnupg, ca-certificates, lsb-release..."
-            sudo apt-get install -y zip unzip curl gnupg ca-certificates lsb-release
+            echo "📦 Installing zip, unzip, curl, gnupg, ca-certificates, lsb-release, lsof..."
+            sudo apt-get install -y zip unzip curl gnupg ca-certificates lsb-release lsof
             echo ""
 
             # Check and install Docker if missing
@@ -410,7 +410,44 @@ jobs:
             EOF
 
             sudo ln -sf /etc/nginx/sites-available/idop.conf /etc/nginx/sites-enabled/
+
+            # Validate nginx config syntax before restarting
+            echo "🔍 Validating nginx configuration..."
+            sudo nginx -t
+            if [ $? -ne 0 ]; then
+              echo "❌ Nginx configuration invalid — aborting nginx restart."
+              exit 1
+            fi
+            echo "✅ Nginx configuration syntax is valid!"
+
+            # Kill any process already holding port 80 (e.g., Apache on some Ubuntu AMIs)
+            if sudo lsof -i :80 -P -n 2>/dev/null | grep -q LISTEN; then
+              OLD_PROCESS=$(sudo lsof -i :80 -P -n | grep LISTEN | awk '{print $1}' | head -1)
+              echo "⚠️ Port 80 is already in use by '$OLD_PROCESS'. Stopping it..."
+              sudo systemctl stop "$OLD_PROCESS" 2>/dev/null || sudo kill -9 $(sudo lsof -t -i :80) 2>/dev/null || true
+              sleep 2
+            fi
+
+            echo "🌐 Restarting nginx..."
+            sudo systemctl enable nginx
             sudo systemctl restart nginx
+            sleep 2
+
+            # Verify nginx is actually listening on port 80
+            if sudo lsof -i :80 -P -n 2>/dev/null | grep -q LISTEN; then
+              echo "✅ Nginx is listening on port 80"
+            else
+              echo "❌ Nginx is NOT listening on port 80 — checking status..."
+              sudo systemctl status nginx --no-pager 2>&1 || true
+              echo "⚠️ Attempting fallback: direct start via nginx binary..."
+              sudo nginx 2>&1 || true
+              sleep 2
+              if sudo lsof -i :80 -P -n 2>/dev/null | grep -q LISTEN; then
+                echo "✅ Nginx started successfully via direct binary!"
+              else
+                echo "❌ Nginx still not listening on port 80. Deployment may fail smoke tests."
+              fi
+            fi
             echo "✅ Nginx reverse proxy configured successfully!"
 
             # Optional Domain Setup & Let's Encrypt SSL
@@ -580,9 +617,11 @@ jobs:
             echo "=========================================="
             echo "🧪 Step 11j: Health check with retry logic"
             echo "=========================================="
-            API_URL="http://localhost:8000"
-            echo "🏥 Testing health endpoint: $API_URL/health"
             echo ""
+
+            # ── Test 1: FastAPI container health (port 8000) ──
+            echo "🏥 Test 1: FastAPI container health (port 8000)..."
+            API_URL="http://localhost:8000"
 
             RETRY=0
             MAX_RETRIES=5
@@ -601,7 +640,7 @@ jobs:
             if [ $RETRY -eq $MAX_RETRIES ]; then
               echo ""
               echo "=========================================="
-              echo "❌ HEALTH CHECK FAILED — TRIGGERING ROLLBACK"
+              echo "❌ CONTAINER HEALTH CHECK FAILED — TRIGGERING ROLLBACK"
               echo "=========================================="
               echo ""
               echo "📋 Container logs (last 50 lines):"
@@ -618,14 +657,48 @@ jobs:
               exit 1
             fi
 
+            echo "   ✅ FastAPI container health endpoint responding!"
             echo ""
-            echo "   ✅ Health endpoint responding!"
-            echo ""
-            echo "📋 Health Check Response:"
-            echo "─────────────────────────"
+            echo "📋 Container Health Check Response:"
+            echo "──────────────────────────────────────"
             curl -s "$API_URL/health" | python3 -m json.tool 2>/dev/null || curl -s "$API_URL/health"
             echo ""
-            echo "─────────────────────────"
+            echo "──────────────────────────────────────"
+            echo ""
+
+            # ── Test 2: Nginx reverse proxy health (port 80) ──
+            echo "🏥 Test 2: Nginx reverse proxy health (port 80)..."
+            NGINX_URL="http://localhost:80"
+
+            RETRY=0
+            MAX_RETRIES=3
+            WAIT_SECONDS=3
+
+            until curl -f -s "$NGINX_URL/health" > /dev/null 2>&1 || [ $RETRY -eq $MAX_RETRIES ]; do
+              RETRY=$((RETRY+1))
+              if [ $RETRY -eq 1 ]; then
+                echo "   ⚠️ Nginx not responding yet, checking status..."
+                sudo systemctl status nginx --no-pager 2>&1 | head -20 || true
+              fi
+              echo "   ⚠️ Attempt $RETRY/$MAX_RETRIES failed, retrying in ${WAIT_SECONDS}s..."
+              sleep $WAIT_SECONDS
+            done
+
+            if [ $RETRY -eq $MAX_RETRIES ]; then
+              echo "   ❌ Nginx proxy health check FAILED after retries."
+              echo "   📋 Nginx error log (last 20 lines):"
+              sudo tail -20 /var/log/nginx/error.log 2>/dev/null || echo "   (no error log found)"
+              echo ""
+              echo "   ⚠️ Deployment will continue, but smoke tests may fail on port 80."
+            else
+              echo "   ✅ Nginx reverse proxy is proxying correctly on port 80!"
+              echo ""
+              echo "📋 Nginx Health Check Response:"
+              echo "─────────────────────────────────"
+              curl -s "$NGINX_URL/health" | python3 -m json.tool 2>/dev/null || curl -s "$NGINX_URL/health"
+              echo ""
+              echo "─────────────────────────────────"
+            fi
             echo ""
 
       # ─────────────────────────────────────────────────────────────────────
