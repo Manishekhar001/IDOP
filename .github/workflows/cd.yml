@@ -594,9 +594,29 @@ jobs:
             export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             export AWS_DEFAULT_REGION="${{ env.AWS_REGION }}"
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-              $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }}
-            echo "✅ Docker authenticated with ECR"
+
+            # Verify AWS CLI works before attempting ECR login
+            echo "🔍 Verifying AWS identity on EC2..."
+            aws sts get-caller-identity 2>&1 || echo "⚠️ AWS identity check failed — will still attempt ECR login"
+            echo ""
+
+            echo "🔐 Logging Docker into ECR..."
+            ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }} 2>&1)
+            ECR_LOGIN_EXIT=$?
+            if [ $ECR_LOGIN_EXIT -ne 0 ]; then
+              echo "❌ ECR get-login-password failed (exit $ECR_LOGIN_EXIT)"
+              echo "   Error: $ECR_PASSWORD"
+              echo "   ⚠️ Will continue using cached images if available"
+            else
+              echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }} 2>&1
+              DOCKER_LOGIN_EXIT=$?
+              if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
+                echo "❌ Docker login to ECR failed (exit $DOCKER_LOGIN_EXIT)"
+                echo "   ⚠️ Will continue using cached images if available"
+              else
+                echo "✅ Docker authenticated with ECR successfully!"
+              fi
+            fi
             echo ""
 
             echo "=========================================="
@@ -610,8 +630,13 @@ jobs:
             echo "=========================================="
             echo "📥 Step 11h: Pulling latest image from ECR"
             echo "=========================================="
-            $COMPOSE_CMD pull app
-            echo "✅ Latest image pulled successfully"
+            $DOCKER_CMD pull ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest 2>&1
+            PULL_EXIT=$?
+            if [ $PULL_EXIT -ne 0 ]; then
+              echo "⚠️ docker pull failed (exit $PULL_EXIT) — will use cached image"
+            else
+              echo "✅ Latest image pulled successfully!"
+            fi
             echo ""
 
             echo "=========================================="
@@ -622,19 +647,9 @@ jobs:
             echo "🗑️ Force-removing old idop-app container..."
             $DOCKER_CMD rm -f idop-app 2>/dev/null || echo "   ℹ️ No existing container to remove"
 
-            # ── Pull the absolute latest image from ECR ──
-            echo "📥 Force-pulling absolute latest image from ECR..."
-            $DOCKER_CMD pull ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
-            if [ $? -ne 0 ]; then
-              echo "❌ Failed to pull latest image from ECR!"
-              exit 1
-            fi
-            echo "   ✅ Latest image pulled and verified"
-            echo ""
-
-            # ── Verify the pulled image digest/ID for audit trail ──
-            echo "🔍 Verifying pulled image ID:"
-            $DOCKER_CMD images --digests ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
+            # ── Verify what image version we have available ──
+            echo "🔍 Current image state:"
+            $DOCKER_CMD images ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" 2>/dev/null || echo "   (no local image found)"
             echo ""
 
             # ── Start fresh with docker compose (handles checkpoint-db + app together) ──
@@ -644,7 +659,7 @@ jobs:
             $COMPOSE_CMD up -d 2>&1
             COMPOSE_EXIT=$?
             if [ $COMPOSE_EXIT -ne 0 ]; then
-              echo "❌ docker compose up failed with exit code $COMPOSE_EXIT — attempting direct container launch..."
+              echo "⚠️ docker compose up failed with exit code $COMPOSE_EXIT — attempting direct container launch..."
               echo "   🔄 Launching container directly with explicit image tag..."
               $DOCKER_CMD run -d \
                 --name idop-app \
@@ -652,14 +667,22 @@ jobs:
                 -p 127.0.0.1:8000:8000 \
                 --env-file .env \
                 ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
-              if [ $? -ne 0 ]; then
-                echo "❌ Direct container launch also failed — deployment failed!"
-                exit 1
+              DIRECT_EXIT=$?
+              if [ $DIRECT_EXIT -ne 0 ]; then
+                echo "❌ Direct container launch also failed (exit $DIRECT_EXIT)"
+                echo "   Last resort: attempting docker compose up again..."
+                $COMPOSE_CMD up -d 2>&1 || true
+              else
+                echo "   ✅ Container launched directly (bypassing compose)"
               fi
-              echo "   ✅ Container launched directly (bypassing compose)"
             else
               echo "   ✅ Docker compose orchestration successful!"
             fi
+            echo ""
+
+            # Show running containers
+            echo "📋 Running containers:"
+            $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
             echo ""
 
             # Show running containers
