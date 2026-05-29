@@ -115,8 +115,11 @@ async def health_check(request: Request) -> Dict[str, Any]:
     # Determine the actual document cache backend at runtime
     doc_cache_backend = "unknown"
     doc_cache_enabled = False
+    doc_cache_error = None
     if doc_cache and hasattr(doc_cache, 'storage'):
         doc_cache_enabled = True
+        # Capture any init error for diagnostics
+        doc_cache_error = getattr(doc_cache, 'init_error', None)
         backend_class = type(doc_cache.storage).__name__
         if backend_class == 'S3StorageBackend':
             doc_cache_backend = "s3" if getattr(doc_cache.storage, 'enabled', False) else "s3_disabled"
@@ -124,6 +127,10 @@ async def health_check(request: Request) -> Dict[str, Any]:
             doc_cache_backend = "local"
         else:
             doc_cache_backend = backend_class
+    else:
+        # Cache init failed — report what was configured for debugging
+        configured_backend = settings.storage_backend
+        doc_cache_backend = f"unavailable (configured: {configured_backend})"
 
     # Check overall liveness / readiness state
     services_status = {
@@ -134,6 +141,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "query_cache_mode": query_cache_mode,
         "document_cache": doc_cache_enabled,
         "document_cache_backend": doc_cache_backend,
+        "document_cache_error": doc_cache_error,
     }
 
     any_service_available = any(services_status.values())

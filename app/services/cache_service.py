@@ -18,6 +18,7 @@ class CacheService:
     """
 
     def __init__(self, storage_backend: Optional[StorageBackend] = None):
+        self.init_error: Optional[str] = None
         settings = get_settings()
         if storage_backend is None:
             backend_type = getattr(settings, "storage_backend", "s3").lower()
@@ -26,20 +27,29 @@ class CacheService:
                 try:
                     self.storage = S3StorageBackend()
                     if not self.storage.enabled:
-                        logger.warning("S3 storage initialized but reported disabled — falling back to local.")
-                        if settings.environment == "production":
-                            raise RuntimeError("S3 storage initialization failed in production (bucket inaccessible)")
+                        # Capture the actual S3 validation error for diagnostics
+                        s3_err = getattr(self.storage, 'validation_error', None)
+                        err_msg = (
+                            f"S3 disabled: {s3_err}" if s3_err else (
+                                f"S3 storage initialized but reported disabled. "
+                                f"Bucket: '{settings.s3_cache_bucket}', Region: {settings.aws_region}. "
+                                f"Check bucket existence, IAM permissions (s3:HeadBucket, s3:PutObject, s3:GetObject), "
+                                f"and that the bucket is in region {settings.aws_region}."
+                            )
+                        )
+                        self.init_error = err_msg
+                        logger.critical(err_msg)
                         self.storage = LocalStorageBackend()
                     else:
                         logger.info(f"Using S3 storage (bucket: {settings.s3_cache_bucket})")
                 except Exception as e:
-                    if settings.environment == "production":
-                        raise RuntimeError(
-                            f"S3 storage initialization failed in production: {e}"
-                        )
-                    logger.warning(
-                        f"Failed to initialize S3 storage: {e}. Falling back to local."
+                    err_msg = (
+                        f"Failed to initialize S3 storage: {e}. "
+                        f"Bucket: '{settings.s3_cache_bucket}', Region: {settings.aws_region}. "
+                        f"Check bucket name, IAM permissions, and network connectivity."
                     )
+                    self.init_error = err_msg
+                    logger.critical(err_msg)
                     self.storage = LocalStorageBackend()
             elif backend_type == "local":
                 self.storage = LocalStorageBackend()

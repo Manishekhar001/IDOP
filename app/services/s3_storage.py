@@ -2,7 +2,7 @@ import json
 import io
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 import numpy as np
 from app.services.storage_backend import StorageBackend
 from app.config import get_settings
@@ -48,10 +48,12 @@ class S3StorageBackend(StorageBackend):
         else:
             self.s3_client = boto3.client("s3", config=boto_config)
 
+        self.validation_error: Optional[str] = None
         try:
             self._validate_bucket()
             logger.info(f"S3Storage initialized with bucket: {self.bucket_name} (region: {self.region})")
         except Exception as e:
+            self.validation_error = str(e)
             logger.warning(f"S3 bucket validation failed, disabling S3 backend: {e}")
             self.enabled = False
 
