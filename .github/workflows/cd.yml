@@ -24,7 +24,8 @@ env:
 # ├──────────────────────────┬─────────────────────────────────────────────┤
 # │ AWS_ACCESS_KEY_ID        │ IAM User Access Key (starts with AKIA...)   │
 # │                          │ Source: IAM → Users → Security credentials  │
-# │                          │ Permissions: ECR read/write, S3 access      │
+# │                          │ Permissions: ECR read/write (S3 cache uses  │
+# │                          │ EC2 instance role, not this user)           │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ AWS_SECRET_ACCESS_KEY    │ IAM User Secret Access Key                  │
 # │                          │ Source: IAM → Users → Security credentials  │
@@ -530,9 +531,10 @@ jobs:
             SUPABASE_DB_URL=${{ secrets.SUPABASE_DB_URL }}
 
             # AWS S3 (Document chunk caching)
+            # NOTE: AWS credentials intentionally NOT passed here — the container
+            # uses the EC2 instance's IAM role for S3 access, which avoids coupling
+            # S3 cache permissions to the GitHub Actions IAM user.
             AWS_REGION=${{ env.AWS_REGION }}
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             S3_CACHE_BUCKET=${{ secrets.S3_CACHE_BUCKET }}
             STORAGE_BACKEND=s3
 
