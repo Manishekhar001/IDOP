@@ -617,13 +617,49 @@ jobs:
             echo "=========================================="
             echo "🚀 Step 11i: Orchestrating containers"
             echo "=========================================="
-            # Stop existing containers gracefully
-            $COMPOSE_CMD down
-            echo "   ✅ Old containers stopped"
 
-            # Start updated containers in detached mode
-            $COMPOSE_CMD up -d
-            echo "   ✅ New containers launched"
+            # ── Forcefully remove any existing idop-app container ──
+            echo "🗑️ Force-removing old idop-app container..."
+            $DOCKER_CMD rm -f idop-app 2>/dev/null || echo "   ℹ️ No existing container to remove"
+
+            # ── Pull the absolute latest image from ECR ──
+            echo "📥 Force-pulling absolute latest image from ECR..."
+            $DOCKER_CMD pull ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
+            if [ $? -ne 0 ]; then
+              echo "❌ Failed to pull latest image from ECR!"
+              exit 1
+            fi
+            echo "   ✅ Latest image pulled and verified"
+            echo ""
+
+            # ── Verify the pulled image digest/ID for audit trail ──
+            echo "🔍 Verifying pulled image ID:"
+            $DOCKER_CMD images --digests ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
+            echo ""
+
+            # ── Start fresh with docker compose (handles checkpoint-db + app together) ──
+            # First bring down (doesn't remove named volumes) then spin up
+            echo "♻️ Recreating containers via docker compose..."
+            $COMPOSE_CMD down 2>&1 || echo "   ℹ️ compose down minor issue (continuing)"
+            $COMPOSE_CMD up -d 2>&1
+            COMPOSE_EXIT=$?
+            if [ $COMPOSE_EXIT -ne 0 ]; then
+              echo "❌ docker compose up failed with exit code $COMPOSE_EXIT — attempting direct container launch..."
+              echo "   🔄 Launching container directly with explicit image tag..."
+              $DOCKER_CMD run -d \
+                --name idop-app \
+                --restart always \
+                -p 127.0.0.1:8000:8000 \
+                --env-file .env \
+                ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
+              if [ $? -ne 0 ]; then
+                echo "❌ Direct container launch also failed — deployment failed!"
+                exit 1
+              fi
+              echo "   ✅ Container launched directly (bypassing compose)"
+            else
+              echo "   ✅ Docker compose orchestration successful!"
+            fi
             echo ""
 
             # Show running containers
