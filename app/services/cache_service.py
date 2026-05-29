@@ -25,7 +25,13 @@ class CacheService:
             if backend_type == "s3":
                 try:
                     self.storage = S3StorageBackend()
-                    logger.info(f"Using S3 storage (bucket: {settings.s3_cache_bucket})")
+                    if not self.storage.enabled:
+                        logger.warning("S3 storage initialized but reported disabled — falling back to local.")
+                        if settings.environment == "production":
+                            raise RuntimeError("S3 storage initialization failed in production (bucket inaccessible)")
+                        self.storage = LocalStorageBackend()
+                    else:
+                        logger.info(f"Using S3 storage (bucket: {settings.s3_cache_bucket})")
                 except Exception as e:
                     if settings.environment == "production":
                         raise RuntimeError(

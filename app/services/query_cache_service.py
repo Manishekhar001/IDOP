@@ -1,6 +1,7 @@
 import json
 import hashlib
 import logging
+import fnmatch
 from typing import Optional, Dict, Any
 from app.config import get_settings
 
@@ -9,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 class QueryCacheService:
     """Redis-based cache service for query results, embeddings, and SQL."""
+
+    # Shared class-level local cache so all instances share the same data
+    _local_cache_shared: Dict[str, str] = {}
 
     def __init__(
         self, redis_url: Optional[str] = None, redis_token: Optional[str] = None
@@ -27,7 +31,7 @@ class QueryCacheService:
         redis_url = redis_url or settings.upstash_redis_url
         redis_token = redis_token or settings.upstash_redis_token
         self.use_local = False
-        self._local_cache = {}
+        self._local_cache = self._local_cache_shared
 
         if redis_url and redis_token:
             try:
@@ -118,8 +122,15 @@ class QueryCacheService:
             return False
 
     def delete(self, pattern: str) -> int:
-        if not self.enabled:
+        if not self.enabled and not self.use_local:
             return 0
+
+        if self.use_local:
+            keys_to_delete = [k for k in self._local_cache if fnmatch.fnmatch(k, pattern)]
+            for k in keys_to_delete:
+                del self._local_cache[k]
+            logger.info(f"Local cache invalidation: Deleted {len(keys_to_delete)} keys matching '{pattern}'")
+            return len(keys_to_delete)
 
         try:
             keys = self.client.keys(pattern)
@@ -139,6 +150,11 @@ class QueryCacheService:
             return 0
 
     def flush_all(self) -> bool:
+        if self.use_local:
+            self._local_cache.clear()
+            logger.info("Local cache flushed: All keys deleted")
+            return True
+
         if not self.enabled:
             return False
 
@@ -198,6 +214,8 @@ class QueryCacheService:
         logger.info("Cache statistics reset")
 
     def health_check(self) -> Dict:
+        if self.use_local:
+            return {"status": "healthy", "message": "Local in-memory cache active", "mode": "local"}
         if not self.enabled:
             return {"status": "disabled", "message": "Redis cache not configured"}
 

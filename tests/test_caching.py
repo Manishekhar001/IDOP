@@ -228,10 +228,11 @@ class TestQueryCacheService:
         assert stats["cache_types"]["rag"]["hits"] == 0
         assert stats["cache_types"]["rag"]["misses"] == 0
 
-    def test_health_check_disabled(self, local_cache):
-        """Test health check reports disabled when Redis is not configured."""
+    def test_health_check_local_mode(self, local_cache):
+        """Test health check reports healthy in local fallback mode."""
         health = local_cache.health_check()
-        assert health["status"] == "disabled"
+        assert health["status"] == "healthy"
+        assert health["mode"] == "local"
 
     def test_multiple_cache_types_tracked_independently(self, local_cache):
         """Test that different cache types (rag, sql_gen, etc.) track stats independently."""
@@ -248,9 +249,16 @@ class TestQueryCacheService:
         assert stats["cache_types"]["sql_gen"]["hits"] == 1
         assert stats["cache_types"]["sql_gen"]["misses"] == 1
 
-    def test_flush_all_disabled(self, local_cache):
-        """Test that flush_all returns False when Redis is disabled."""
-        assert local_cache.flush_all() is False
+    def test_flush_all_local_cache(self, local_cache):
+        """Test that flush_all clears all keys from local cache."""
+        # Flush first to start clean (shared class-level cache may have data from other tests)
+        local_cache.flush_all()
+        local_cache.set("flush:k1", {"a": 1}, ttl=3600)
+        local_cache.set("flush:k2", {"b": 2}, ttl=3600)
+        assert "flush:k1" in local_cache._local_cache
+        assert "flush:k2" in local_cache._local_cache
+        assert local_cache.flush_all() is True
+        assert len(local_cache._local_cache) == 0
 
     def test_delete_disabled(self, local_cache):
         """Test that delete returns 0 when Redis is disabled."""

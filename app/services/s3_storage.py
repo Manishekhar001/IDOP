@@ -52,7 +52,8 @@ class S3StorageBackend(StorageBackend):
             self._validate_bucket()
             logger.info(f"S3Storage initialized with bucket: {self.bucket_name} (region: {self.region})")
         except Exception as e:
-            logger.warning(f"S3 bucket validation failed, running in unvalidated mode: {e}")
+            logger.warning(f"S3 bucket validation failed, disabling S3 backend: {e}")
+            self.enabled = False
 
     def _validate_bucket(self) -> None:
         from botocore.exceptions import ClientError
@@ -83,8 +84,10 @@ class S3StorageBackend(StorageBackend):
     def exists(self, document_id: str, file_extension: str) -> bool:
         if not self.enabled:
             return False
+        # NOTE: document.{ext} is intentionally excluded — the upload flow only saves
+        # chunks.json, embeddings.npy, and metadata.json via save_chunks_and_embeddings().
+        # LocalStorageBackend matches this check for consistency.
         required_files = [
-            f"document.{file_extension}",
             "chunks.json",
             "embeddings.npy",
             "metadata.json",
@@ -300,12 +303,22 @@ class S3StorageBackend(StorageBackend):
                     total_objects += 1
                     doc_type = obj["Key"].split("/")[0] if "/" in obj["Key"] else "unknown"
                     doc_type_counts[doc_type] = doc_type_counts.get(doc_type, 0) + 1
+            total_size_bytes_value = total_size
+            if total_size_bytes_value < 1024:
+                total_size_human_value = f"{total_size_bytes_value} B"
+            elif total_size_bytes_value < 1024 * 1024:
+                total_size_human_value = f"{total_size_bytes_value / 1024:.1f} KB"
+            else:
+                total_size_human_value = f"{total_size_bytes_value / (1024 * 1024):.2f} MB"
+
             stats = {
                 "backend": "s3",
                 "bucket": self.bucket_name,
                 "region": self.region,
                 "total_documents": len(self.list_documents()),
                 "total_objects": total_objects,
+                "total_size_bytes": total_size_bytes_value,
+                "total_size_human": total_size_human_value,
                 "total_size_mb": round(total_size / (1024 * 1024), 2),
                 "documents_by_type": doc_type_counts,
             }

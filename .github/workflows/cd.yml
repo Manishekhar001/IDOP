@@ -379,8 +379,19 @@ jobs:
             echo "🌐 Configuring Nginx server block..."
             sudo rm -f /etc/nginx/sites-enabled/default
 
-            # Get public IP dynamically
-            EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || curl -s https://api.ipify.org || echo "_")
+            # Get public IP dynamically (IMDSv2 → IMDSv1 → ipify → catch-all _)
+            IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
+            if [ -n "$IMDS_TOKEN" ]; then
+              EC2_PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+            else
+              EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+            fi
+            if [ -z "$EC2_PUBLIC_IP" ]; then
+              EC2_PUBLIC_IP=$(curl -s https://api.ipify.org)
+            fi
+            if [ -z "$EC2_PUBLIC_IP" ]; then
+              EC2_PUBLIC_IP="_"
+            fi
             echo "🌐 Dynamic Public IP: $EC2_PUBLIC_IP"
 
             sudo tee /etc/nginx/sites-available/idop.conf <<EOF
@@ -712,7 +723,7 @@ jobs:
           echo "   Target Host: ${{ secrets.EC2_HOST }}"
           echo ""
           python -m pip install --upgrade pip
-          pip install requests pydantic
+          pip install requests pydantic boto3
           
           if [ -n "${{ secrets.DOMAIN_NAME }}" ]; then
             export API_TARGET_URL="https://${{ secrets.DOMAIN_NAME }}"

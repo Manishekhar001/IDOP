@@ -143,12 +143,22 @@ class LocalStorageBackend(StorageBackend):
                         if file.is_file():
                             total_size += file.stat().st_size
                             total_files += 1
+        total_size_bytes = total_size
+        if total_size_bytes < 1024:
+            total_size_human = f"{total_size_bytes} B"
+        elif total_size_bytes < 1024 * 1024:
+            total_size_human = f"{total_size_bytes / 1024:.1f} KB"
+        else:
+            total_size_human = f"{total_size_bytes / (1024 * 1024):.2f} MB"
+
         stats = {
             "backend": "local",
             "cache_dir": str(self.cache_dir),
             "total_documents": documents_count,
             "total_files": total_files,
             "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "total_size_bytes": total_size_bytes,
+            "total_size_human": total_size_human,
         }
         logger.info(f"Local storage stats: {stats}")
         return stats

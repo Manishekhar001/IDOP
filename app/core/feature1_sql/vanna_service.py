@@ -301,7 +301,7 @@ class TextToSQLService:
         else:
             self.vanna.current_top_p = 0.1
 
-        if self.query_cache_service and self.query_cache_service.enabled:
+        if self.query_cache_service and (self.query_cache_service.enabled or self.query_cache_service.use_local):
             cache_key = self.query_cache_service.get_sql_gen_key(question)
             cached_result = self.query_cache_service.get(cache_key, cache_type="sql_gen")
 
@@ -372,7 +372,7 @@ Do not include any additional text outside the code block.
                 logger.info(f"Direct LLM SQL generation fallback succeeded! Generated SQL: {sql[:100]}...")
                 explanation = "⚠️ Direct LLM Fallback: Generated directly using OpenAI GPT-4o as the core Vanna agent was unavailable." if explain else "Explanation omitted by request."
 
-            if self.query_cache_service and self.query_cache_service.enabled:
+            if self.query_cache_service and (self.query_cache_service.enabled or self.query_cache_service.use_local):
                 cache_key = self.query_cache_service.get_sql_gen_key(question)
                 cache_value = {
                     "sql": sql,
@@ -429,7 +429,7 @@ Do not include any additional text outside the code block.
         if (
             is_select_query
             and self.query_cache_service
-            and self.query_cache_service.enabled
+            and (self.query_cache_service.enabled or self.query_cache_service.use_local)
         ):
             cache_key = self.query_cache_service.get_sql_result_key(sql)
             cached_result = self.query_cache_service.get(cache_key, cache_type="sql_result")
@@ -454,7 +454,7 @@ Do not include any additional text outside the code block.
             if (
                 is_select_query
                 and self.query_cache_service
-                and self.query_cache_service.enabled
+                and (self.query_cache_service.enabled or self.query_cache_service.use_local)
             ):
                 cache_key = self.query_cache_service.get_sql_result_key(sql)
                 cache_value = {
