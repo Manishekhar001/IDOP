@@ -10,6 +10,62 @@ from app.api.schemas import ChatResponse, MutationResponse
 from app.main import app
 
 
+class TestStorageBackendDefault:
+    """Tests that the default storage backend is now S3."""
+
+    def test_default_storage_backend_is_s3(self):
+        """Verify the Settings class default for storage_backend is 's3'."""
+        from app.config import Settings
+        field = Settings.model_fields["storage_backend"]
+        assert field.default == "s3", f"Expected default 's3', got '{field.default}'"
+
+    def test_health_reports_s3_when_backend_is_s3(self):
+        """Verify /health reports s3_cache_configured: true when storage_backend is 's3'."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+
+        mock_settings = MagicMock()
+        mock_settings.storage_backend = "s3"
+        mock_settings.app_version = "0.1.0"
+        mock_settings.openai_api_key = "sk-test"
+        mock_settings.voyage_api_key = "va-test"
+        mock_settings.tavily_api_key = "tvly-test"
+        mock_settings.database_url = "postgresql://test:test@localhost:5432/idop_test"
+        mock_settings.supabase_db_url = ""
+        mock_settings.upstash_redis_url = None
+        mock_settings.upstash_redis_token = None
+
+        with patch("app.api.routes.health.get_settings", return_value=mock_settings):
+            response = client.get("/health")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["configuration"]["s3_cache_configured"] is True
+
+    def test_health_reports_local_when_backend_is_local(self):
+        """Verify /health reports s3_cache_configured: false when storage_backend is 'local'."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+        client = TestClient(app)
+
+        mock_settings = MagicMock()
+        mock_settings.storage_backend = "local"
+        mock_settings.app_version = "0.1.0"
+        mock_settings.openai_api_key = "sk-test"
+        mock_settings.voyage_api_key = "va-test"
+        mock_settings.tavily_api_key = "tvly-test"
+        mock_settings.database_url = "postgresql://test:test@localhost:5432/idop_test"
+        mock_settings.supabase_db_url = ""
+        mock_settings.upstash_redis_url = None
+        mock_settings.upstash_redis_token = None
+
+        with patch("app.api.routes.health.get_settings", return_value=mock_settings):
+            response = client.get("/health")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["configuration"]["s3_cache_configured"] is False
+
+
 class TestEnhancedSchemas:
     """Tests the detailed schema definitions for ChatResponse and MutationResponse."""
 

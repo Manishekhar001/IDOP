@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     supabase_db_url: str = ""
 
     # Storage Backend Configuration (for bulk document ingestion cache)
-    storage_backend: str = "local"  # 'local' or 's3'
+    storage_backend: str = "s3"  # 's3' or 'local'
     s3_cache_bucket: str = "idop-cache-docs"
     aws_region: str = "us-east-1"
     aws_access_key_id: Optional[str] = None
