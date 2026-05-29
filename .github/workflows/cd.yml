@@ -800,7 +800,7 @@ jobs:
           
           echo "📡 API Target URL: $API_TARGET_URL"
           echo ""
-          python tests/deploy_smoke.py
+          python scripts/deploy_smoke.py
 
 
       # ─────────────────────────────────────────────────────────────────────
