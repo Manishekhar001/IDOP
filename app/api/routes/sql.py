@@ -3,14 +3,14 @@ from app.api.schemas import SQLApprovalRequest, SQLResponse, SQLExecuteResponse,
 from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
-from app.services.query_cache_service import QueryCacheService
+from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/sql", tags=["SQL Operations"])
 
-# Shared services
-query_cache = QueryCacheService()
+# Use centralized singleton for shared cache stats
+query_cache = get_query_cache()
 sql_service = TextToSQLService(query_cache_service=query_cache)
 executor = SQLExecutor()
 

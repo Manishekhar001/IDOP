@@ -33,6 +33,7 @@ class CSRAGState(TypedDict):
     top_k: int
     enable_hyde: bool
     enable_reranking: bool
+    enable_ragas: bool
     hyde_used: bool
     hyde_hypotheses: list[str]
     reranking_used: bool

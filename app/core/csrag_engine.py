@@ -8,6 +8,7 @@ from app.core.graph.builder import build_graph
 from app.core.vector_store import VectorStoreService
 from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
+from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -45,6 +46,7 @@ class CSRAGEngine:
         top_k: int = 4,
         enable_hyde: bool = False,
         enable_reranking: bool = False,
+        enable_ragas: bool = False,
         explain: bool = True,
         vanna_temperature: float = 0.0,
         vanna_seed: int = 42,
@@ -80,6 +82,7 @@ class CSRAGEngine:
             "top_k": top_k,
             "enable_hyde": enable_hyde,
             "enable_reranking": enable_reranking,
+            "enable_ragas": enable_ragas,
             "hyde_used": False,
             "hyde_hypotheses": [],
             "reranking_used": False,
@@ -117,6 +120,7 @@ class CSRAGEngine:
         top_k: int = 4,
         enable_hyde: bool = False,
         enable_reranking: bool = False,
+        enable_ragas: bool = False,
         explain: bool = True,
         vanna_temperature: float = 0.0,
         vanna_seed: int = 42,
@@ -142,6 +146,7 @@ class CSRAGEngine:
             top_k=top_k,
             enable_hyde=enable_hyde,
             enable_reranking=enable_reranking,
+            enable_ragas=enable_ragas,
             explain=explain,
             vanna_temperature=vanna_temperature,
             vanna_seed=vanna_seed,
@@ -149,6 +154,30 @@ class CSRAGEngine:
         )
         result = await self._graph.ainvoke(init_state, config)
         formatted = self._format_result(result)
+
+        # RAGAS evaluation (if enabled)
+        if enable_ragas:
+            try:
+                ragas_evaluator = get_ragas_evaluator()
+                # Collect context texts from sources for faithfulness evaluation
+                contexts = [s["content"] for s in formatted.get("sources", [])]
+                ragas_result = await ragas_evaluator.evaluate(
+                    question=question,
+                    answer=formatted.get("answer", ""),
+                    contexts=contexts,
+                )
+                if ragas_result:
+                    formatted["ragas_scores"] = ragas_result.model_dump()
+                    logger.info(
+                        f"RAGAS evaluation: relevancy={ragas_result.answer_relevancy:.3f}, "
+                        f"faithfulness={ragas_result.faithfulness:.3f}, "
+                        f"precision={ragas_result.context_precision:.3f}"
+                    )
+                else:
+                    formatted["ragas_scores"] = None
+            except Exception as ragas_err:
+                logger.error(f"RAGAS evaluation error: {ragas_err}")
+                formatted["ragas_scores"] = None
 
         # Check post-verification gates before writing to Redis/local cache
         if query_cache and (query_cache.enabled or query_cache.use_local) and formatted.get("query_type") == "RAG":
@@ -173,6 +202,7 @@ class CSRAGEngine:
         top_k: int = 4,
         enable_hyde: bool = False,
         enable_reranking: bool = False,
+        enable_ragas: bool = False,
         explain: bool = True,
         vanna_temperature: float = 0.0,
         vanna_seed: int = 42,
@@ -189,6 +219,7 @@ class CSRAGEngine:
             top_k=top_k,
             enable_hyde=enable_hyde,
             enable_reranking=enable_reranking,
+            enable_ragas=enable_ragas,
             explain=explain,
             vanna_temperature=vanna_temperature,
             vanna_seed=vanna_seed,
@@ -276,5 +307,6 @@ class CSRAGEngine:
             # Advanced Corrective RAG Config outputs
             "hyde_used": state.get("hyde_used", False),
             "hyde_hypotheses": state.get("hyde_hypotheses", []),
-            "reranking_used": state.get("reranking_used", False)
+            "reranking_used": state.get("reranking_used", False),
+            "ragas_scores": state.get("ragas_scores", None),
         }

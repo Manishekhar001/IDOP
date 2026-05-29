@@ -203,8 +203,10 @@ class QueryCacheService:
                 "hit_rate": f"{hit_rate:.1f}%",
             }
 
+        mode = "redis" if self.enabled else ("local_fallback" if self.use_local else "disabled")
         return {
-            "enabled": self.enabled,
+            "enabled": self.enabled or self.use_local,
+            "mode": mode,
             "cache_types": stats_with_rates,
         }
 

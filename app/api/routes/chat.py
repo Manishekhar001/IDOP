@@ -55,6 +55,7 @@ async def chat(
             top_k=body.top_k,
             enable_hyde=body.enable_hyde,
             enable_reranking=body.enable_reranking,
+            enable_ragas=body.enable_ragas,
             explain=body.explain,
             vanna_temperature=body.vanna_temperature,
             vanna_seed=body.vanna_seed,
@@ -115,6 +116,7 @@ async def chat(
         mutation_error=result.get("mutation_error") if result.get("mutation_error") else None,
         mutation_result_count=result.get("mutation_result_count") if result.get("mutation_result_count") else None,
         approval_token=result.get("approval_token") if result.get("approval_token") else None,
+        ragas_scores=result.get("ragas_scores") if result.get("ragas_scores") else None,
     )
 
 
@@ -145,6 +147,7 @@ async def chat_stream(
                 top_k=body.top_k,
                 enable_hyde=body.enable_hyde,
                 enable_reranking=body.enable_reranking,
+                enable_ragas=body.enable_ragas,
                 explain=body.explain,
                 vanna_temperature=body.vanna_temperature,
                 vanna_seed=body.vanna_seed,

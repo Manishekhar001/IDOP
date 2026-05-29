@@ -160,7 +160,7 @@ class TestQueryCacheService:
     def test_initialization_local_fallback(self, local_cache):
         """Test that the service initializes in local fallback mode without Redis."""
         assert local_cache.use_local is True
-        assert local_cache.enabled is False
+        assert local_cache.enabled is False  # Redis itself is not connected
         assert local_cache._local_cache == {}
 
     def test_set_and_get_local_cache(self, local_cache):
@@ -211,6 +211,8 @@ class TestQueryCacheService:
         local_cache.get("missing:key", cache_type="rag")
 
         stats = local_cache.get_stats()
+        assert stats["enabled"] is True  # local fallback is considered "enabled"
+        assert stats["mode"] == "local_fallback"
         rag_stats = stats["cache_types"]["rag"]
         assert rag_stats["hits"] == 1
         assert rag_stats["misses"] == 1
@@ -260,9 +262,14 @@ class TestQueryCacheService:
         assert local_cache.flush_all() is True
         assert len(local_cache._local_cache) == 0
 
-    def test_delete_disabled(self, local_cache):
-        """Test that delete returns 0 when Redis is disabled."""
-        assert local_cache.delete("some:pattern:*") == 0
+    def test_delete_local_pattern_match(self, local_cache):
+        """Test that delete in local mode filters keys by fnmatch pattern."""
+        local_cache.set("prefix:a", {"v": 1}, ttl=3600)
+        local_cache.set("prefix:b", {"v": 2}, ttl=3600)
+        local_cache.set("other:c", {"v": 3}, ttl=3600)
+        deleted = local_cache.delete("prefix:*")
+        assert deleted == 2
+        assert "other:c" in local_cache._local_cache
 
     def test_serialization_complex_data(self, local_cache):
         """Test that complex nested data structures survive serialization round-trip."""

@@ -5,19 +5,209 @@ from pydantic import BaseModel, Field
 
 # ==================== System Health & Diagnostics Schemas ====================
 
-class HealthResponse(BaseModel):
-    """System health check model detailing the service uptime status."""
-    status: str = Field(
-        ..., 
-        description="Core operational status of the service (e.g. 'healthy', 'degraded', 'unhealthy')."
+class ServiceStatus(BaseModel):
+    """Detailed service-by-service health status rich model."""
+    postgres_checkpointer: bool = Field(
+        ..., description="Boolean indicating PostgreSQL checkpointer connectivity."
     )
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="ISO 8601 UTC timestamp indicating exactly when the health check was performed."
+    supabase_company_db: bool = Field(
+        ..., description="Boolean indicating Supabase company database connectivity."
+    )
+    qdrant_vector_store: bool = Field(
+        ..., description="Boolean indicating Qdrant vector store connectivity."
+    )
+    query_cache_redis: bool = Field(
+        ..., description="Boolean indicating Upstash Redis query cache connectivity."
+    )
+    query_cache_mode: str = Field(
+        ..., description="Runtime query cache mode: 'redis', 'local_fallback', or 'disabled'."
+    )
+    document_cache: bool = Field(
+        ..., description="Boolean indicating S3/local document cache service availability."
+    )
+    document_cache_backend: str = Field(
+        ..., description="Runtime document cache backend type: 's3', 's3_disabled', 'local', or 'unknown'."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "postgres_checkpointer": True,
+                    "supabase_company_db": True,
+                    "qdrant_vector_store": True,
+                    "query_cache_redis": True,
+                    "query_cache_mode": "redis",
+                    "document_cache": True,
+                    "document_cache_backend": "s3",
+                }
+            ]
+        }
+    }
+
+
+class FeaturesAvailable(BaseModel):
+    """Available IDOP feature flags model."""
+    text_to_sql: bool = Field(
+        ..., description="Boolean flag — Text-to-SQL feature is always configured out-of-the-box."
+    )
+    excel_mutations: bool = Field(
+        ..., description="Boolean flag — Governed transactional spreadsheet mutations are active."
+    )
+    advanced_rag: bool = Field(
+        ..., description="Boolean flag — Advanced RAG with hybrid search, CRAG, and SRAG is active."
+    )
+    query_routing: bool = Field(
+        ..., description="Boolean flag — The 5-path semantic query router (SQL/MUTATION/RAG/CHAT/HYBRID) is active."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "text_to_sql": True,
+                    "excel_mutations": True,
+                    "advanced_rag": True,
+                    "query_routing": True,
+                }
+            ]
+        }
+    }
+
+
+class ConfigurationStatus(BaseModel):
+    """External service configuration status flags model."""
+    openai_configured: bool = Field(
+        ..., description="True if OPENAI_API_KEY is set."
+    )
+    voyage_configured: bool = Field(
+        ..., description="True if VOYAGE_API_KEY is set for reranking."
+    )
+    tavily_configured: bool = Field(
+        ..., description="True if TAVILY_API_KEY is set for web search."
+    )
+    database_configured: bool = Field(
+        ..., description="True if DATABASE_URL is set for PostgreSQL."
+    )
+    supabase_configured: bool = Field(
+        ..., description="True if SUPABASE_DB_URL is set."
+    )
+    redis_cache_configured: bool = Field(
+        ..., description="True if UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN are set."
+    )
+    s3_cache_configured: bool = Field(
+        ..., description="True if STORAGE_BACKEND is set to 's3'."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "openai_configured": True,
+                    "voyage_configured": True,
+                    "tavily_configured": True,
+                    "database_configured": True,
+                    "supabase_configured": True,
+                    "redis_cache_configured": True,
+                    "s3_cache_configured": True,
+                }
+            ]
+        }
+    }
+
+
+class QdrantInfo(BaseModel):
+    """Qdrant vector store collection information model."""
+    status: str = Field(
+        default="unknown", description="Qdrant collection status flag (e.g. 'green', 'yellow', 'red')."
+    )
+    points_count: int = Field(
+        default=0, description="Total quantity of vector points stored in the collection."
+    )
+    indexed_chunks: int = Field(
+        default=0, description="Total number of indexed document chunks."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "status": "green",
+                    "points_count": 1420,
+                    "indexed_chunks": 1420,
+                }
+            ]
+        }
+    }
+
+
+class RedisCacheStatus(BaseModel):
+    """Redis query cache status and metrics model."""
+    status: str = Field(
+        ..., description="Cache status: 'redis' for connected, 'local_fallback' or 'disabled' otherwise."
+    )
+    message: str = Field(
+        ..., description="Human-readable description of the cache state."
+    )
+    hit_rate: Optional[str] = Field(
+        None, description="Overall cache hit rate percentage when available."
+    )
+    total_savings: Optional[str] = Field(
+        None, description="Estimated total cost savings from cache hits."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "status": "redis",
+                    "message": "Redis cache connected and operational.",
+                    "hit_rate": "72.3%",
+                    "total_savings": "$12.4500",
+                },
+                {
+                    "status": "local_fallback",
+                    "message": "Redis not connected — using local in-memory fallback.",
+                    "hit_rate": None,
+                    "total_savings": None,
+                },
+            ]
+        }
+    }
+
+
+class DetailedHealthResponse(BaseModel):
+    """
+    Comprehensive system health check model detailing every service's connectivity status.
+    Returns per-service flags, feature availability, external API configuration status,
+    Qdrant collection info, and Redis cache metrics in a single rich payload.
+    """
+    status: str = Field(
+        ..., description="Core operational status: 'healthy', 'degraded', or 'unhealthy'."
+    )
+    service: str = Field(
+        ..., description="Service identifier string (e.g. 'IDOP — Intelligent Data Operations Platform API')."
+    )
+    timestamp: str = Field(
+        ..., description="ISO 8601 UTC timestamp of when the health check was performed."
     )
     version: str = Field(
-        ..., 
-        description="The semantic version string of the IDOP backend currently deployed."
+        ..., description="Semantic version string of the currently deployed IDOP backend."
+    )
+    services: ServiceStatus = Field(
+        ..., description="Per-service connectivity status flags."
+    )
+    features_available: FeaturesAvailable = Field(
+        ..., description="Feature availability flags indicating which IDOP subsystems are operational."
+    )
+    configuration: ConfigurationStatus = Field(
+        ..., description="External service API key and endpoint configuration status flags."
+    )
+    qdrant_info: QdrantInfo = Field(
+        ..., description="Qdrant vector store collection metadata and point counts."
+    )
+    redis_cache: RedisCacheStatus = Field(
+        ..., description="Redis query cache current operational status and performance metrics."
     )
 
     model_config = {
@@ -25,31 +215,69 @@ class HealthResponse(BaseModel):
             "examples": [
                 {
                     "status": "healthy",
+                    "service": "IDOP — Intelligent Data Operations Platform API",
                     "timestamp": "2026-05-25T12:00:00Z",
-                    "version": "0.1.0"
+                    "version": "0.1.0",
+                    "services": {
+                        "postgres_checkpointer": True,
+                        "supabase_company_db": True,
+                        "qdrant_vector_store": True,
+                        "query_cache_redis": True,
+                        "query_cache_mode": "redis",
+                        "document_cache": True,
+                        "document_cache_backend": "s3",
+                    },
+                    "features_available": {
+                        "text_to_sql": True,
+                        "excel_mutations": True,
+                        "advanced_rag": True,
+                        "query_routing": True,
+                    },
+                    "configuration": {
+                        "openai_configured": True,
+                        "voyage_configured": True,
+                        "tavily_configured": True,
+                        "database_configured": True,
+                        "supabase_configured": True,
+                        "redis_cache_configured": True,
+                        "s3_cache_configured": True,
+                    },
+                    "qdrant_info": {
+                        "status": "green",
+                        "points_count": 1420,
+                        "indexed_chunks": 1420,
+                    },
+                    "redis_cache": {
+                        "status": "redis",
+                        "message": "Redis cache connected and operational.",
+                        "hit_rate": "72.3%",
+                        "total_savings": "$12.4500",
+                    },
                 }
             ]
         }
     }
 
 
-class ReadinessResponse(BaseModel):
-    """System readiness check model validating all database connections."""
+class DetailedReadinessResponse(BaseModel):
+    """
+    System readiness probe model validating all underlying database and vector store connections.
+    Returns 'ready' only when Qdrant, PostgreSQL, and Supabase are all connected.
+    """
     status: str = Field(
-        ..., 
-        description="Readiness state. 'ready' indicates all systems online; 'not_ready' implies connection drops."
+        ..., description="Readiness state: 'ready' (all systems online) or 'not_ready' (connection drops detected)."
     )
     qdrant_connected: bool = Field(
-        ..., 
-        description="Boolean connection status of the Qdrant hybrid vector store."
+        ..., description="Boolean connection status of the Qdrant hybrid vector store."
     )
     postgres_connected: bool = Field(
-        ..., 
-        description="Boolean connection status of the PostgreSQL database instance."
+        ..., description="Boolean connection status of the PostgreSQL checkpointer database."
     )
-    collection_info: dict = Field(
-        ..., 
-        description="Key-value dictionary showing the Qdrant collection status, vectors counts, and indexing state."
+    supabase_connected: bool = Field(
+        ..., description="Boolean connection status of the Supabase company database."
+    )
+    collection_info: Dict[str, Any] = Field(
+        ..., description="Key-value dictionary showing the Qdrant collection status, vector counts, and indexing progress."
     )
 
     model_config = {
@@ -59,11 +287,113 @@ class ReadinessResponse(BaseModel):
                     "status": "ready",
                     "qdrant_connected": True,
                     "postgres_connected": True,
+                    "supabase_connected": True,
                     "collection_info": {
                         "status": "green",
-                        "vectors_count": 1420,
-                        "indexed_chunks": 1420
-                    }
+                        "points_count": 1420,
+                        "indexed_chunks": 1420,
+                    },
+                }
+            ]
+        }
+    }
+
+
+class SystemInfoResponse(BaseModel):
+    """
+    Comprehensive system layout and documentation information model.
+    Returns application metadata, implementation phases, feature descriptions,
+    Python runtime version, and full endpoint mapping documentation.
+    """
+    application: Dict[str, str] = Field(
+        ..., description="Application metadata: name, version, and environment."
+    )
+    phases: Dict[str, str] = Field(
+        ..., description="IDOP implementation phases mapped to completion status strings."
+    )
+    features: Dict[str, Any] = Field(
+        ..., description="Active platform features including router pathways and cache tier descriptions."
+    )
+    system: Dict[str, str] = Field(
+        ..., description="System runtime information including Python version."
+    )
+    endpoints: Dict[str, str] = Field(
+        ..., description="Complete API endpoint documentation with descriptions and HTTP methods."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "application": {
+                        "name": "IDOP",
+                        "version": "0.1.0",
+                        "environment": "production",
+                    },
+                    "phases": {
+                        "Phase 1: Foundation": "Completed",
+                    },
+                    "features": {
+                        "router_pathways": ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"],
+                    },
+                    "system": {
+                        "python_version": "3.11.0",
+                    },
+                    "endpoints": {
+                        "health": "GET /health (Detailed liveness checks)",
+                    },
+                }
+            ]
+        }
+    }
+
+
+class SystemStatsResponse(BaseModel):
+    """
+    Real-time platform statistics and query cache savings model.
+    Returns document indexing metrics, query cache performance with cost savings estimates,
+    system runtime info, and current configuration parameters.
+    """
+    indexing: Dict[str, Any] = Field(
+        ..., description="Document indexing metrics: total Qdrant vectors, cached document count and storage size."
+    )
+    query_cache: Dict[str, Any] = Field(
+        ..., description="Query cache performance metrics: enabled status, per-type hit counts, and estimated cost savings."
+    )
+    system: Dict[str, str] = Field(
+        ..., description="System runtime information including check timestamp and Python version."
+    )
+    configuration: Dict[str, Any] = Field(
+        ..., description="Current operational configuration: chunk size, overlap, and per-cache-type TTL values."
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "indexing": {
+                        "total_vectors_in_qdrant": 1420,
+                        "cached_documents_count": 10,
+                        "cached_documents_size": "2.5 MB",
+                        "cached_documents_size_bytes": 2500000,
+                    },
+                    "query_cache": {
+                        "enabled": True,
+                        "overall_hit_rate": "72.3%",
+                        "total_estimated_savings": "$12.4500",
+                    },
+                    "system": {
+                        "checked_at": "2026-05-25T12:00:00Z",
+                        "python_version": "3.11.0",
+                    },
+                    "configuration": {
+                        "chunk_size": 512,
+                        "chunk_overlap": 50,
+                        "cache_ttl": {
+                            "embeddings": "3600s",
+                            "rag": "1800s",
+                        },
+                    },
                 }
             ]
         }
@@ -196,6 +526,10 @@ class ChatRequest(BaseModel):
     enable_reranking: bool = Field(
         default=False, 
         description="Use cross-encoder reranking for improved precision"
+    )
+    enable_ragas: bool = Field(
+        default=False,
+        description="Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness, context_precision) computed via LLM after generation."
     )
     explain: bool = Field(
         default=True, 
@@ -333,6 +667,10 @@ class ChatResponse(BaseModel):
     reranking_used: bool = Field(
         default=False, 
         description="True if cross-encoder reranking was applied."
+    )
+    ragas_scores: Optional[Dict[str, Any]] = Field(
+        None,
+        description="RAGAS evaluation metrics computed when enable_ragas=True. Contains answer_relevancy, faithfulness, context_precision scores."
     )
     query_type: Optional[str] = Field(
         None, 
@@ -547,6 +885,10 @@ class SQLGenerationRequest(BaseModel):
     explain: bool = Field(
         default=True, 
         description="Whether the judge should perform a semantic audit and explanation of the generated SQL."
+    )
+    enable_ragas: bool = Field(
+        default=False,
+        description="Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness) computed via LLM after generation."
     )
     vanna_temperature: float = Field(
         default=0.0, 

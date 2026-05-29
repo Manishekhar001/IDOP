@@ -8,10 +8,59 @@ import psycopg2
 from app.config import get_settings
 from app.services.cache_init import get_doc_cache, get_query_cache
 
+from app.api.schemas import (
+    DetailedHealthResponse,
+    DetailedReadinessResponse,
+    ServiceStatus,
+    FeaturesAvailable,
+    ConfigurationStatus,
+    QdrantInfo,
+    RedisCacheStatus,
+    SystemInfoResponse,
+    SystemStatsResponse,
+)
+
 router = APIRouter(tags=["System Diagnostics"])
 
 
-@router.get("/health", status_code=status.HTTP_200_OK, summary="Enhanced Health Check")
+def _format_redis_cache(query_cache) -> dict:
+    """Format query cache stats into RedisCacheStatus-compatible dict."""
+    if not query_cache or (not query_cache.enabled and not query_cache.use_local):
+        return {"status": "disabled", "message": "Redis not connected and local fallback not active"}
+
+    mode = "redis" if query_cache.enabled else "local_fallback"
+    stats = query_cache.get_stats() if hasattr(query_cache, 'get_stats') else {}
+    cache_types = stats.get("cache_types", {})
+
+    total_hits = sum(ct.get("hits", 0) for ct in cache_types.values())
+    total_queries = sum(ct.get("total_queries", 0) for ct in cache_types.values())
+    hit_rate = f"{(total_hits / max(total_queries, 1)) * 100:.1f}%"
+
+    # Estimate cost savings (same logic as /stats route)
+    cost_estimates = {"rag": 0.05, "embedding": 0.0001, "sql_gen": 0.08, "sql_result": 0.01}
+    total_savings = sum(
+        ct.get("hits", 0) * cost_estimates.get(ct_name, 0)
+        for ct_name, ct in cache_types.items()
+    )
+
+    return {
+        "status": mode,
+        "message": (
+            "Redis cache connected and operational"
+            if mode == "redis"
+            else "Redis not connected — using local in-memory fallback"
+        ),
+        "hit_rate": hit_rate,
+        "total_savings": f"${total_savings:.4f}",
+    }
+
+
+@router.get(
+    "/health",
+    status_code=status.HTTP_200_OK,
+    response_model=DetailedHealthResponse,
+    summary="Enhanced Health Check — detailed per-service status, feature flags, config status, Qdrant info, and Redis metrics",
+)
 async def health_check(request: Request) -> Dict[str, Any]:
     """
     Enhanced Health check endpoint to verify the API is running and check service connectivity.
@@ -97,10 +146,10 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "version": settings.app_version,
         "services": services_status,
         "features_available": {
-            "text_to_sql": True,       # Always configured out-of-the-box
-            "excel_mutations": True,   # Governed transactional mutations active
+            "text_to_sql": True,
+            "excel_mutations": True,
             "advanced_rag": qdrant_connected,
-            "query_routing": True,      # 5-path router
+            "query_routing": True,
         },
         "configuration": {
             "openai_configured": bool(settings.openai_api_key),
@@ -112,15 +161,11 @@ async def health_check(request: Request) -> Dict[str, Any]:
             "s3_cache_configured": settings.storage_backend == "s3",
         },
         "qdrant_info": collection_info,
-        "redis_cache": (
-            query_cache.get_stats()
-            if query_cache_status
-            else {"status": query_cache_mode, "message": "Redis not connected — using local in-memory fallback"}
-        ),
+        "redis_cache": _format_redis_cache(query_cache),
     }
 
 
-@router.get("/health/ready", summary="Readiness check")
+@router.get("/health/ready", response_model=DetailedReadinessResponse, summary="Readiness check")
 async def readiness(request: Request) -> Dict[str, Any]:
     """
     Readiness probe validating underlying Qdrant, PostgreSQL, and Supabase connections.
@@ -171,7 +216,7 @@ async def readiness(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.get("/info", status_code=status.HTTP_200_OK, summary="Get system layout and documentation info")
+@router.get("/info", response_model=SystemInfoResponse, status_code=status.HTTP_200_OK, summary="Get system layout and documentation info")
 async def get_info() -> Dict[str, Any]:
     """
     Get system layout, design manuals, operational project phases, and detailed platform endpoint mappings.
@@ -219,7 +264,7 @@ async def get_info() -> Dict[str, Any]:
     }
 
 
-@router.get("/stats", status_code=status.HTTP_200_OK, summary="Get platform statistics and query cache savings")
+@router.get("/stats", response_model=SystemStatsResponse, status_code=status.HTTP_200_OK, summary="Get platform statistics and query cache savings")
 async def get_stats(request: Request) -> Dict[str, Any]:
     """
     Get system statistics, document ingestion sizes, vector count profiles, and query cache savings estimates.
@@ -235,9 +280,10 @@ async def get_stats(request: Request) -> Dict[str, Any]:
     doc_stats = doc_cache.get_cache_stats() if doc_cache else {"total_documents": 0, "total_size_human": "0 Bytes", "total_size_bytes": 0}
 
     # Get query cache Redis metrics
-    cache_stats = {"enabled": False, "total_estimated_savings": "$0.0000", "overall_hit_rate": "0.0%"}
-    if query_cache and query_cache.enabled:
+    cache_stats = {"enabled": False, "mode": "disabled", "total_estimated_savings": "$0.0000", "overall_hit_rate": "0.0%"}
+    if query_cache and (query_cache.enabled or query_cache.use_local):
         try:
+            cache_mode = "redis" if query_cache.enabled else "local_fallback"
             stats = query_cache.get_stats()
             total_cost_saved = 0.0
 
@@ -261,6 +307,7 @@ async def get_stats(request: Request) -> Dict[str, Any]:
 
             cache_stats = {
                 "enabled": True,
+                "mode": cache_mode,
                 "by_type": stats.get("cache_types", {}),
                 "total_estimated_savings": f"${total_cost_saved:.4f}",
                 "overall_hit_rate": f"{hit_rate:.1f}%",

@@ -53,6 +53,7 @@ class MockSettings:
 
     storage_backend = "local"
     s3_cache_bucket = "idop-test-bucket"
+    cache_dir = "data/cached_chunks"
     aws_region = "us-east-1"
     aws_access_key_id = "AKIAIOSFODNN7EXAMPLE"
     aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
@@ -74,6 +75,7 @@ class MockSettings:
     crag_lower_threshold = 0.3
     srag_max_retries = 2
     max_rewrite_tries = 2
+    retrieval_k = 5
 
     chunk_size = 512
     chunk_overlap = 50
@@ -86,12 +88,16 @@ def mock_settings():
     so no test ever needs a real .env or external credentials.
     Also patches database connections for SQL and Mutation approval gates
     to return None, preventing TCP handshake socket timeout delays.
+    Resets cache singletons to prevent cross-test contamination.
     """
+    from app.services.cache_init import reset_caches
+    reset_caches()
     mock = MockSettings()
     with patch("app.config.get_settings", return_value=mock), \
          patch("app.core.feature1_sql.approval_gate.ApprovalGate._get_connection", return_value=None), \
          patch("app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection", return_value=None):
         yield mock
+    reset_caches()
 
 
 # ---------------------------------------------------------------------------
