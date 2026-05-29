@@ -531,9 +531,11 @@ jobs:
             SUPABASE_DB_URL=${{ secrets.SUPABASE_DB_URL }}
 
             # AWS S3 (Document chunk caching)
-            # NOTE: AWS credentials intentionally NOT passed here — the container
-            # uses the EC2 instance's IAM role for S3 access, which avoids coupling
-            # S3 cache permissions to the GitHub Actions IAM user.
+            # AWS credentials passed for S3 access (needed if EC2 instance role
+            # lacks S3 permissions). The IAM user must have s3:HeadBucket,
+            # s3:PutObject, s3:GetObject, s3:ListBucket on the cache bucket.
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_REGION=${{ env.AWS_REGION }}
             S3_CACHE_BUCKET=${{ secrets.S3_CACHE_BUCKET }}
             STORAGE_BACKEND=s3
@@ -612,32 +614,57 @@ jobs:
               echo "❌ ECR get-login-password failed (exit $ECR_LOGIN_EXIT)"
               echo "   Error: $ECR_PASSWORD"
               echo ""
-              echo "🔐 Trying ECR login via EC2 instance role as fallback..."
+              echo "Trying ECR login via EC2 instance role as fallback..."
               unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
               ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }} 2>&1)
               ECR_LOGIN_EXIT=$?
               if [ $ECR_LOGIN_EXIT -ne 0 ]; then
-                echo "❌ Instance role ECR login also failed (exit $ECR_LOGIN_EXIT)"
-                echo "   Error: $ECR_PASSWORD"
-                echo "   ⚠️ Will continue using cached images if available"
+                echo "Instance role ECR login also failed (exit $ECR_LOGIN_EXIT)"
+                echo "Error: $ECR_PASSWORD"
+                echo ""
+                echo "============================================================"
+                echo "DEPLOYMENT BLOCKED: Cannot authenticate to ECR"
+                echo "============================================================"
+                echo ""
+                echo "Both IAM User and EC2 Instance Role failed to login to ECR."
+                echo ""
+                echo "Fix 1: Attach AmazonEC2ContainerRegistryReadOnly to the"
+                echo "       IAM user used by the GitHub secrets."
+                echo "  Console: IAM > Users > select user > Add permissions"
+                echo "  > Attach policies > AmazonEC2ContainerRegistryReadOnly"
+                echo ""
+                echo "Fix 2: Attach AmazonEC2ContainerRegistryReadOnly to the"
+                echo "       EC2 instance's IAM role."
+                echo "  Console: EC2 > Instances > select > Security > Modify IAM role"
+                echo "  > Attach policy: AmazonEC2ContainerRegistryReadOnly"
+                echo ""
+                echo "Alternatively, add the repo to the IAM user's inline policy:"
+                echo '  { "Effect": "Allow", "Action": ["ecr:GetAuthorizationToken",'
+                echo '    "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage",'
+                echo '    "ecr:GetDownloadUrlForLayer"], "Resource": "*" }'
+                echo "============================================================"
+                exit 1
               else
                 echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }} 2>&1
                 DOCKER_LOGIN_EXIT=$?
                 if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
-                  echo "❌ Docker login to ECR via instance role failed (exit $DOCKER_LOGIN_EXIT)"
-                  echo "   ⚠️ Will continue using cached images if available"
+                  echo "Docker login to ECR via instance role failed (exit $DOCKER_LOGIN_EXIT)"
+                  echo "Error: $ECR_PASSWORD"
+                  exit 1
                 else
-                  echo "✅ Docker authenticated with ECR via instance role!"
+                  echo "Docker authenticated with ECR via instance role!"
                 fi
               fi
             else
               echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin ${{ env.RESOLVED_ECR_REGISTRY }} 2>&1
               DOCKER_LOGIN_EXIT=$?
               if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
-                echo "❌ Docker login to ECR failed (exit $DOCKER_LOGIN_EXIT)"
-                echo "   ⚠️ Will continue using cached images if available"
+                echo "Docker login to ECR failed (exit $DOCKER_LOGIN_EXIT)"
+                echo "Error: $ECR_PASSWORD"
+                echo "Check ECR_REGISTRY secret value and repository permissions."
+                exit 1
               else
-                echo "✅ Docker authenticated with ECR successfully!"
+                echo "Docker authenticated with ECR successfully!"
               fi
             fi
             echo ""
