@@ -158,7 +158,7 @@ class TestEnhancedApiEndpoints:
             # Assert detailed fields are serialized in the response JSON
             assert data["query_type"] == "HYBRID"
             assert data["ltm_context"] == "User prefers CSV reports."
-            assert data["approval_token"] == "token-12345"
+            # approval_token is intentionally excluded from chat response for security
             assert data["mutation_id"] == "mut-777"
             assert data["mutation_table"] == "orders"
             assert data["mutation_op"] == "UPDATE"

@@ -209,7 +209,8 @@ class VectorStoreService:
         hashes = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
 
         new_documents, new_texts, new_hashes, doc_ids = self._deduplicate_chunks(documents, texts, hashes)
-        new_embeddings = [emb for doc, emb in zip(documents, dense_embeddings) if doc.metadata.get("content_hash") in new_hashes]
+        new_hashes_set = set(new_hashes)
+        new_embeddings = [dense_embeddings[i] for i, h in enumerate(hashes) if h in new_hashes_set]
 
         if not new_documents:
             logger.info("All chunks already exist in Qdrant — skipped upsert entirely")

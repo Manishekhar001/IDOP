@@ -48,7 +48,8 @@ class TestSQLApiEndpoints:
 
     @patch("app.api.routes.sql.sql_service")
     @patch("app.api.routes.sql.gate")
-    def test_generate_sql_returns_token_and_updates_cache(self, mock_gate, mock_sql_service, client):
+    @patch("app.api.routes.sql.shared_pending_queries", new_callable=dict)
+    def test_generate_sql_returns_token_and_updates_cache(self, mock_shared_pending, mock_gate, mock_sql_service, client):
         """Test that /sql/generate creates a session, returns the token, and updates pending_queries."""
         # Setup mocks
         mock_query_id = "test-query-id-123"
@@ -61,16 +62,13 @@ class TestSQLApiEndpoints:
             "cache_hit": False
         })
         
-        # Mock pending queries dictionary
-        pending_dict = {
-            mock_query_id: {
-                "question": "Show all customers",
-                "sql": "SELECT * FROM customers;",
-                "status": "pending_approval",
-                "cache_hit": False
-            }
+        # Pre-populate shared pending with the query_id (mimicking what sql_service would have returned)
+        mock_shared_pending[mock_query_id] = {
+            "question": "Show all customers",
+            "sql": "SELECT * FROM customers;",
+            "status": "pending_approval",
+            "cache_hit": False
         }
-        mock_sql_service.pending_queries = pending_dict
         
         mock_token = "mock-crypto-approval-token-999"
         mock_gate.generate_session.return_value = mock_token
@@ -88,5 +86,5 @@ class TestSQLApiEndpoints:
         # Verify gate was called with query_id
         mock_gate.generate_session.assert_called_once_with(mock_query_id)
         
-        # Verify the pending queries entry was updated with the token
-        assert pending_dict[mock_query_id]["token"] == mock_token
+        # Verify the shared pending queries entry was updated with the token
+        assert mock_shared_pending[mock_query_id]["token"] == mock_token

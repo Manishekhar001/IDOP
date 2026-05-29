@@ -3,89 +3,105 @@ import uuid
 from typing import List, Dict, Any, Optional
 import pandas as pd
 
-from vanna import Agent
-from vanna.integrations.openai import OpenAILlmService
-from vanna.integrations.postgres import PostgresRunner
-from vanna.core.registry import ToolRegistry
-from vanna.tools import RunSqlTool
-from vanna.core.user import UserResolver, User, RequestContext
-from vanna.integrations.local.agent_memory import DemoAgentMemory
+# Vanna imports are lazy-loaded inside VannaAgentWrapper to avoid ImportError
+# when vanna 2.0 submodules are not available.
 
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.vanna_service")
 
 
-class SimpleUserResolver(UserResolver):
-    async def resolve_user(self, request_context: RequestContext) -> User:
-        return User(
-            id="sql_service_user",
-            email="sql@service.local",
-            group_memberships=["user", "admin"],
-        )
-
-
 class VannaAgentWrapper:
+    """
+    Wrapper around Vanna 2.0 Agent for Text-to-SQL generation.
+
+    All Vanna imports are lazy-loaded to gracefully handle missing/misconfigured
+    vanna submodules. When Vanna is unavailable, callers fall back to direct
+    OpenAI SQL generation (handled in TextToSQLService.generate_sql_for_approval).
+    """
+
     def __init__(
         self,
         openai_api_key: str,
         database_url: str,
     ):
-        settings = get_settings()
-        self.llm = OpenAILlmService(api_key=openai_api_key, model=settings.llm_model)
-
-        logger.info(
-            f"Configuring SQL LLM with deterministic settings: "
-            f"temperature={settings.llm_temperature}"
-        )
-
-        self.current_temperature = settings.llm_temperature
+        self._available = False
+        self.agent = None
+        self.postgres_runner = None
+        self.current_temperature = 0.0
         self.current_top_p = 0.1
         self.current_seed = 42
 
-        original_build_payload = self.llm._build_payload
+        try:
+            from vanna import Agent as VannaAgent
+            from vanna.integrations.openai import OpenAILlmService
+            from vanna.integrations.postgres import PostgresRunner
+            from vanna.core.registry import ToolRegistry
+            from vanna.tools import RunSqlTool
+            from vanna.integrations.local.agent_memory import DemoAgentMemory
 
-        def deterministic_build_payload(request):
-            payload = original_build_payload(request)
-            payload["temperature"] = self.current_temperature
-            payload["top_p"] = self.current_top_p
-            payload["seed"] = self.current_seed
-            payload["max_tokens"] = 2000
-            logger.debug(f"SQL LLM payload: {payload}")
-            return payload
+            settings = get_settings()
+            self.llm = OpenAILlmService(api_key=openai_api_key, model=settings.llm_model)
 
-        self.llm._build_payload = deterministic_build_payload
-        self.postgres_runner = PostgresRunner(connection_string=database_url)
+            logger.info(
+                f"Configuring SQL LLM with deterministic settings: "
+                f"temperature={settings.llm_temperature}"
+            )
 
-        self.tools = ToolRegistry()
-        self.tools.register_local_tool(
-            RunSqlTool(sql_runner=self.postgres_runner), access_groups=["admin", "user"]
-        )
+            self.current_temperature = settings.llm_temperature
+            self.current_top_p = 0.1
+            self.current_seed = 42
 
-        self.user_resolver = SimpleUserResolver()
-        self.memory = DemoAgentMemory()
+            original_build_payload = self.llm._build_payload
 
-        self.agent = Agent(
-            llm_service=self.llm,
-            tool_registry=self.tools,
-            user_resolver=self.user_resolver,
-            agent_memory=self.memory,
-        )
-        logger.info("Vanna Agent Wrapper initialized successfully")
+            def deterministic_build_payload(request):
+                payload = original_build_payload(request)
+                payload["temperature"] = self.current_temperature
+                payload["top_p"] = self.current_top_p
+                payload["seed"] = self.current_seed
+                payload["max_tokens"] = 2000
+                logger.debug(f"SQL LLM payload: {payload}")
+                return payload
+
+            self.llm._build_payload = deterministic_build_payload
+            self.postgres_runner = PostgresRunner(connection_string=database_url)
+
+            self.tools = ToolRegistry()
+            self.tools.register_local_tool(
+                RunSqlTool(sql_runner=self.postgres_runner), access_groups=["admin", "user"]
+            )
+
+            self.agent = VannaAgent(
+                llm_service=self.llm,
+                tool_registry=self.tools,
+                agent_memory=DemoAgentMemory(),
+            )
+            self._available = True
+            logger.info("Vanna Agent Wrapper initialized successfully")
+        except ImportError as e:
+            logger.warning(f"Vanna 2.0 submodules not available ({e}) — will use direct LLM fallback")
+        except Exception as e:
+            logger.warning(f"Vanna Agent initialization failed ({e}) — will use direct LLM fallback")
 
     async def generate_sql_async(self, question: str, schema_context: str = "") -> str:
+        if not self._available or self.agent is None:
+            raise RuntimeError("Vanna agent not available — use direct LLM fallback")
+
         if schema_context:
             full_message = f"{schema_context}\n\n Question: {question}"
         else:
             full_message = question
-        return await self._extract_sql_from_agent(full_message)
 
-    async def _extract_sql_from_agent(self, message: str) -> str:
+        try:
+            from vanna.core.user import RequestContext
+        except ImportError:
+            raise RuntimeError("Vanna RequestContext not available")
+
         request_context = RequestContext()
         sql = None
 
         async for component in self.agent.send_message(
-            request_context=request_context, message=message
+            request_context=request_context, message=full_message
         ):
             rich_comp = component.rich_component
             if hasattr(rich_comp, "metadata") and rich_comp.metadata:
@@ -107,9 +123,9 @@ class VannaAgentWrapper:
         return sql
 
     async def execute_sql_async(self, sql: str) -> List[Dict[str, Any]]:
-        return await self._execute_and_extract_results(sql)
+        if not self._available or self.postgres_runner is None:
+            raise RuntimeError("Vanna agent not available — cannot execute SQL through Vanna")
 
-    async def _execute_and_extract_results(self, sql: str) -> List[Dict[str, Any]]:
         logger.info(f"Executing SQL directly: {sql[:100]}...")
         try:
             import psycopg2

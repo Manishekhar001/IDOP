@@ -4,6 +4,7 @@ from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
 from app.services.cache_init import get_query_cache
+from app.services.pending_store import pending_queries as shared_pending_queries
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,10 +36,14 @@ async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
         # Crypto gate generation
         token = gate.generate_session(res["query_id"])
         
-        # Update the pending register with the token
+        # Store in shared pending store so graph nodes and routes share the same data
         query_id = res["query_id"]
-        if query_id in sql_service.pending_queries:
-            sql_service.pending_queries[query_id]["token"] = token
+        shared_pending_queries[query_id] = {
+            "question": res["question"],
+            "sql": res["sql"],
+            "status": "pending_approval",
+            "token": token
+        }
             
         return SQLResponse(
             query_id=res["query_id"],
@@ -70,8 +75,8 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
 
     # 2. Handle Rejection
     if not body.approved:
-        if body.query_id in sql_service.pending_queries:
-            del sql_service.pending_queries[body.query_id]
+        if body.query_id in shared_pending_queries:
+            del shared_pending_queries[body.query_id]
         return SQLExecuteResponse(
             query_id=body.query_id,
             sql="",
@@ -81,10 +86,10 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
         )
 
     # 3. Handle Execution
-    if body.query_id not in sql_service.pending_queries:
+    if body.query_id not in shared_pending_queries:
         raise HTTPException(status_code=404, detail="Query session not found in pending register.")
 
-    query_info = sql_service.pending_queries[body.query_id]
+    query_info = shared_pending_queries[body.query_id]
     sql = query_info["sql"]
     question = query_info["question"]
 
@@ -93,8 +98,8 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
         results = executor.execute_and_log(body.query_id, question, sql)
         
         # Remove from pending queue
-        if body.query_id in sql_service.pending_queries:
-            del sql_service.pending_queries[body.query_id]
+        if body.query_id in shared_pending_queries:
+            del shared_pending_queries[body.query_id]
 
         return SQLExecuteResponse(
             query_id=body.query_id,
@@ -113,4 +118,4 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
     summary="Get all pending SQL queries",
 )
 async def get_pending():
-    return sql_service.get_pending_queries()
+    return [{"query_id": qid, **info} for qid, info in shared_pending_queries.items()]

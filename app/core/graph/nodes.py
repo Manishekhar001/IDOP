@@ -87,12 +87,13 @@ async def sql_generation_node(state: CSRAGState) -> dict:
     question = state["question"]
     logger.info(f"Feature 1 SQL Node triggered: '{question}'")
 
-    sql_service = TextToSQLService(query_cache_service=get_query_cache())
+    from app.services.pending_store import pending_queries as shared_pending_queries
     validator = SQLValidator()
     judge = LLMJudge()
 
     try:
-        # Generate raw SQL
+        # Generate raw SQL (uses direct OpenAI fallback when Vanna imports fail)
+        sql_service = TextToSQLService(query_cache_service=get_query_cache())
         gen_res = await sql_service.generate_sql_for_approval(
             question=question,
             explain=state.get("explain", True),
@@ -123,8 +124,8 @@ async def sql_generation_node(state: CSRAGState) -> dict:
         # Cryptographic Token Session
         token = gate.generate_session(query_id)
 
-        # Store globally for reference
-        sql_service.pending_queries[query_id] = {
+        # Store in SHARED pending_queries so /sql/approve route can find it
+        shared_pending_queries[query_id] = {
             "question": question,
             "sql": sql,
             "status": "pending_approval",

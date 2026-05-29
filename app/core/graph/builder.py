@@ -89,7 +89,7 @@ def build_graph(
     # Terminate direct branch endpoints
     builder.add_edge("sql_gen", END)
     builder.add_edge("mutation", END)
-    builder.add_edge("generate_direct", END)
+    builder.add_edge("generate_direct", "stm_summarize")  # LOGIC-01: summarize conversation even for direct responses
     builder.add_edge("hybrid_gen", "stm_summarize")
 
     # Ingest document RAG pipeline sequence
@@ -140,7 +140,7 @@ def build_graph(
         },
     )
 
-    builder.add_edge("rewrite_question", "retrieve_docs")
+    builder.add_edge("rewrite_question", "ltm_remember")  # LOGIC-02: re-check LTM on rewritten query
     builder.add_edge("stm_summarize", END)
 
     graph = builder.compile(

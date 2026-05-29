@@ -13,6 +13,7 @@ from app.core.feature2_mutation.llm_judge import MutationLLMJudge
 from app.core.feature2_mutation.approval_gate import MutationApprovalGate
 from app.core.feature2_mutation.executor import MutationExecutor
 
+from app.services.pending_store import pending_mutations as shared_pending_mutations
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,9 +27,6 @@ generator = MutationGenerator()
 judge = MutationLLMJudge()
 gate = MutationApprovalGate()
 executor = MutationExecutor()
-
-# Pending memory store for mutation sessions
-pending_mutations: Dict[str, Dict[str, Any]] = {}
 
 
 @router.post(
@@ -149,7 +147,7 @@ async def upload_mutation(
         mutation_id = str(uuid.uuid4())
         token = gate.generate_session(mutation_id)
 
-        pending_mutations[mutation_id] = {
+        shared_pending_mutations[mutation_id] = {
             "table_name": table_name,
             "op_type": op_type,
             "mapped_rows": mapped_rows,
@@ -195,8 +193,8 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
 
     # 2. Handle Rejection
     if not body.approved:
-        if body.mutation_id in pending_mutations:
-            del pending_mutations[body.mutation_id]
+        if body.mutation_id in shared_pending_mutations:
+            del shared_pending_mutations[body.mutation_id]
         return MutationExecuteResponse(
             mutation_id=body.mutation_id,
             rows_affected=0,
@@ -204,10 +202,10 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
         )
 
     # 3. Handle Transaction Execution
-    if body.mutation_id not in pending_mutations:
+    if body.mutation_id not in shared_pending_mutations:
         raise HTTPException(status_code=404, detail="Mutation session not found in pending register.")
 
-    session_info = pending_mutations[body.mutation_id]
+    session_info = shared_pending_mutations[body.mutation_id]
     table_name = session_info["table_name"]
     op_type = session_info["op_type"]
 
@@ -227,8 +225,8 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
             )
 
         # Remove from pending queue
-        if body.mutation_id in pending_mutations:
-            del pending_mutations[body.mutation_id]
+        if body.mutation_id in shared_pending_mutations:
+            del shared_pending_mutations[body.mutation_id]
 
         return MutationExecuteResponse(
             mutation_id=body.mutation_id,
@@ -246,4 +244,4 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
     summary="Get all pending database mutations",
 )
 async def get_pending():
-    return [{"mutation_id": mid, "table_name": info["table_name"], "op_type": info["op_type"]} for mid, info in pending_mutations.items()]
+    return [{"mutation_id": mid, "table_name": info["table_name"], "op_type": info["op_type"]} for mid, info in shared_pending_mutations.items()]

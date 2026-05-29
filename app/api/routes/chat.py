@@ -82,10 +82,10 @@ async def chat(
         ]
 
     # Support NL-to-SQL or Mutation response interception:
-    # If the router directed to SQL, return information containing SQL status details
+    # If the router directed to SQL, return status info (token intentionally excluded — use /sql/pending)
     answer_text = result["answer"]
     if result.get("query_type") == "SQL":
-        answer_text = f"Generated approved SQL Session: {result.get('sql_query_id')}\nQuery: {result.get('sql_query')}\nStatus: {result.get('sql_status')}\nToken: {result.get('approval_token')}"
+        answer_text = f"Generated approved SQL Session: {result.get('sql_query_id')}\nQuery: {result.get('sql_query')}\nStatus: {result.get('sql_status')}\n\nTo approve this SQL, use POST /sql/approve with the approval token from POST /sql/generate or GET /sql/pending."
 
     return ChatResponse(
         question=body.question,
@@ -115,7 +115,7 @@ async def chat(
         mutation_status=result.get("mutation_status") if result.get("mutation_status") else None,
         mutation_error=result.get("mutation_error") if result.get("mutation_error") else None,
         mutation_result_count=result.get("mutation_result_count") if result.get("mutation_result_count") else None,
-        approval_token=result.get("approval_token") if result.get("approval_token") else None,
+        # approval_token intentionally excluded from chat response for security — use POST /sql/generate or GET /sql/pending
         ragas_scores=result.get("ragas_scores") if result.get("ragas_scores") else None,
     )
 

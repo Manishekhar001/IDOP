@@ -30,8 +30,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@idop-postgres:5432/postgres?sslmode=disable
+    # DATABASE_URL removed — .env handles it. The docker-compose DATABASE_URL
+    # overrides the .env file at runtime, breaking local dev setups.
     networks:
       - idop-net
     restart: unless-stopped
