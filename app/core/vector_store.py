@@ -80,6 +80,18 @@ class VectorStoreService:
             logger.error(f"Collection creation error: {e}")
             raise
 
+    def _ensure_and_retry(self, func, *args, **kwargs):
+        """Execute a Qdrant operation, ensuring the collection exists if it fails."""
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "not found" in err_str or "doesn't exist" in err_str or "404" in err_str:
+                logger.warning(f"Collection '{self.collection_name}' not found — recreating and retrying...")
+                self._ensure_collection()
+                return func(*args, **kwargs)
+            raise
+
     def add_documents(self, documents: list[Document]) -> list[str]:
         """Insert standard langchain Document items with dual vectors into Qdrant with SHA-256 chunk deduplication"""
         if not documents:
@@ -103,7 +115,8 @@ class VectorStoreService:
         points = self._build_points(new_documents, dense_embeddings, new_texts, new_hashes, doc_ids)
 
         try:
-            self.client.upsert(
+            self._ensure_and_retry(
+                self.client.upsert,
                 collection_name=self.collection_name,
                 points=points
             )
@@ -207,7 +220,8 @@ class VectorStoreService:
         points = self._build_points(new_documents, new_embeddings, new_texts, new_hashes, doc_ids)
 
         try:
-            self.client.upsert(
+            self._ensure_and_retry(
+                self.client.upsert,
                 collection_name=self.collection_name,
                 points=points
             )
@@ -224,14 +238,19 @@ class VectorStoreService:
         search_filter=None
     ) -> list:
         """Dense-only semantic search"""
-        return self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            using="dense",
-            query_filter=search_filter,
-            limit=top_k,
-            with_payload=True
-        ).points
+        try:
+            return self._ensure_and_retry(
+                self.client.query_points,
+                collection_name=self.collection_name,
+                query=query_vector,
+                using="dense",
+                query_filter=search_filter,
+                limit=top_k,
+                with_payload=True
+            ).points
+        except Exception as e:
+            logger.error(f"Dense search failed: {e}")
+            return []
 
     def search_sparse(
         self,
@@ -241,14 +260,19 @@ class VectorStoreService:
     ) -> list:
         """Sparse-only keyword search (BM25)"""
         sparse_query = self.sparse_service.generate_sparse_vector(query_text)
-        return self.client.query_points(
-            collection_name=self.collection_name,
-            query=sparse_query,
-            using="sparse",
-            query_filter=search_filter,
-            limit=top_k,
-            with_payload=True
-        ).points
+        try:
+            return self._ensure_and_retry(
+                self.client.query_points,
+                collection_name=self.collection_name,
+                query=sparse_query,
+                using="sparse",
+                query_filter=search_filter,
+                limit=top_k,
+                with_payload=True
+            ).points
+        except Exception as e:
+            logger.error(f"Sparse search failed: {e}")
+            return []
 
     def search_hybrid(
         self,
@@ -259,16 +283,21 @@ class VectorStoreService:
     ) -> list:
         """Hybrid search with RRF fusion"""
         sparse_query = self.sparse_service.generate_sparse_vector(query_text)
-        return self.client.query_points(
-            collection_name=self.collection_name,
-            prefetch=[
-                Prefetch(query=sparse_query, using="sparse", limit=top_k * 3),
-                Prefetch(query=query_vector, using="dense", limit=top_k * 3)
-            ],
-            query=FusionQuery(fusion=Fusion.RRF),
-            limit=top_k,
-            with_payload=True
-        ).points
+        try:
+            return self._ensure_and_retry(
+                self.client.query_points,
+                collection_name=self.collection_name,
+                prefetch=[
+                    Prefetch(query=sparse_query, using="sparse", limit=top_k * 3),
+                    Prefetch(query=query_vector, using="dense", limit=top_k * 3)
+                ],
+                query=FusionQuery(fusion=Fusion.RRF),
+                limit=top_k,
+                with_payload=True
+            ).points
+        except Exception as e:
+            logger.error(f"Hybrid search failed: {e}")
+            return []
 
     def search(
         self,
@@ -312,7 +341,8 @@ class VectorStoreService:
             ]
         )
         try:
-            res = self.client.scroll(
+            res = self._ensure_and_retry(
+                self.client.scroll,
                 collection_name=self.collection_name,
                 scroll_filter=filter_cond,
                 limit=1,
