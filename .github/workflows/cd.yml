@@ -683,7 +683,7 @@ jobs:
             echo "📥 Ensuring latest image is pulled..."
             $COMPOSE_CMD pull 2>&1 || echo "   ⚠️ compose pull had issues (check ECR auth above)"
 
-            # ── Recreate containers with --pull always to force fresh image ──
+            # ── Recreate containers (image already pulled by $COMPOSE_CMD pull above) ──
             $COMPOSE_CMD up -d 2>&1
             COMPOSE_EXIT=$?
             if [ $COMPOSE_EXIT -ne 0 ]; then
