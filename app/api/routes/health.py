@@ -56,8 +56,22 @@ async def health_check(request: Request) -> Dict[str, Any]:
         except Exception:
             pass
 
-    # 3. Check cache availability
+    # 3. Check cache availability and actual runtime backend types
     query_cache_status = query_cache.enabled if query_cache else False
+    query_cache_mode = "redis" if query_cache_status else ("local_fallback" if getattr(query_cache, 'use_local', False) else "disabled")
+
+    # Determine the actual document cache backend at runtime
+    doc_cache_backend = "unknown"
+    doc_cache_enabled = False
+    if doc_cache and hasattr(doc_cache, 'storage'):
+        doc_cache_enabled = True
+        backend_class = type(doc_cache.storage).__name__
+        if backend_class == 'S3StorageBackend':
+            doc_cache_backend = "s3" if getattr(doc_cache.storage, 'enabled', False) else "s3_disabled"
+        elif backend_class == 'LocalStorageBackend':
+            doc_cache_backend = "local"
+        else:
+            doc_cache_backend = backend_class
 
     # Check overall liveness / readiness state
     services_status = {
@@ -65,7 +79,9 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "supabase_company_db": supabase_connected,
         "qdrant_vector_store": qdrant_connected,
         "query_cache_redis": query_cache_status,
-        "document_cache": doc_cache is not None,
+        "query_cache_mode": query_cache_mode,
+        "document_cache": doc_cache_enabled,
+        "document_cache_backend": doc_cache_backend,
     }
 
     any_service_available = any(services_status.values())
@@ -96,7 +112,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "redis_cache": (
             query_cache.get_stats()
             if query_cache_status
-            else {"status": "disabled_or_offline"}
+            else {"status": query_cache_mode, "message": "Redis not connected — using local in-memory fallback"}
         ),
     }
 

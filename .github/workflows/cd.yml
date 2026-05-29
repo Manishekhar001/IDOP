@@ -502,10 +502,8 @@ jobs:
             # ─────────────────────────────────────────────────────────
 
             # Runtime state
-            ENV_STATE=production
             ECR_REGISTRY=${{ env.RESOLVED_ECR_REGISTRY }}
             ECR_REPOSITORY=${{ env.RESOLVED_ECR_REPOSITORY }}
-            AWS_REGION=${{ env.AWS_REGION }}
 
             # Internal PostgreSQL (LangGraph checkpointing)
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -531,8 +529,15 @@ jobs:
             # Supabase (Relational database)
             SUPABASE_DB_URL=${{ secrets.SUPABASE_DB_URL }}
 
-            # AWS S3 (Document chunk caching — optional)
+            # AWS S3 (Document chunk caching)
+            AWS_REGION=${{ env.AWS_REGION }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             S3_CACHE_BUCKET=${{ secrets.S3_CACHE_BUCKET }}
+            STORAGE_BACKEND=s3
+
+            # Correct runtime state flag (maps to Settings.environment)
+            ENVIRONMENT=production
             ENVEOF
 
             chmod 600 .env
