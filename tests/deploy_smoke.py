@@ -154,18 +154,27 @@ def run_health_check():
             return False
             
         data = response.json()
-        
+
         status = data.get("status")
         version = data.get("version")
-        config = data.get("configuration", {})
-        
-        # Verify S3 cache is configured (the new default)
-        s3_configured = config.get("s3_cache_configured", False)
-        if s3_configured:
-            print(f"   ✅ S3 cache is configured (storage_backend=s3)")
-        else:
-            print(f"   ⚠️ S3 cache is NOT configured (storage_backend != s3)")
-        
+        services = data.get("services", {})
+
+        # 1. Assert document cache backend is S3 (runtime check, not config check)
+        doc_cache_backend = services.get("document_cache_backend", "unknown")
+        print(f"   📦 Document Cache Backend: {doc_cache_backend}")
+        if doc_cache_backend != "s3":
+            print(f"   ❌ Document cache backend is '{doc_cache_backend}', expected 's3'")
+            return False
+        print(f"   ✅ Document cache backend is S3")
+
+        # 2. Assert query cache mode is Redis (not local_fallback or disabled)
+        query_cache_mode = services.get("query_cache_mode", "unknown")
+        print(f"   ⚡ Query Cache Mode     : {query_cache_mode}")
+        if query_cache_mode != "redis":
+            print(f"   ❌ Query cache mode is '{query_cache_mode}', expected 'redis'")
+            return False
+        print(f"   ✅ Query cache is connected to Redis")
+
         if status == "healthy":
             print(f"   ✅ Health endpoint verified! [Version: {version}]")
             print("")

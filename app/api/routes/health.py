@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -5,14 +6,9 @@ from fastapi import APIRouter, Request, status
 import psycopg2
 
 from app.config import get_settings
-from app.services.cache_service import CacheService
-from app.services.query_cache_service import QueryCacheService
+from app.services.cache_init import get_doc_cache, get_query_cache
 
 router = APIRouter(tags=["System Diagnostics"])
-
-# Instantiate services locally to check operational statuses
-doc_cache = CacheService()
-query_cache = QueryCacheService()
 
 
 @router.get("/health", status_code=status.HTTP_200_OK, summary="Enhanced Health Check")
@@ -33,30 +29,37 @@ async def health_check(request: Request) -> Dict[str, Any]:
     except Exception:
         pass
 
-    # 2. Check Postgres Connection (checkpointer)
+    # 2. Check Postgres Connection (checkpointer) — off the event loop
+    loop = asyncio.get_event_loop()
     postgres_connected = False
     try:
-        conn = psycopg2.connect(settings.database_url)
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1;")
-        conn.close()
-        postgres_connected = True
-    except Exception:
-        pass
-
-    # Check Supabase Connection (company data)
-    supabase_connected = False
-    if settings.supabase_db_url:
-        try:
-            conn = psycopg2.connect(settings.supabase_db_url)
+        def _check_postgres():
+            conn = psycopg2.connect(settings.database_url)
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
             conn.close()
-            supabase_connected = True
+            return True
+        postgres_connected = await loop.run_in_executor(None, _check_postgres)
+    except Exception:
+        pass
+
+    # Check Supabase Connection (company data) — off the event loop
+    supabase_connected = False
+    if settings.supabase_db_url:
+        try:
+            def _check_supabase():
+                conn = psycopg2.connect(settings.supabase_db_url)
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                conn.close()
+                return True
+            supabase_connected = await loop.run_in_executor(None, _check_supabase)
         except Exception:
             pass
 
     # 3. Check cache availability and actual runtime backend types
+    doc_cache = get_doc_cache()
+    query_cache = get_query_cache()
     query_cache_status = query_cache.enabled if query_cache else False
     query_cache_mode = "redis" if query_cache_status else ("local_fallback" if getattr(query_cache, 'use_local', False) else "disabled")
 
@@ -123,32 +126,37 @@ async def readiness(request: Request) -> Dict[str, Any]:
     Readiness probe validating underlying Qdrant, PostgreSQL, and Supabase connections.
     """
     settings = get_settings()
+    loop = asyncio.get_event_loop()
 
     # Qdrant Check
     vector_store = request.app.state.vector_store
     qdrant_connected = vector_store.health_check()
     collection_info = vector_store.get_collection_info()
 
-    # Postgres Check (checkpointer)
+    # Postgres Check (checkpointer) — off the event loop
     postgres_connected = False
     try:
-        conn = psycopg2.connect(settings.database_url)
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1;")
-        conn.close()
-        postgres_connected = True
-    except Exception:
-        pass
-
-    # Supabase Check (company data)
-    supabase_connected = False
-    if settings.supabase_db_url:
-        try:
-            conn = psycopg2.connect(settings.supabase_db_url)
+        def _check_postgres():
+            conn = psycopg2.connect(settings.database_url)
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
             conn.close()
-            supabase_connected = True
+            return True
+        postgres_connected = await loop.run_in_executor(None, _check_postgres)
+    except Exception:
+        pass
+
+    # Supabase Check (company data) — off the event loop
+    supabase_connected = False
+    if settings.supabase_db_url:
+        try:
+            def _check_supabase():
+                conn = psycopg2.connect(settings.supabase_db_url)
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                conn.close()
+                return True
+            supabase_connected = await loop.run_in_executor(None, _check_supabase)
         except Exception:
             pass
 
@@ -222,7 +230,9 @@ async def get_stats(request: Request) -> Dict[str, Any]:
     vector_count = collection_info.get("points_count", 0)
 
     # Fetch document cache stats
-    doc_stats = doc_cache.get_cache_stats()
+    doc_cache = get_doc_cache()
+    query_cache = get_query_cache()
+    doc_stats = doc_cache.get_cache_stats() if doc_cache else {"total_documents": 0, "total_size_human": "0 Bytes", "total_size_bytes": 0}
 
     # Get query cache Redis metrics
     cache_stats = {"enabled": False, "total_estimated_savings": "$0.0000", "overall_hit_rate": "0.0%"}

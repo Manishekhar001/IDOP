@@ -20,7 +20,7 @@ class CacheService:
     def __init__(self, storage_backend: Optional[StorageBackend] = None):
         settings = get_settings()
         if storage_backend is None:
-            backend_type = getattr(settings, "storage_backend", "local").lower()
+            backend_type = getattr(settings, "storage_backend", "s3").lower()
 
             if backend_type == "s3":
                 try:

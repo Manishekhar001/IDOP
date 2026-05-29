@@ -6,12 +6,11 @@ from langgraph.store.postgres.aio import AsyncPostgresStore
 from app.config import get_settings
 from app.core.graph.builder import build_graph
 from app.core.vector_store import VectorStoreService
-from app.services.query_cache_service import QueryCacheService
+from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
-query_cache = QueryCacheService()
 
 _RECURSION_LIMIT = 80
 
@@ -128,8 +127,9 @@ class CSRAGEngine:
             f"q='{question[:80]}'"
         )
         
-        cache_key = query_cache.get_rag_key(question, top_k)
-        if (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
+        query_cache = get_query_cache()
+        cache_key = query_cache.get_rag_key(question, top_k) if query_cache else None
+        if query_cache and (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
             cached_result = query_cache.get(cache_key, cache_type="rag")
             if cached_result:
                 logger.info(f"RAG Cache HIT for: '{question[:50]}'")
@@ -151,7 +151,7 @@ class CSRAGEngine:
         formatted = self._format_result(result)
 
         # Check post-verification gates before writing to Redis/local cache
-        if (query_cache.enabled or query_cache.use_local) and formatted.get("query_type") == "RAG":
+        if query_cache and (query_cache.enabled or query_cache.use_local) and formatted.get("query_type") == "RAG":
             crag_verdict = formatted.get("crag_verdict")
             issup = formatted.get("issup")
             isuse = formatted.get("isuse")

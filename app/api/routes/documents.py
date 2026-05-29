@@ -6,15 +6,12 @@ from typing import Optional
 from app.api.schemas import CollectionInfoResponse, DocumentUploadResponse, ErrorResponse
 from app.core.document_processor import DocumentProcessor
 from app.core.vector_store import VectorStoreService
-from app.services.cache_service import CacheService
+from app.services.cache_init import get_doc_cache
 from app.utils.logger import get_logger
 from app.utils.validators import FileValidator, ValidationError
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
-
-# Document cache service (local/S3-based chunk + embedding cache)
-doc_cache = CacheService()
 
 
 def get_vector_store(request: Request) -> VectorStoreService:
@@ -100,10 +97,20 @@ async def upload_document(
         loop = asyncio.get_event_loop()
 
         # --- Cache Check ---
-        cache_hit = doc_cache.cache_exists(doc_id, file_ext)
+        doc_cache = get_doc_cache()
+        cache_hit = False
+        cached = None
+        if doc_cache is not None:
+            try:
+                cache_hit = doc_cache.cache_exists(doc_id, file_ext)
+            except Exception as e:
+                logger.warning(f"Cache exists check failed: {e}")
         if cache_hit:
             logger.info(f"Cache HIT for {filename} (doc_id={doc_id[:12]}...)")
-            cached = doc_cache.load_chunks_and_embeddings(doc_id, file_ext)
+            try:
+                cached = doc_cache.load_chunks_and_embeddings(doc_id, file_ext)
+            except Exception as e:
+                logger.warning(f"Cache load failed: {e}")
             if cached is not None:
                 # Reconstruct Document objects from cached chunks
                 chunks = [
@@ -156,30 +163,31 @@ async def upload_document(
         )
 
         # --- Save to cache for future requests ---
-        try:
-            chunk_dicts = [
-                {"text": doc.page_content, "metadata": doc.metadata}
-                for doc in chunks
-            ]
-            metadata = {
-                "filename": filename,
-                "chunk_size": processor.chunk_size,
-                "chunk_overlap": processor.chunk_overlap,
-                "total_chunks": len(chunks),
-            }
+        if doc_cache is not None:
+            try:
+                chunk_dicts = [
+                    {"text": doc.page_content, "metadata": doc.metadata}
+                    for doc in chunks
+                ]
+                metadata = {
+                    "filename": filename,
+                    "chunk_size": processor.chunk_size,
+                    "chunk_overlap": processor.chunk_overlap,
+                    "total_chunks": len(chunks),
+                }
 
-            await loop.run_in_executor(
-                None,
-                doc_cache.save_chunks_and_embeddings,
-                doc_id,
-                file_ext,
-                chunk_dicts,
-                embeddings,
-                metadata,
-            )
-            logger.info(f"Cached {len(chunks)} chunks for {filename}")
-        except Exception as cache_err:
-            logger.warning(f"Failed to cache document {filename}: {cache_err}")
+                await loop.run_in_executor(
+                    None,
+                    doc_cache.save_chunks_and_embeddings,
+                    doc_id,
+                    file_ext,
+                    chunk_dicts,
+                    embeddings,
+                    metadata,
+                )
+                logger.info(f"Cached {len(chunks)} chunks for {filename}")
+            except Exception as cache_err:
+                logger.warning(f"Failed to cache document {filename}: {cache_err}")
 
         logger.info(f"Indexed {filename}: {len(chunks)} chunks, {len(document_ids)} IDs")
         return DocumentUploadResponse(
