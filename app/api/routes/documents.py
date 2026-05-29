@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import os
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from typing import Optional
 from app.api.schemas import CollectionInfoResponse, DocumentUploadResponse, ErrorResponse
@@ -22,7 +23,6 @@ def get_vector_store(request: Request) -> VectorStoreService:
 
 def _get_extension(filename: str) -> str:
     """Extract the file extension without the leading dot."""
-    import os
     _, ext = os.path.splitext(filename)
     return ext.lstrip(".") if ext else "bin"
 

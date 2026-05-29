@@ -5,12 +5,8 @@ Tests graph compilation, state shape, conditional routing functions,
 and the CSRAGEngine format_result utility.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-
 from app.core.graph.state import CSRAGState
 from app.core.graph.nodes import (
-    route_after_router,
     route_after_decide,
     route_after_crag,
     route_after_support,

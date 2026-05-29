@@ -5,12 +5,10 @@ Runs a fixed 50-item benchmark dataset against 5 pipeline configurations
 and evaluates RAG metrics using the RAGAS framework.
 """
 
-import os
 import sys
 import asyncio
-import time
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
@@ -93,8 +91,8 @@ async def run_pipeline(question: str, config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Initialize services
     vector_store = VectorStoreService()
-    store = AsyncPostgresStore.from_conn_string(settings.DATABASE_URL)
-    checkpointer = AsyncPostgresSaver.from_conn_string(settings.DATABASE_URL)
+    store = await AsyncPostgresStore.from_conn_string(settings.database_url).__aenter__()
+    checkpointer = await AsyncPostgresSaver.from_conn_string(settings.database_url).__aenter__()
     
     try:
         await store.setup()
@@ -121,8 +119,8 @@ async def run_pipeline(question: str, config: Dict[str, Any]) -> Dict[str, Any]:
             "contexts": retrieved_contexts
         }
     finally:
-        await store.close()
-        await checkpointer.close()
+        await store.__aexit__(None, None, None)
+        await checkpointer.__aexit__(None, None, None)
 
 
 async def run_ablation_study():

@@ -46,14 +46,15 @@ async def health_check(request: Request) -> Dict[str, Any]:
 
     # Check Supabase Connection (company data)
     supabase_connected = False
-    try:
-        conn = psycopg2.connect(settings.supabase_db_url)
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1;")
-        conn.close()
-        supabase_connected = True
-    except Exception:
-        pass
+    if settings.supabase_db_url:
+        try:
+            conn = psycopg2.connect(settings.supabase_db_url)
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+            conn.close()
+            supabase_connected = True
+        except Exception:
+            pass
 
     # 3. Check cache availability
     query_cache_status = query_cache.enabled if query_cache else False
@@ -125,14 +126,15 @@ async def readiness(request: Request) -> Dict[str, Any]:
 
     # Supabase Check (company data)
     supabase_connected = False
-    try:
-        conn = psycopg2.connect(settings.supabase_db_url)
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1;")
-        conn.close()
-        supabase_connected = True
-    except Exception:
-        pass
+    if settings.supabase_db_url:
+        try:
+            conn = psycopg2.connect(settings.supabase_db_url)
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+            conn.close()
+            supabase_connected = True
+        except Exception:
+            pass
 
     status = "ready" if (qdrant_connected and postgres_connected and supabase_connected) else "not_ready"
 

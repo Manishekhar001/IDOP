@@ -3,11 +3,10 @@ Unit tests for IDOP SQL API and schema updates.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 
 from app.api.schemas import SQLResponse
-from app.api.routes.sql import router
 from app.main import app
 
 

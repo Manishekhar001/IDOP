@@ -36,28 +36,32 @@ async def lifespan(app: FastAPI):
     logger.info("VectorStoreService ready")
 
     logger.info("Connecting AsyncPostgresStore (LTM)...")
-    # Using database_url as the unified Postgres connection string
-    async with AsyncPostgresStore.from_conn_string(settings.database_url) as store:
-        await store.setup()
-        app.state.store = store
-        logger.info("AsyncPostgresStore (LTM) ready")
+    store = await AsyncPostgresStore.from_conn_string(settings.database_url).__aenter__()
+    await store.setup()
+    app.state.store = store
+    logger.info("AsyncPostgresStore (LTM) ready")
 
-        logger.info("Connecting AsyncPostgresSaver (STM checkpointer)...")
-        async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
-            await checkpointer.setup()
-            app.state.checkpointer = checkpointer
-            logger.info("AsyncPostgresSaver (STM checkpointer) ready")
+    logger.info("Connecting AsyncPostgresSaver (STM checkpointer)...")
+    checkpointer = await AsyncPostgresSaver.from_conn_string(settings.database_url).__aenter__()
+    await checkpointer.setup()
+    app.state.checkpointer = checkpointer
+    logger.info("AsyncPostgresSaver (STM checkpointer) ready")
 
-            logger.info("Compiling IDOP Graph Engine...")
-            app.state.engine = CSRAGEngine(
-                vector_store=app.state.vector_store,
-                store=store,
-                checkpointer=checkpointer,
-            )
-            logger.info("IDOP Engine ready — all services online")
+    logger.info("Compiling IDOP Graph Engine...")
+    app.state.engine = CSRAGEngine(
+        vector_store=app.state.vector_store,
+        store=store,
+        checkpointer=checkpointer,
+    )
+    logger.info("IDOP Engine ready — all services online")
 
-            yield
+    yield
 
+    logger.info("Shutting down services...")
+    if hasattr(app.state, "checkpointer") and app.state.checkpointer:
+        await app.state.checkpointer.__aexit__(None, None, None)
+    if hasattr(app.state, "store") and app.state.store:
+        await app.state.store.__aexit__(None, None, None)
     logger.info("Shutdown complete")
 
 

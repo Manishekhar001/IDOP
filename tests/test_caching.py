@@ -6,8 +6,6 @@ and the Redis-backed query cache with local in-memory fallback.
 """
 
 import pytest
-import numpy as np
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from app.services.cache_service import CacheService

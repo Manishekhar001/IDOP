@@ -8,8 +8,6 @@ document caching pipeline.
 
 import pytest
 import numpy as np
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 from app.services.local_storage import LocalStorageBackend
 from app.services.s3_storage import S3StorageBackend

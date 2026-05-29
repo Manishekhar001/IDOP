@@ -5,7 +5,7 @@ from uuid import uuid4
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
-    Distance, VectorParams, PointStruct,
+    Distance, VectorParams,
     Filter, FieldCondition, MatchValue,
     SparseVectorParams,
     Prefetch, FusionQuery, Fusion
