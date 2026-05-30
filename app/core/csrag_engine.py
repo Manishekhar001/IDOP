@@ -10,6 +10,8 @@ from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
 from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
 from app.opik import track
+from opik import start_as_current_trace, start_as_current_span
+from opik import opik_context
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -210,57 +212,128 @@ class CSRAGEngine:
         vanna_seed: int = 42,
         vanna_top_p: float = 0.1,
     ):
+        """
+        Streaming version of aquery with manual Opik tracing.
+
+        Manual tracing is used here instead of @track because the @track decorator
+        cannot properly instrument async generators — it creates a span that closes
+        immediately when the generator object is created, rather than capturing the
+        actual streaming duration. By using start_as_current_trace/start_as_current_span
+        directly inside the generator body, the span correctly covers the full
+        lifecycle from first yield to generator exhaustion.
+        """
         logger.info(
             f"streaming query — thread={thread_id}, user={user_id}, "
             f"q='{question[:80]}'"
         )
 
-        # Check query cache before streaming
+        # Build trace input metadata once
+        trace_input = {
+            "question": question[:200],
+            "thread_id": thread_id,
+            "user_id": user_id,
+            "search_mode": search_mode,
+            "top_k": top_k,
+            "enable_hyde": enable_hyde,
+            "enable_reranking": enable_reranking,
+        }
+
         query_cache = get_query_cache()
         cache_key = query_cache.get_rag_key(question, top_k) if query_cache else None
-        cache_hit = False
+
+        # ── Cache hit path (short span) ──────────────────────────────────
         if query_cache and (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
             cached_result = query_cache.get(cache_key, cache_type="rag")
             if cached_result:
                 answer_text = cached_result.get("answer", "")
                 if answer_text:
                     logger.info(f"RAG Cache HIT for stream: '{question[:50]}'")
-                    # Yield metadata envelope first, then the cached answer
-                    yield f"⏺ cache_hit=true  cost_saved=$0.05\n"
-                    yield answer_text
+                    with start_as_current_trace(
+                        name="csrag_astream",
+                        input=trace_input,
+                        metadata={"cache_hit": True, "cost_saved": "$0.05"},
+                    ):
+                        with start_as_current_span(
+                            name="csrag_astream_body",
+                            input=trace_input,
+                            metadata={"cache_hit": True},
+                            tags=["stream", "cache_hit"],
+                        ):
+                            yield f"⏺ cache_hit=true  cost_saved=$0.05\n"
+                            yield answer_text
+
+                            # Update span & trace with output info
+                            char_count = len(answer_text)
+                            opik_context.update_current_span(
+                                output={"answer_length_chars": char_count, "cache_hit": True}
+                            )
+                            opik_context.update_current_trace(
+                                output={"answer_length_chars": char_count, "cache_hit": True}
+                            )
                     return
 
-        # Cache miss — yield metadata envelope, then stream from graph
-        yield "⏺ cache_hit=false\n"
-
-        config = self._build_config(thread_id, user_id)
-        init_state = self._initial_state(
-            question=question,
-            search_mode=search_mode,
-            top_k=top_k,
-            enable_hyde=enable_hyde,
-            enable_reranking=enable_reranking,
-            enable_ragas=enable_ragas,
-            explain=explain,
-            vanna_temperature=vanna_temperature,
-            vanna_seed=vanna_seed,
-            vanna_top_p=vanna_top_p,
-        )
-
-        _ANSWER_NODES = {"generate_answer", "generate_direct"}
-
-        try:
-            async for msg, metadata in self._graph.astream(
-                init_state,
-                config,
-                stream_mode="messages",
+        # ── Cache miss path (full streaming span) ────────────────────────
+        with start_as_current_trace(
+            name="csrag_astream",
+            input=trace_input,
+            metadata={"cache_hit": False},
+            thread_id=thread_id,
+        ):
+            with start_as_current_span(
+                name="csrag_astream_body",
+                input=trace_input,
+                metadata={"cache_hit": False},
+                tags=["stream", "cache_miss"],
             ):
-                node = metadata.get("langgraph_node", "")
-                if node in _ANSWER_NODES and hasattr(msg, "content") and msg.content:
-                    yield msg.content
-        except Exception as e:
-            logger.error(f"Streaming error: {e}", exc_info=True)
-            yield f"\n\n[Error: {type(e).__name__}: {str(e)}]"
+                yield "⏺ cache_hit=false\n"
+
+                config = self._build_config(thread_id, user_id)
+                init_state = self._initial_state(
+                    question=question,
+                    search_mode=search_mode,
+                    top_k=top_k,
+                    enable_hyde=enable_hyde,
+                    enable_reranking=enable_reranking,
+                    enable_ragas=enable_ragas,
+                    explain=explain,
+                    vanna_temperature=vanna_temperature,
+                    vanna_seed=vanna_seed,
+                    vanna_top_p=vanna_top_p,
+                )
+
+                _ANSWER_NODES = {"generate_answer", "generate_direct"}
+                char_count = 0
+                had_error = False
+
+                try:
+                    async for msg, metadata in self._graph.astream(
+                        init_state,
+                        config,
+                        stream_mode="messages",
+                    ):
+                        node = metadata.get("langgraph_node", "")
+                        if node in _ANSWER_NODES and hasattr(msg, "content") and msg.content:
+                            chunk = msg.content
+                            char_count += len(chunk)
+                            yield chunk
+                except Exception as e:
+                    had_error = True
+                    logger.error(f"Streaming error: {e}", exc_info=True)
+                    yield f"\n\n[Error: {type(e).__name__}: {str(e)}]"
+                finally:
+                    # Finalize span & trace with output metadata
+                    span_output = {
+                        "answer_length_chars": char_count,
+                        "cache_hit": False,
+                        "had_error": had_error,
+                    }
+                    trace_output = {
+                        "answer_length_chars": char_count,
+                        "cache_hit": False,
+                        "had_error": had_error,
+                    }
+                    opik_context.update_current_span(output=span_output)
+                    opik_context.update_current_trace(output=trace_output)
 
     def health_check(self) -> bool:
         return self._graph is not None

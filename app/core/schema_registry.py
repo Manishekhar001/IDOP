@@ -9,9 +9,9 @@ Add new tables here to make them available across the platform.
 # Supported mutation tables and their column definitions
 # Extend this dict when adding new tables to the mutation pipeline.
 TABLE_SCHEMAS = {
-    "products": ["id", "name", "category", "price", "stock_quantity", "description"],
-    "customers": ["id", "name", "email", "segment", "country"],
-    "orders": ["id", "customer_id", "order_date", "total_amount", "status", "shipping_address"],
+    "customers": ["id", "name", "email", "segment", "country", "created_at", "updated_at"],
+    "products": ["id", "name", "category", "price", "stock_quantity", "description", "created_at", "updated_at"],
+    "orders": ["id", "customer_id", "order_date", "total_amount", "status", "shipping_address", "created_at", "updated_at"],
 }
 
 # Set of all supported table names for quick lookup

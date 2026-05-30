@@ -199,6 +199,176 @@ class TextToSQLService:
         logger.info("Schema prepared for Vanna 2.0 Agent!")
 
     def _build_schema_context(self) -> str:
+        """
+        Build schema context dynamically by introspecting the actual database.
+
+        Queries information_schema.columns and information_schema.table_constraints
+        to build an accurate, up-to-date representation of all business tables.
+        Falls back to the hardcoded static context if the database is unreachable.
+        """
+        import psycopg2
+        import psycopg2.extras
+
+        schema_parts = []
+        schema_parts.append("DATABASE SCHEMA DOCUMENTATION")
+        schema_parts.append("=" * 60)
+
+        try:
+            conn = psycopg2.connect(self.database_url)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            # Fetch all business tables (exclude LangGraph / idop_ infrastructure tables)
+            cur.execute("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_type = 'BASE TABLE'
+                  AND table_name NOT LIKE 'checkpoint_%'
+                  AND table_name NOT LIKE 'store%'
+                  AND table_name NOT LIKE 'idop_%'
+                ORDER BY table_name
+            """)
+            business_tables = [r["table_name"] for r in cur.fetchall()]
+
+            if not business_tables:
+                logger.warning("No business tables found in database — using static schema fallback")
+                conn.close()
+                return self._static_schema_context()
+
+            # Build table relationships description
+            schema_parts.append("\nThis is an e-commerce database with the following tables:")
+            for tbl in business_tables:
+                cur.execute(
+                    "SELECT COUNT(*) as cnt FROM information_schema.columns "
+                    "WHERE table_schema = 'public' AND table_name = %s",
+                    (tbl,)
+                )
+                col_count = cur.fetchone()["cnt"]
+                schema_parts.append(f"- {tbl}: {col_count} columns")
+
+            # Fetch foreign keys
+            cur.execute("""
+                SELECT
+                    tc.table_name,
+                    kcu.column_name,
+                    ccu.table_name AS foreign_table_name,
+                    ccu.column_name AS foreign_column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = 'public'
+                  AND tc.table_name NOT LIKE 'checkpoint_%'
+                  AND tc.table_name NOT LIKE 'store%'
+                  AND tc.table_name NOT LIKE 'idop_%'
+            """)
+            foreign_keys = cur.fetchall()
+
+            # Fetch column details for each table
+            for tbl in business_tables:
+                cur.execute(
+                    """
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = %s
+                    ORDER BY ordinal_position
+                    """,
+                    (tbl,)
+                )
+                columns = cur.fetchall()
+
+                schema_parts.append(f"\nTable: {tbl}")
+                schema_parts.append("Columns:")
+                for col in columns:
+                    nullable = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
+                    default = f" DEFAULT {col['column_default']}" if col["column_default"] else ""
+                    schema_parts.append(f"  - {col['column_name']} ({col['data_type']}, {nullable}{default})")
+
+                # Link foreign keys for this table
+                for fk in foreign_keys:
+                    if fk["table_name"] == tbl:
+                        schema_parts.append(
+                            f"  * Foreign Key: {fk['column_name']} -> {fk['foreign_table_name']}.{fk['foreign_column_name']}"
+                        )
+
+            # Fetch enum-like check constraint values
+            cur.execute("""
+                SELECT
+                    tc.table_name,
+                    ccu.column_name,
+                    pg_get_constraintdef(tc.oid) as constraint_def
+                FROM pg_catalog.pg_constraint tc
+                JOIN information_schema.table_constraints tc2
+                    ON tc.conname = tc2.constraint_name
+                JOIN information_schema.constraint_column_usage ccu
+                    ON tc2.constraint_name = ccu.constraint_name
+                WHERE tc2.constraint_type = 'CHECK'
+                  AND tc2.table_schema = 'public'
+                  AND tc2.table_name NOT LIKE 'checkpoint_%'
+                  AND tc2.table_name NOT LIKE 'store%'
+                  AND tc2.table_name NOT LIKE 'idop_%'
+                  AND ccu.column_name IN ('segment', 'status')
+            """)
+            check_constraints = cur.fetchall()
+
+            if check_constraints:
+                schema_parts.append("\nColumn Constraints (allowed values):")
+                enum_descriptions = {
+                    "customers.segment": "'SMB', 'Enterprise', 'Individual'",
+                    "orders.status": "'Pending', 'Delivered', 'Cancelled', 'Processing'",
+                }
+                for cc in check_constraints:
+                    key = f"{cc['table_name']}.{cc['column_name']}"
+                    desc = enum_descriptions.get(key, f"See check constraint: {cc['constraint_def']}")
+                    schema_parts.append(f"  - {key}: {desc}")
+
+            conn.close()
+
+        except Exception as e:
+            logger.warning(f"Dynamic schema introspection failed ({e}) — using static fallback")
+            return self._static_schema_context()
+
+        # Add example queries
+        schema_parts.append("\nEXAMPLE QUERIES:")
+        schema_parts.append("-" * 60)
+
+        examples = [
+            (
+                "How many customers do we have?",
+                "SELECT COUNT(*) as customer_count FROM customers;",
+            ),
+            (
+                "What is the total revenue from all orders?",
+                "SELECT SUM(total_amount) as total_revenue FROM orders;",
+            ),
+            (
+                "List all delivered orders",
+                "SELECT * FROM orders WHERE status = 'Delivered' ORDER BY order_date DESC;",
+            ),
+            (
+                "How many orders per customer segment?",
+                "SELECT c.segment, COUNT(o.id) as order_count FROM customers c LEFT JOIN orders o ON c.id = o.customer_id GROUP BY c.segment;",
+            ),
+            (
+                "Top 10 customers by total spending",
+                "SELECT c.name, c.email, SUM(o.total_amount) as total_spent FROM customers c JOIN orders o ON c.id = o.customer_id GROUP BY c.id, c.name, c.email ORDER BY total_spent DESC LIMIT 10;",
+            ),
+        ]
+
+        for i, (question, sql) in enumerate(examples, 1):
+            schema_parts.append(f"\nExample {i}:")
+            schema_parts.append(f"Question: {question}")
+            schema_parts.append(f"SQL: {sql}")
+
+        return "\n".join(schema_parts)
+
+    def _static_schema_context(self) -> str:
+        """
+        Static fallback schema context used when the database is unreachable.
+        Mirrors the tables created by scripts/init_db.py.
+        """
         schema_parts = []
         schema_parts.append("DATABASE SCHEMA DOCUMENTATION")
         schema_parts.append("=" * 60)
@@ -216,6 +386,8 @@ class TextToSQLService:
     - Customer segments: 'SMB', 'Enterprise', 'Individual' (case-sensitive)
     - Order statuses: 'Pending', 'Delivered', 'Cancelled', 'Processing' (case-sensitive)
     - To join customers and orders: JOIN orders ON customers.id = orders.customer_id
+    - Revenue: SUM(orders.total_amount)
+    - Product categories include Electronics, Software, Hardware, Services
     """
         schema_parts.append(documentation)
         schema_parts.append("\nTABLE SCHEMAS:")
@@ -225,38 +397,38 @@ class TextToSQLService:
     Table: customers
     Columns:
     - id (SERIAL PRIMARY KEY)
-    - name (VARCHAR) - Customer full name
-    - email (VARCHAR) - Customer email address
-    - segment (VARCHAR) - One of: 'SMB', 'Enterprise', 'Individual'
-    - country (VARCHAR) - Customer country
-    - created_at (TIMESTAMP)
-    - updated_at (TIMESTAMP)
+    - name (VARCHAR NOT NULL) - Customer full name
+    - email (VARCHAR UNIQUE NOT NULL) - Customer email address
+    - segment (VARCHAR NOT NULL) - One of: 'SMB', 'Enterprise', 'Individual'
+    - country (VARCHAR NOT NULL) - Customer country of operation
+    - created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    - updated_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
     """)
 
         schema_parts.append("""
     Table: products
     Columns:
     - id (SERIAL PRIMARY KEY)
-    - name (VARCHAR) - Product name
-    - category (VARCHAR) - Product category (Electronics, Software, Hardware, etc.)
-    - price (DECIMAL) - Product unit price
-    - stock_quantity (INT) - Current inventory count
-    - description (TEXT)
-    - created_at (TIMESTAMP)
-    - updated_at (TIMESTAMP)
+    - name (VARCHAR NOT NULL) - Product name
+    - category (VARCHAR NOT NULL) - Product category (Electronics, Software, Hardware, Services)
+    - price (DECIMAL NOT NULL, min 0.01) - Product unit price
+    - stock_quantity (INT NOT NULL DEFAULT 0, min 0) - Current inventory count
+    - description (TEXT) - Product description
+    - created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    - updated_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
     """)
 
         schema_parts.append("""
     Table: orders
     Columns:
     - id (SERIAL PRIMARY KEY)
-    - customer_id (INT) - Foreign key to customers.id
-    - order_date (DATE) - Date of order
-    - total_amount (DECIMAL) - TOTAL ORDER PRICE (use this for revenue, NOT 'price'!)
-    - status (VARCHAR) - One of: 'Pending', 'Delivered', 'Cancelled', 'Processing'
-    - shipping_address (TEXT)
-    - created_at (TIMESTAMP)
-    - updated_at (TIMESTAMP)
+    - customer_id (INT NOT NULL) - Foreign key to customers.id
+    - order_date (DATE NOT NULL DEFAULT CURRENT_DATE) - Date of order
+    - total_amount (DECIMAL NOT NULL, min 0) - TOTAL ORDER PRICE (use this for revenue, NOT 'price'!)
+    - status (VARCHAR NOT NULL) - One of: 'Pending', 'Delivered', 'Cancelled', 'Processing'
+    - shipping_address (TEXT) - Shipping address
+    - created_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    - updated_at (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
     """)
 
         schema_parts.append("\nEXAMPLE QUERIES:")
