@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.opik import track
 from app.config import get_settings
 from app.utils.logger import get_logger
 
@@ -56,12 +57,14 @@ class WebSearchService:
             f"tavily max_results={settings.tavily_max_results}"
         )
 
+    @track(name="web_search_rewrite")
     async def rewrite_query(self, question: str) -> str:
         logger.debug(f"Rewriting query for: {question[:80]}")
         result: WebQuery = await self._rewrite_chain.ainvoke({"question": question})
         logger.info(f"Rewritten web query: {result.query}")
         return result.query
 
+    @track(name="web_search_execute")
     async def search(self, query: str) -> list[Document]:
         logger.info(f"Tavily web search: '{query}'")
         try:

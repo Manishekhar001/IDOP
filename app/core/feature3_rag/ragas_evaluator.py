@@ -14,6 +14,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.ragas_evaluator")
@@ -208,6 +209,7 @@ class RagasEvaluator:
         self._precision_chain = _CONTEXT_PRECISION_PROMPT | llm.with_structured_output(ContextPrecisionScore)
         logger.info("RAGASEvaluator initialized")
 
+    @track(name="ragas_evaluator_evaluate")
     async def evaluate(
         self,
         question: str,

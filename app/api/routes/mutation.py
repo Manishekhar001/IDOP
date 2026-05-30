@@ -14,6 +14,7 @@ from app.core.feature2_mutation.approval_gate import MutationApprovalGate
 from app.core.feature2_mutation.executor import MutationExecutor
 
 from app.services.pending_store import pending_mutations as shared_pending_mutations
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -32,18 +33,51 @@ executor = MutationExecutor()
 @router.post(
     "/upload",
     response_model=MutationResponse,
-    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
-    summary="Upload Excel/CSV for mutation mapping and validation",
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid file, empty spreadsheet, or parameter error"},
+        500: {"model": ErrorResponse, "description": "Processing or LLM error"},
+    },
+    summary="Upload Excel/CSV for mutation mapping, validation, and preview",
+    description=(
+        "Upload a spreadsheet containing mutation payload data. The pipeline: "
+        "parse file → map columns to database schema → validate business rules → "
+        "classify operation type (INSERT/UPDATE/DELETE) → LLM audit → generate SQL → "
+        "return approval token. The mutation remains pending until POST /mutation/approve."
+    ),
 )
+@track(name="upload_mutation")
 async def upload_mutation(
-    table_name: str = Form(..., description="Target database table name"),
-    request_intent: str = Form(..., description="Description of mutation intent (e.g. Add products, Update stock)"),
-    file: UploadFile = File(..., description="Excel/CSV spreadsheet containing payload data"),
-    max_bulk_rows: Optional[str] = Form(None, description="Custom maximum allowed rows to prevent resource exhaustion"),
-    primary_key: Optional[str] = Form("id", description="Primary key column for UPDATE and DELETE operations"),
-    auto_map: Optional[str] = Form("true", description="Enable automatic column mapping using LLM"),
-    skip_validation: Optional[str] = Form("false", description="Skip business rules validation"),
+    table_name: str = Form(..., description="Target database table name (e.g. 'products', 'customers')"),
+    request_intent: str = Form(..., description="Natural language description of the mutation intent (e.g. 'Add products', 'Update stock levels')"),
+    file: UploadFile = File(..., description="Excel (.xlsx/.xls) or CSV spreadsheet containing the mutation payload data"),
+    max_bulk_rows: Optional[str] = Form(None, description="Maximum allowed rows to prevent resource exhaustion (default: 1000)"),
+    primary_key: Optional[str] = Form("id", description="Primary key column name for UPDATE and DELETE operations"),
+    auto_map: Optional[str] = Form("true", description="Enable automatic LLM-based column mapping from file headers to database columns"),
+    skip_validation: Optional[str] = Form("false", description="Skip business rules validation checks"),
 ) -> MutationResponse:
+    """
+    Upload and process a spreadsheet for database mutation (INSERT, UPDATE, or DELETE).
+
+    Pipeline: parse file → column mapping → validate business rules → classify operation →
+    LLM audit → generate SQL → store pending → return approval token
+
+    Args:
+        table_name: Target database table for the mutation.
+        request_intent: Description of what the mutation should accomplish.
+        file: Excel (.xlsx/.xls) or CSV file containing the payload data.
+        max_bulk_rows: Maximum number of rows to process (default 1000).
+        primary_key: Primary key column (default 'id').
+        auto_map: If true, uses LLM to map file columns to database columns.
+        skip_validation: If true, skips business rule validation.
+
+    Returns:
+        MutationResponse: Parsing results with column mappings, row count, operation type,
+                         validation errors (if any), and approval token.
+
+    Raises:
+        HTTPException 400: If the file is empty, exceeds row limits, or parameter parsing fails.
+        HTTPException 500: If file parsing, LLM, or internal processing fails.
+    """
     # Safely parse max_bulk_rows
     parsed_max_bulk_rows = None
     if max_bulk_rows is not None:
@@ -180,10 +214,40 @@ async def upload_mutation(
 @router.post(
     "/approve",
     response_model=MutationExecuteResponse,
-    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={
+        403: {"model": ErrorResponse, "description": "Invalid or expired approval token"},
+        404: {"model": ErrorResponse, "description": "Mutation session not found"},
+        500: {"model": ErrorResponse, "description": "Database transaction error"},
+    },
     summary="Approve and execute database mutation inside atomic transaction",
+    description=(
+        "Approve or reject a pending spreadsheet mutation. Requires the cryptographic token "
+        "returned by POST /mutation/upload. On approval, executes the mutation inside a "
+        "safe all-or-nothing database transaction. On rejection, discards the pending mutation."
+    ),
 )
+@track(name="approve_mutation")
 async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResponse:
+    """
+    Approve or reject a pending database mutation with cryptographic token verification.
+
+    Pipeline: verify token → handle rejection → execute transaction → commit/rollback
+
+    The mutation is executed inside a single database transaction. If any row fails,
+    the entire transaction is rolled back, leaving the database in its original state.
+
+    Args:
+        body: The approval request containing mutation_id, approved flag, and cryptographic token.
+
+    Returns:
+        MutationExecuteResponse: Execution results with rows affected count, commit status,
+                                 and optional error details on rollback.
+
+    Raises:
+        HTTPException 403: If the cryptographic token is invalid, expired, or already used.
+        HTTPException 404: If the mutation session ID is not found in the pending register.
+        HTTPException 500: If the database transaction fails (changes are rolled back).
+    """
     logger.info(f"Mutation approval request for ID: {body.mutation_id}, Approved: {body.approved}")
 
     # 1. Verify Cryptographic Token
@@ -242,6 +306,25 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
 @router.get(
     "/pending",
     summary="Get all pending database mutations",
+    description="Returns all spreadsheet mutations awaiting human approval. Each entry includes the mutation ID, target table, and operation type for the approval workflow.",
 )
-async def get_pending():
-    return [{"mutation_id": mid, "table_name": info["table_name"], "op_type": info["op_type"]} for mid, info in shared_pending_mutations.items()]
+@track(name="get_pending_mutations")
+async def get_pending() -> list[dict]:
+    """
+    Retrieve all pending database mutations awaiting human approval.
+
+    Returns a list of pending mutations with their session IDs, target tables,
+    and classified operation types. Use POST /mutation/approve to approve or
+    reject a specific mutation.
+
+    Returns:
+        list[dict]: List of pending mutation objects with mutation_id, table_name, and op_type fields.
+    """
+    return [
+        {
+            "mutation_id": mid,
+            "table_name": info["table_name"],
+            "op_type": info["op_type"],
+        }
+        for mid, info in shared_pending_mutations.items()
+    ]

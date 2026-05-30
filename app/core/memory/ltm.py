@@ -5,6 +5,7 @@ from langchain_core.messages import SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.opik import track
 from app.config import get_settings
 from app.utils.logger import get_logger
 
@@ -61,6 +62,7 @@ class LTMService:
     def _namespace(user_id: str) -> tuple:
         return ("user", user_id, "details")
 
+    @track(name="ltm_read_memories")
     async def read_memories(self, store, user_id: str) -> str:
         ns = self._namespace(user_id)
         items = await store.asearch(ns)
@@ -71,6 +73,7 @@ class LTMService:
         logger.debug(f"LTM: read {len(items)} memories for user={user_id}")
         return memories
 
+    @track(name="ltm_extract_and_store")
     async def extract_and_store(self, store, user_id: str, user_message: str) -> int:
         existing = await self.read_memories(store, user_id)
         ns = self._namespace(user_id)

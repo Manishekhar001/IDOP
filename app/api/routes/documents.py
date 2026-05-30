@@ -7,6 +7,7 @@ from app.api.schemas import CollectionInfoResponse, DocumentUploadResponse, Erro
 from app.core.document_processor import DocumentProcessor
 from app.core.vector_store import VectorStoreService
 from app.services.cache_init import get_doc_cache
+from app.opik import track
 from app.utils.logger import get_logger
 from app.utils.validators import FileValidator, ValidationError
 
@@ -43,14 +44,41 @@ def _validate_file_size(file_bytes: bytes) -> None:
         413: {"description": "File too large"},
         500: {"model": ErrorResponse, "description": "Processing error"},
     },
-    summary="Upload a document",
+    summary="Upload a document for processing",
+    description=(
+        "Upload and process a document (PDF, TXT, CSV) through the ingestion pipeline. "
+        "Pipeline: validate → cache check → parse → chunk → embed → index in Qdrant → cache. "
+        "Returns document IDs and chunk metadata for downstream querying."
+    ),
 )
+@track(name="upload_document")
 async def upload_document(
     file: UploadFile = File(..., description="Document to upload (PDF, TXT, CSV)"),
     chunk_size: Optional[str] = Form(None, description="Custom target chunk size for parsing"),
     chunk_overlap: Optional[str] = Form(None, description="Custom chunk overlap"),
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> DocumentUploadResponse:
+    """
+    Upload and process a document through the ingestion pipeline.
+
+    Pipeline: validate → cache check (SHA-256) → parse → chunk → embed →
+    index in Qdrant → cache chunks + embeddings for future cache hits.
+
+    Args:
+        file: The document file to upload (PDF, TXT, CSV). Max 50 MB.
+        chunk_size: Optional custom chunk size override.
+        chunk_overlap: Optional custom chunk overlap override.
+        vector_store: Injected Qdrant vector store dependency.
+
+    Returns:
+        DocumentUploadResponse: Upload status with filename, chunk count, document IDs,
+                               chunking parameters applied, and cache hit indicator.
+
+    Raises:
+        HTTPException 400: If the file format is unsupported or no text can be extracted.
+        HTTPException 413: If the file exceeds the maximum allowed size.
+        HTTPException 500: If embedding, indexing, or cache operations fail.
+    """
     logger.info(f"Document upload: {file.filename} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})")
 
     if not file.filename:
@@ -212,8 +240,10 @@ async def upload_document(
 @router.get(
     "/info",
     response_model=CollectionInfoResponse,
-    summary="Collection info",
+    summary="Get Qdrant collection information",
+    description="Returns the current Qdrant vector store collection metadata including name, total indexed documents, and cluster status.",
 )
+@track(name="collection_info")
 async def collection_info(
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> CollectionInfoResponse:
@@ -231,8 +261,10 @@ async def collection_info(
 
 @router.delete(
     "/collection",
-    summary="Delete collection",
+    summary="Delete the entire Qdrant collection",
+    description="Danger operation — permanently removes the entire Qdrant vector collection and all indexed documents. Use with caution.",
 )
+@track(name="delete_collection")
 async def delete_collection(
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> dict:

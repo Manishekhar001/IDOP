@@ -3,6 +3,8 @@ import logging
 from io import BytesIO
 from typing import List, Dict, Any
 
+from app.opik import track
+
 logger = logging.getLogger("idop_app.file_parser")
 
 
@@ -14,6 +16,7 @@ class FileParser:
     def __init__(self):
         pass
 
+    @track(name="file_parser_parse")
     def parse_file(self, file_content: bytes, filename: str) -> List[Dict[str, Any]]:
         """
         Parse file bytes into a list of row dictionaries.

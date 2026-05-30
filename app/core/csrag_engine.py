@@ -9,6 +9,7 @@ from app.core.vector_store import VectorStoreService
 from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
 from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
+from app.opik import track
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -111,6 +112,7 @@ class CSRAGEngine:
             "vanna_top_p": vanna_top_p,
         }
 
+    @track(name="csrag_aquery")
     async def aquery(
         self,
         question: str,
@@ -212,6 +214,25 @@ class CSRAGEngine:
             f"streaming query — thread={thread_id}, user={user_id}, "
             f"q='{question[:80]}'"
         )
+
+        # Check query cache before streaming
+        query_cache = get_query_cache()
+        cache_key = query_cache.get_rag_key(question, top_k) if query_cache else None
+        cache_hit = False
+        if query_cache and (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
+            cached_result = query_cache.get(cache_key, cache_type="rag")
+            if cached_result:
+                answer_text = cached_result.get("answer", "")
+                if answer_text:
+                    logger.info(f"RAG Cache HIT for stream: '{question[:50]}'")
+                    # Yield metadata envelope first, then the cached answer
+                    yield f"⏺ cache_hit=true  cost_saved=$0.05\n"
+                    yield answer_text
+                    return
+
+        # Cache miss — yield metadata envelope, then stream from graph
+        yield "⏺ cache_hit=false\n"
+
         config = self._build_config(thread_id, user_id)
         init_state = self._initial_state(
             question=question,

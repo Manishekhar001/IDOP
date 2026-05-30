@@ -2,6 +2,7 @@ import logging
 from typing import List
 from langchain_core.documents import Document
 from app.core.vector_store import VectorStoreService
+from app.opik import track
 
 logger = logging.getLogger("idop_app.context_enrichment")
 
@@ -15,6 +16,7 @@ class ContextEnrichmentService:
     def __init__(self):
         self.vector_store = VectorStoreService()
 
+    @track(name="context_enrichment_enrich")
     def enrich_documents(self, documents: List[Document], num_neighbors: int = 1, chunk_overlap: int = 50) -> List[Document]:
         """
         Enrich retrieved documents with their chronological neighbors.

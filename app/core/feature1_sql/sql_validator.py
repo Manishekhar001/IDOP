@@ -1,6 +1,8 @@
 import logging
 import re
 
+from app.opik import track
+
 logger = logging.getLogger("idop_app.sql_validator")
 
 
@@ -29,6 +31,7 @@ class SQLValidator:
     def __init__(self):
         pass
 
+    @track(name="sql_validator_validate")
     def validate(self, sql: str) -> tuple[bool, str]:
         """
         Validate the safety and read-only nature of the SQL string.

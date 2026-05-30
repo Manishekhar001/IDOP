@@ -13,6 +13,7 @@ from app.api.schemas import (
     SourceDocument,
 )
 from app.core.csrag_engine import CSRAGEngine
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,8 +35,14 @@ def get_checkpointer(request: Request):
         400: {"model": ErrorResponse, "description": "Invalid request"},
         500: {"model": ErrorResponse, "description": "Processing error"},
     },
-    summary="Ask a question",
+    summary="Ask a question (unified 5-path routing)",
+    description=(
+        "Process a natural language query through the IDOP 5-path semantic router. "
+        "Automatically classifies the query type (SQL / MUTATION / RAG / CHAT / HYBRID) "
+        "and executes the appropriate pipeline. Supports dense, sparse, and hybrid search modes."
+    ),
 )
+@track(name="chat")
 async def chat(
     body: ChatRequest,
     engine: CSRAGEngine = Depends(get_engine),
@@ -126,8 +133,14 @@ async def chat(
         400: {"model": ErrorResponse, "description": "Invalid request"},
         500: {"model": ErrorResponse, "description": "Streaming error"},
     },
-    summary="Ask a question (streaming)",
+    summary="Ask a question (streaming response)",
+    description=(
+        "Stream the LLM response token-by-token for real-time display. "
+        "Uses Server-Sent Events (text/plain) format. Supports the same 5-path routing "
+        "as POST /chat but returns tokens incrementally."
+    ),
 )
+@track(name="chat_stream")
 async def chat_stream(
     body: ChatRequest,
     engine: CSRAGEngine = Depends(get_engine),
@@ -170,6 +183,7 @@ async def chat_stream(
     },
     summary="Get conversation history",
 )
+@track(name="get_chat_history")
 async def get_chat_history(
     thread_id: str,
     request: Request,

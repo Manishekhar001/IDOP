@@ -288,6 +288,9 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           S3_CACHE_BUCKET: ${{ secrets.S3_CACHE_BUCKET }}
           DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+          # Opik observability — hardcoded directly (no GitHub secret)
+          OPIK_API_KEY: muDw2J5DzTHuSVKvpOWGWiAP3
+          OPIK_PROJECT_NAME: idop-Project
           RESOLVED_ECR_REGISTRY: ${{ env.RESOLVED_ECR_REGISTRY }}
           RESOLVED_ECR_REPOSITORY: ${{ env.RESOLVED_ECR_REPOSITORY }}
           EC2_PROJECT_PATH: ${{ env.EC2_PROJECT_PATH }}
@@ -302,7 +305,7 @@ jobs:
           # Do NOT use >- YAML folding — it inserts spaces between lines,
           # causing env var names like " OPENAI_API_KEY" (with leading space)
           # that won't match the actual env var names.
-          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,OPENAI_API_KEY,VOYAGE_API_KEY,TAVILY_API_KEY,QDRANT_URL,QDRANT_API_KEY,UPSTASH_REDIS_URL,UPSTASH_REDIS_TOKEN,SUPABASE_DB_URL,S3_CACHE_BUCKET,DOMAIN_NAME,RESOLVED_ECR_REGISTRY,RESOLVED_ECR_REPOSITORY,EC2_PROJECT_PATH,AWS_REGION,GITHUB_SHA,IMAGE_DIGEST
+          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,OPENAI_API_KEY,VOYAGE_API_KEY,TAVILY_API_KEY,QDRANT_URL,QDRANT_API_KEY,UPSTASH_REDIS_URL,UPSTASH_REDIS_TOKEN,SUPABASE_DB_URL,S3_CACHE_BUCKET,DOMAIN_NAME,OPIK_API_KEY,OPIK_PROJECT_NAME,RESOLVED_ECR_REGISTRY,RESOLVED_ECR_REPOSITORY,EC2_PROJECT_PATH,AWS_REGION,GITHUB_SHA,IMAGE_DIGEST
           script: |
             echo "=========================================="
             echo "📂 Step 11a: Preparing deployment directory"
@@ -525,6 +528,10 @@ jobs:
             AWS_REGION=$AWS_REGION
             S3_CACHE_BUCKET=$S3_CACHE_BUCKET
             STORAGE_BACKEND=s3
+
+            # Opik Observability
+            OPIK_API_KEY=$OPIK_API_KEY
+            OPIK_PROJECT_NAME=$OPIK_PROJECT_NAME
 
             # Runtime state
             ENVIRONMENT=production

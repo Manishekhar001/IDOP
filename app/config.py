@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     chunk_size: int = 512
     chunk_overlap: int = 50
 
+    # OPIK Observability Configuration (optional)
+    opik_api_key: Optional[str] = None
+    opik_workspace: Optional[str] = None
+    opik_project_name: Optional[str] = None
+
 
 @lru_cache
 def get_settings() -> Settings:

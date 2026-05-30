@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.opik import track
 from app.config import get_settings
 from app.utils.logger import get_logger
 
@@ -64,6 +65,7 @@ class CRAGEvaluator:
             f"upper_th={self._upper_th}, lower_th={self._lower_th}"
         )
 
+    @track(name="crag_evaluator_evaluate")
     async def evaluate(
         self, question: str, docs: list[Document]
     ) -> tuple[CRAGVerdict, str, list[Document]]:

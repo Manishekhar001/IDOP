@@ -5,6 +5,7 @@ from app.core.vector_store import VectorStoreService
 from app.core.embeddings import get_embeddings
 from app.core.feature3_rag.hyde import HydeService
 from app.config import get_settings
+from app.opik import track
 
 logger = logging.getLogger("idop_app.retrieval")
 
@@ -17,6 +18,7 @@ class RetrievalService:
         self.hyde_service = HydeService()
         self.settings = settings
 
+    @track(name="retrieval_service_retrieve")
     def retrieve(
         self,
         query: str,

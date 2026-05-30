@@ -1,6 +1,7 @@
 import logging
 from typing import List
 from langchain_core.documents import Document
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.reranking")
@@ -28,6 +29,7 @@ class RerankingService:
         else:
             logger.info("VOYAGE_API_KEY not configured. Reranking will be bypassed.")
 
+    @track(name="reranking_service_rerank")
     def rerank(self, query: str, documents: List[Document], top_k: int = 5) -> List[Document]:
         """
         Rerank a list of documents relative to the user query.

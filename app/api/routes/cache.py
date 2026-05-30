@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 from app.services.cache_init import get_doc_cache, get_query_cache
+from app.opik import track
+from app.utils.logger import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/cache", tags=["Cache Management"])
 
 
@@ -41,6 +44,7 @@ class CacheTestResponse(BaseModel):
     summary="Get stats for both Document and Query caches",
     description="Returns detailed statistics including hit rates, sizes, and backend information for all cache layers.",
 )
+@track(name="get_cache_stats")
 async def get_cache_stats() -> CacheStatsResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
@@ -70,6 +74,7 @@ async def get_cache_stats() -> CacheStatsResponse:
         "or omit both to flush everything. Optionally clears the query cache as well."
     ),
 )
+@track(name="clear_cache")
 async def clear_cache(
     doc_id: Optional[str] = None,
     file_extension: Optional[str] = None,
@@ -116,6 +121,7 @@ async def clear_cache(
     summary="Check health of all cache layers",
     description="Performs connectivity checks on both document storage and query cache backends.",
 )
+@track(name="cache_health")
 async def cache_health() -> CacheHealthResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
@@ -163,6 +169,7 @@ async def cache_health() -> CacheHealthResponse:
         "Use this to validate that the cache backend is working in real-time."
     ),
 )
+@track(name="test_cache")
 async def test_cache() -> CacheTestResponse:
     query_cache = get_query_cache()
     if not query_cache:

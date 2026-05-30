@@ -14,6 +14,7 @@ from app.api.schemas import (
     SystemInfoResponse,
     SystemStatsResponse,
 )
+from app.opik import track
 
 router = APIRouter(tags=["System Diagnostics"])
 
@@ -56,6 +57,7 @@ def _format_redis_cache(query_cache) -> dict:
     response_model=DetailedHealthResponse,
     summary="Enhanced Health Check — detailed per-service status, feature flags, config status, Qdrant info, and Redis metrics",
 )
+@track(name="health_check")
 async def health_check(request: Request) -> Dict[str, Any]:
     """
     Enhanced Health check endpoint to verify the API is running and check service connectivity.
@@ -171,6 +173,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/health/ready", response_model=DetailedReadinessResponse, summary="Readiness check")
+@track(name="readiness_check")
 async def readiness(request: Request) -> Dict[str, Any]:
     """
     Readiness probe validating underlying Qdrant, PostgreSQL, and Supabase connections.
@@ -221,6 +224,7 @@ async def readiness(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/info", response_model=SystemInfoResponse, status_code=status.HTTP_200_OK, summary="Get system layout and documentation info")
+@track(name="get_system_info")
 async def get_info() -> Dict[str, Any]:
     """
     Get system layout, design manuals, operational project phases, and detailed platform endpoint mappings.
@@ -269,6 +273,7 @@ async def get_info() -> Dict[str, Any]:
 
 
 @router.get("/stats", response_model=SystemStatsResponse, status_code=status.HTTP_200_OK, summary="Get platform statistics and query cache savings")
+@track(name="get_system_stats")
 async def get_stats(request: Request) -> Dict[str, Any]:
     """
     Get system statistics, document ingestion sizes, vector count profiles, and query cache savings estimates.

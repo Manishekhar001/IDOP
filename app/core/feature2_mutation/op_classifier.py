@@ -1,5 +1,6 @@
 import logging
 from openai import OpenAI
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.op_classifier")
@@ -15,6 +16,7 @@ class OpClassifier:
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.model = settings.memory_llm_model
 
+    @track(name="op_classifier_classify")
     def classify_operation(self, request_text: str) -> str:
         """
         Classify operational intent: INSERT, UPDATE, or DELETE.

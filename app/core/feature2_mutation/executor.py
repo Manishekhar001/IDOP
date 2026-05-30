@@ -1,6 +1,7 @@
 import logging
 import psycopg2
 from typing import List, Any, Tuple
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.mutation_executor")
@@ -34,6 +35,7 @@ class MutationExecutor:
             logger.warning(f"Could not create audit logs table: {e}")
             conn.rollback()
 
+    @track(name="mutation_executor_insert")
     def execute_insert_transaction(self, mutation_id: str, table_name: str, sql: str, params: List[Tuple[Any, ...]]) -> int:
         """
         Execute bulk insert inside a single safe transaction.
@@ -82,6 +84,7 @@ class MutationExecutor:
             conn.close()
             raise ValueError(f"All-or-Nothing bulk INSERT failed: {str(e)}")
 
+    @track(name="mutation_executor_update")
     def execute_updates_transaction(self, mutation_id: str, table_name: str, updates: List[Tuple[str, Tuple[Any, ...]]]) -> int:
         """
         Execute updates inside a single safe transaction.
@@ -129,6 +132,7 @@ class MutationExecutor:
             conn.close()
             raise ValueError(f"All-or-Nothing bulk UPDATE failed: {str(e)}")
 
+    @track(name="mutation_executor_delete")
     def execute_delete_transaction(self, mutation_id: str, table_name: str, sql: str, ids: List[Any]) -> int:
         """
         Execute delete inside a single safe transaction.

@@ -3,6 +3,8 @@ import re
 import logging
 from typing import List, Dict, Any, Tuple
 
+from app.opik import track
+
 logger = logging.getLogger("idop_app.rule_validator")
 
 
@@ -24,6 +26,7 @@ class RuleValidator:
         except Exception as e:
             logger.error(f"Failed to load business rules from {self.rules_path}: {e}")
 
+    @track(name="rule_validator_validate")
     def validate_rows(self, table_name: str, rows: List[Dict[str, Any]]) -> Tuple[bool, List[str]]:
         """
         Validate all rows. Returns (is_valid, list_of_error_messages).

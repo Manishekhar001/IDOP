@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.opik import track
 from app.config import get_settings
 from app.utils.logger import get_logger
 
@@ -113,6 +114,7 @@ class SRAGVerifier:
         self._revise_chain = _REVISE_PROMPT | llm
         logger.info("SRAGVerifier ready")
 
+    @track(name="srag_verify_support")
     async def verify_support(
         self, question: str, context: str, answer: str
     ) -> tuple[SupportVerdict, list[str]]:
@@ -130,6 +132,7 @@ class SRAGVerifier:
             logger.error(f"Support verification failed: {e}")
             return "fully_supported", []
 
+    @track(name="srag_verify_usefulness")
     async def verify_usefulness(
         self, question: str, answer: str
     ) -> tuple[UsefulnessVerdict, str]:
@@ -144,6 +147,7 @@ class SRAGVerifier:
             logger.error(f"Usefulness verification failed: {e}")
             return "useful", "Verification error — accepting answer as-is."
 
+    @track(name="srag_revise_answer")
     async def revise_answer(self, question: str, context: str, answer: str) -> str:
         logger.info("Revising answer to improve factual grounding...")
         try:

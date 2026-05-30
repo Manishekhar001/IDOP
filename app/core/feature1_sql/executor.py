@@ -2,6 +2,7 @@ import logging
 import psycopg2
 import psycopg2.extras
 from typing import List, Dict, Any
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.sql_executor")
@@ -36,6 +37,7 @@ class SQLExecutor:
             logger.warning(f"Could not create audit logs table: {e}")
             conn.rollback()
 
+    @track(name="sql_executor_execute")
     def execute_and_log(self, query_id: str, question: str, sql: str) -> List[Dict[str, Any]]:
         """
         Execute SQL query and log to audit table.

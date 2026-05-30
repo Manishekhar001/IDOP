@@ -11,6 +11,7 @@ from qdrant_client.models import (
     Prefetch, FusionQuery, Fusion
 )
 
+from app.opik import track
 from app.config import get_settings
 from app.core.embeddings import get_embeddings
 from app.core.sparse_vector_service import SparseVectorService
@@ -92,6 +93,7 @@ class VectorStoreService:
                 return func(*args, **kwargs)
             raise
 
+    @track(name="vector_store_add_documents")
     def add_documents(self, documents: list[Document]) -> list[str]:
         """Insert standard langchain Document items with dual vectors into Qdrant with SHA-256 chunk deduplication"""
         if not documents:
@@ -189,6 +191,7 @@ class VectorStoreService:
 
         return points
 
+    @track(name="vector_store_add_with_embeddings")
     def add_documents_with_embeddings(self, documents: list[Document], dense_embeddings: list[list[float]]) -> list[str]:
         """
         Insert documents with pre-computed dense embeddings (useful for cache-based uploads).
@@ -300,6 +303,7 @@ class VectorStoreService:
             logger.error(f"Hybrid search failed: {e}")
             return []
 
+    @track(name="vector_store_search")
     def search(
         self,
         query: str,
@@ -359,6 +363,7 @@ class VectorStoreService:
             logger.error(f"Failed to fetch chunk by index: {e}")
             return None
 
+    @track(name="vector_store_delete_collection")
     def delete_collection(self) -> None:
         logger.warning(f"Deleting collection: {self.collection_name}")
         try:

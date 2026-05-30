@@ -28,6 +28,7 @@ from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
 from app.services.cache_init import get_query_cache
 
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -66,6 +67,7 @@ def _build_system_prompt(ltm_context: str, summary: str) -> str:
 # IDOP Top-Level Router Node
 # ---------------------------------------------------------------------------
 
+@track(name="graph_router")
 async def router_node(state: CSRAGState) -> dict:
     """Classifies user input into SQL, MUTATION, RAG, CHAT, or HYBRID."""
     last_human = next(
@@ -82,6 +84,7 @@ async def router_node(state: CSRAGState) -> dict:
 # Feature 1: SQL Generation Node
 # ---------------------------------------------------------------------------
 
+@track(name="graph_sql_generation")
 async def sql_generation_node(state: CSRAGState) -> dict:
     """Generates SQL query, performs validation, runs LLM Judge, and creates approval session."""
     question = state["question"]
@@ -152,6 +155,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 # Feature 2: Mutation Processing Node
 # ---------------------------------------------------------------------------
 
+@track(name="graph_mutation")
 async def mutation_node(state: CSRAGState) -> dict:
     """Validates mutation rules, column mappings, and formats approval token."""
     logger.info("Feature 2 Mutation Node triggered")
@@ -169,6 +173,7 @@ async def mutation_node(state: CSRAGState) -> dict:
 # LTM
 # ---------------------------------------------------------------------------
 
+@track(name="graph_ltm_remember")
 async def ltm_remember_node(
     state: CSRAGState,
     config: RunnableConfig,
@@ -214,6 +219,7 @@ _DECIDE_RETRIEVAL_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
+@track(name="graph_decide_retrieval")
 async def decide_retrieval_node(state: CSRAGState) -> dict:
     question = state["question"]
     llm = _get_chat_llm()
@@ -236,6 +242,7 @@ async def decide_retrieval_node(state: CSRAGState) -> dict:
 # Direct generation (no retrieval path)
 # ---------------------------------------------------------------------------
 
+@track(name="graph_generate_direct")
 async def generate_direct_node(state: CSRAGState) -> dict:
     import uuid
 
@@ -258,6 +265,7 @@ async def generate_direct_node(state: CSRAGState) -> dict:
 # Document retrieval
 # ---------------------------------------------------------------------------
 
+@track(name="graph_retrieve_docs")
 async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreService) -> dict:
     query = state.get("retrieval_query") or state["question"]
     
@@ -324,6 +332,7 @@ async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreServ
 # CRAG evaluation
 # ---------------------------------------------------------------------------
 
+@track(name="graph_evaluate_docs")
 async def evaluate_docs_node(state: CSRAGState) -> dict:
     evaluator = get_crag_evaluator()
     verdict, reason, good_docs = await evaluator.evaluate(
@@ -341,12 +350,14 @@ async def evaluate_docs_node(state: CSRAGState) -> dict:
 # Web search
 # ---------------------------------------------------------------------------
 
+@track(name="graph_rewrite_query")
 async def rewrite_query_node(state: CSRAGState) -> dict:
     svc = get_web_search_service()
     web_query = await svc.rewrite_query(state["question"])
     return {"web_query": web_query}
 
 
+@track(name="graph_web_search")
 async def web_search_node(state: CSRAGState) -> dict:
     svc = get_web_search_service()
     query = state.get("web_query") or state["question"]
@@ -387,6 +398,7 @@ _BATCH_FILTER_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
+@track(name="graph_refine_context")
 async def refine_context_node(state: CSRAGState) -> dict:
     verdict = state.get("crag_verdict", "CORRECT")
     good_docs = state.get("good_docs", [])
@@ -445,6 +457,7 @@ _RAG_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
+@track(name="graph_generate_answer")
 async def generate_answer_node(state: CSRAGState) -> dict:
     llm = _get_chat_llm()
     system_prompt = _build_system_prompt(
@@ -465,6 +478,7 @@ async def generate_answer_node(state: CSRAGState) -> dict:
 # SRAG verification & usefulness
 # ---------------------------------------------------------------------------
 
+@track(name="graph_verify_support")
 async def verify_support_node(state: CSRAGState) -> dict:
     verifier = get_srag_verifier()
     verdict, evidence = await verifier.verify_support(
@@ -475,6 +489,7 @@ async def verify_support_node(state: CSRAGState) -> dict:
     return {"issup": verdict, "evidence": evidence}
 
 
+@track(name="graph_revise_answer")
 async def revise_answer_node(state: CSRAGState) -> dict:
     verifier = get_srag_verifier()
     revised = await verifier.revise_answer(
@@ -486,6 +501,7 @@ async def revise_answer_node(state: CSRAGState) -> dict:
     return {"answer": revised, "retries": new_retries}
 
 
+@track(name="graph_verify_usefulness")
 async def verify_usefulness_node(state: CSRAGState) -> dict:
     verifier = get_srag_verifier()
     verdict, reason = await verifier.verify_usefulness(
@@ -514,6 +530,7 @@ _REWRITE_QUESTION_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
+@track(name="graph_rewrite_question")
 async def rewrite_question_node(state: CSRAGState) -> dict:
     llm = _get_chat_llm()
     chain = _REWRITE_QUESTION_PROMPT | llm.with_structured_output(RewrittenQuestion)
@@ -528,6 +545,7 @@ async def rewrite_question_node(state: CSRAGState) -> dict:
     return {"retrieval_query": new_query, "rewrite_tries": new_tries}
 
 
+@track(name="graph_stm_summarize")
 async def stm_summarize_node(state: CSRAGState) -> dict:
     import uuid
 
@@ -552,6 +570,7 @@ async def stm_summarize_node(state: CSRAGState) -> dict:
 # Hybrid SQL + RAG Generation Node
 # ---------------------------------------------------------------------------
 
+@track(name="graph_hybrid_generation")
 async def hybrid_generation_node(state: CSRAGState) -> dict:
     """
     Executes simultaneous Text-to-SQL database operations and RAG document search,

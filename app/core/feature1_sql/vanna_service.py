@@ -7,6 +7,7 @@ import pandas as pd
 # when vanna 2.0 submodules are not available.
 
 from app.config import get_settings
+from app.opik import track
 
 logger = logging.getLogger("idop_app.vanna_service")
 
@@ -83,6 +84,7 @@ class VannaAgentWrapper:
         except Exception as e:
             logger.warning(f"Vanna Agent initialization failed ({e}) — will use direct LLM fallback")
 
+    @track(name="vanna_generate_sql")
     async def generate_sql_async(self, question: str, schema_context: str = "") -> str:
         if not self._available or self.agent is None:
             raise RuntimeError("Vanna agent not available — use direct LLM fallback")
@@ -122,6 +124,7 @@ class VannaAgentWrapper:
             )
         return sql
 
+    @track(name="vanna_execute_sql")
     async def execute_sql_async(self, sql: str) -> List[Dict[str, Any]]:
         if not self._available or self.postgres_runner is None:
             raise RuntimeError("Vanna agent not available — cannot execute SQL through Vanna")
@@ -289,6 +292,7 @@ class TextToSQLService:
 
         return "\n".join(schema_parts)
 
+    @track(name="text_to_sql_generate")
     async def generate_sql_for_approval(
         self,
         question: str,

@@ -4,6 +4,7 @@ import uuid
 from langchain_core.messages import HumanMessage, RemoveMessage
 from langchain_openai import ChatOpenAI
 
+from app.opik import track
 from app.config import get_settings
 from app.utils.logger import get_logger
 
@@ -24,6 +25,7 @@ class STMSummarizer:
     def should_summarize(self, messages: list) -> bool:
         return len(messages) > self._threshold
 
+    @track(name="stm_summarize")
     async def summarize(self, messages: list, existing_summary: str) -> tuple[str, list]:
         if existing_summary:
             prompt_text = (

@@ -1,6 +1,7 @@
 import logging
 import json
 from openai import OpenAI
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.mutation_llm_judge")
@@ -16,6 +17,7 @@ class MutationLLMJudge:
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.model = settings.memory_llm_model
 
+    @track(name="mutation_llm_judge_audit")
     def audit_mutation(self, request_text: str, table_name: str, op_type: str) -> tuple[bool, str]:
         """
         Audit the planned mutation. Returns (is_approved, explanation).

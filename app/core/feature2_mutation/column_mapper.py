@@ -2,6 +2,7 @@ import json
 import logging
 from openai import OpenAI
 from typing import Dict, List
+from app.opik import track
 from app.config import get_settings
 from app.core.schema_registry import TABLE_SCHEMAS
 
@@ -18,6 +19,7 @@ class ColumnMapper:
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.model = settings.memory_llm_model
 
+    @track(name="column_mapper_map")
     def get_semantic_mapping(self, table_name: str, file_headers: List[str]) -> Dict[str, str]:
         """
         Map spreadsheet headers to target DB table column names using semantic matching.

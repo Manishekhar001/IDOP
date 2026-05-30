@@ -3,6 +3,7 @@ import asyncio
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.hyde")
@@ -57,6 +58,7 @@ class HydeService:
         )
         self._hyde_chain = _HYDE_PROMPT | llm.with_structured_output(HydeHypotheses)
 
+    @track(name="hyde_generate")
     async def generate_hypothetical_documents_async(self, query: str, num_hypotheses: int = 3) -> list[str]:
         """
         Generate hypothetical answers to improve retrieval (async).

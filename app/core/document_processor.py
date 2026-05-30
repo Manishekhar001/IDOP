@@ -6,6 +6,7 @@ from langchain_community.document_loaders import CSVLoader, PyPDFLoader, TextLoa
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from app.opik import track
 from app.config import get_settings
 from app.utils.logger import get_logger
 
@@ -119,6 +120,7 @@ class DocumentProcessor:
         docs = self.load_from_upload(file, filename)
         return self.split_documents(docs)
 
+    @track(name="document_processor_process")
     def process_upload_bytes(self, file_bytes: bytes, filename: str) -> list[Document]:
         """
         Process a file upload from raw bytes, avoiding redundant BytesIO wrapping.

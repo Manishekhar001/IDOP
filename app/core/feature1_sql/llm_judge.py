@@ -1,5 +1,6 @@
 import logging
 from openai import OpenAI
+from app.opik import track
 from app.config import get_settings
 
 logger = logging.getLogger("idop_app.llm_judge")
@@ -15,6 +16,7 @@ class LLMJudge:
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.model = settings.memory_llm_model  # Uses gpt-4o-mini for cost-efficiency
 
+    @track(name="llm_judge_sql")
     def judge_sql(self, question: str, sql: str) -> tuple[bool, str]:
         """
         Evaluate if the generated SQL is semantically correct for the input question.

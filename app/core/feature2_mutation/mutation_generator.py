@@ -1,6 +1,8 @@
 import logging
 from typing import List, Dict, Any, Tuple
 
+from app.opik import track
+
 logger = logging.getLogger("idop_app.mutation_generator")
 
 
@@ -12,6 +14,7 @@ class MutationGenerator:
     def __init__(self):
         pass
 
+    @track(name="mutation_generator_insert")
     def generate_insert(self, table_name: str, mapped_rows: List[Dict[str, Any]]) -> Tuple[str, List[Tuple[Any, ...]]]:
         """
         Generate parameterized bulk INSERT statement and corresponding flat parameter tuples.
@@ -31,6 +34,7 @@ class MutationGenerator:
         logger.info(f"Generated parameterized SQL INSERT for '{table_name}' with {len(params)} value tuples.")
         return sql, params
 
+    @track(name="mutation_generator_update")
     def generate_update(self, table_name: str, mapped_rows: List[Dict[str, Any]], primary_key: str = "id") -> List[Tuple[str, Tuple[Any, ...]]]:
         """
         Generate parameterized UPDATE statements for each row.
@@ -55,6 +59,7 @@ class MutationGenerator:
         logger.info(f"Generated {len(updates)} parameterized UPDATE statements for table '{table_name}'.")
         return updates
 
+    @track(name="mutation_generator_delete")
     def generate_delete(self, table_name: str, mapped_rows: List[Dict[str, Any]], primary_key: str = "id") -> Tuple[str, List[Any]]:
         """
         Generate parameterized DELETE statement for bulk keys.
