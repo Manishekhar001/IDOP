@@ -2,7 +2,7 @@
 
 This manual provides a detailed, production-grade guide for system administrators to provision, configure, secure, and deploy the IDOP platform onto a clean AWS EC2 instance — including a complete reference for every GitHub Secret, environment variable, and integration key required by the CI/CD pipeline.
 
-**Last Updated:** 2026-05-25
+**Last Updated:** 2026-05-30
 **Target Architecture:** AWS EC2 (Ubuntu 22.04 LTS, x86-64/AMD64) + Docker Compose + Nginx + Let's Encrypt
 **Deployment Method:** GitHub Actions CI/CD (ci.yml + cd.yml)
 **Audience:** Intermediate AWS users familiar with CLI, console, and GitHub Actions
@@ -387,16 +387,29 @@ aws ec2 describe-instances \
 
 ---
 
-#### 🔐 Category 3: Internal Database Credentials
+#### 🔐 Category 3: Internal Database Credentials (Hardcoded — No Secret Needed)
 
-| Secret Name | Example Value | Where to Get It | Used By |
-|:---|:---|:---|:---|
-| `POSTGRES_PASSWORD` | `MyStr0ng!P@ssw0rd2026` | You choose this — it's the password for the internal PostgreSQL Docker container used for LangGraph checkpointing | `cd.yml` |
+The internal PostgreSQL container (`checkpoint-db`) now uses a **hardcoded password** that is baked directly into the CD pipeline. This is safe because `checkpoint-db` has **no exposed ports** — it is only reachable from inside the Docker network by the `idop-app` container.
 
-**How this is used:** The CD pipeline dynamically constructs the `DATABASE_URL` on the EC2 host:
+| Property | Value |
+|:---|:---|
+| **Password** | `idop_checkpoint_2026` |
+| **Source** | Hardcoded in `cd.yml` Step 11d (`.env` heredoc) and Step 11e (`docker-compose.yml` heredoc) |
+| **Secret Needed?** | ❌ No — do NOT set `POSTGRES_PASSWORD` as a GitHub secret |
+
+**How this flows into the application (CD pipeline does this automatically):**
 ```
-DATABASE_URL=postgresql+psycopg://postgres:<POSTGRES_PASSWORD>@checkpoint-db:5432/idop_memories
+.env file on EC2:
+  POSTGRES_PASSWORD=idop_checkpoint_2026
+  DATABASE_URL=postgresql://postgres:idop_checkpoint_2026@checkpoint-db:5432/idop_memories
+
+docker-compose.yml:
+  POSTGRES_PASSWORD: idop_checkpoint_2026
 ```
+
+⚠️ If you ever need to change this password, update it in **both** locations inside `cd.yml`:
+1. `.env` heredoc (Step 11d) — `POSTGRES_PASSWORD=` and `DATABASE_URL=`
+2. `docker-compose.yml` heredoc (Step 11e) — `POSTGRES_PASSWORD:`
 
 ---
 
@@ -432,7 +445,7 @@ These are optional. If not set, the application will run without caching (slight
 After adding all secrets, your GitHub **Settings → Secrets → Actions** page should look like this:
 
 ```
-✅ Required Secrets (10 total):
+✅ Required Secrets (11 total):
 ┌─────────────────────────────┬──────────────────────────────────────┐
 │ Secret Name                 │ Status                               │
 ├─────────────────────────────┼──────────────────────────────────────┤
@@ -441,7 +454,6 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ ECR_REGISTRY                │ ● Added                              │
 │ EC2_HOST                    │ ● Added                              │
 │ EC2_SSH_KEY                 │ ● Added                              │
-│ POSTGRES_PASSWORD           │ ● Added                              │
 │ OPENAI_API_KEY              │ ● Added                              │
 │ VOYAGE_API_KEY              │ ● Added                              │
 │ TAVILY_API_KEY              │ ● Added                              │
@@ -456,6 +468,9 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ UPSTASH_REDIS_TOKEN         │ ○ Optional (query caching)           │
 │ S3_CACHE_BUCKET             │ ○ Optional (document caching)        │
 └─────────────────────────────┴──────────────────────────────────────┘
+
+ℹ️ POSTGRES_PASSWORD is no longer a required secret — it is hardcoded
+   to idop_checkpoint_2026 in cd.yml (see Category 3 above).
 ```
 
 ### 5.4 How Secrets Flow into the Application
@@ -480,9 +495,15 @@ GitHub Repository Secrets
 │   3. EC2_HOST + EC2_SSH_KEY      │
 │      → SSH into EC2 instance     │
 │                                  │
-│   4. All API keys + passwords    │
+│   4. All API keys (except        │
+│      POSTGRES_PASSWORD)          │
 │      → Written to /home/ubuntu/  │
 │        IDOP/.env on EC2 host     │
+│                                  │
+│     POSTGRES_PASSWORD is         │
+│     HARDCODED directly in the    │
+│     .env heredoc inside cd.yml   │
+│     (not from GitHub Secrets)    │
 └──────────────┬───────────────────┘
                │
                ▼ (SSH connection)
@@ -493,10 +514,13 @@ GitHub Repository Secrets
 │   (chmod 600 — restricted)       │
 │                                  │
 │   Contains:                      │
-│   ├── ENV_STATE=production       │
+│   ├── ENVIRONMENT=production     │
 │   ├── ECR_REGISTRY=...          │
-│   ├── POSTGRES_PASSWORD=...      │
-│   ├── DATABASE_URL=...          │
+│   ├── POSTGRES_PASSWORD=       │
+│   │   idop_checkpoint_2026       │
+│   ├── DATABASE_URL=            │
+│   │   postgresql://postgres:    │
+│   │   idop_checkpoint_2026@...  │
 │   ├── OPENAI_API_KEY=...        │
 │   ├── VOYAGE_API_KEY=...        │
 │   ├── TAVILY_API_KEY=...        │
@@ -519,12 +543,15 @@ GitHub Repository Secrets
 │   │ idop-app container       │   │
 │   │ (FastAPI on port 8000)   │   │
 │   │ Receives all API keys    │   │
+│   │ from .env                │   │
 │   └──────────────────────────┘   │
 │                                  │
 │   ┌──────────────────────────┐   │
 │   │ checkpoint-db container  │   │
 │   │ (PostgreSQL 15)          │   │
-│   │ Receives POSTGRES_PASS   │   │
+│   │ POSTGRES_PASSWORD is     │   │
+│   │ hardcoded in compose     │   │
+│   │ heredoc in cd.yml        │   │
 │   └──────────────────────────┘   │
 └──────────────────────────────────┘
 ```
@@ -678,9 +705,7 @@ cd /home/ubuntu/IDOP
 Create the Docker Compose configuration:
 
 ```bash
-cat << 'EOF' > docker-compose.yml
-version: '3.8'
-
+cat << 'COMPOSEEOF' > docker-compose.yml
 services:
   app:
     image: ${ECR_REGISTRY}/idop-app:latest
@@ -690,7 +715,7 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       - ENV_STATE=production
-      - DATABASE_URL=postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@checkpoint-db:5432/idop_memories
+      - DATABASE_URL=postgresql+psycopg://postgres:idop_checkpoint_2026@checkpoint-db:5432/idop_memories
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY}
       - TAVILY_API_KEY=${TAVILY_API_KEY}
@@ -703,6 +728,8 @@ services:
     depends_on:
       checkpoint-db:
         condition: service_healthy
+    networks:
+      - idop-net
 
   checkpoint-db:
     image: postgres:15-alpine
@@ -710,19 +737,26 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: idop_checkpoint_2026
       POSTGRES_DB: idop_memories
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d idop_memories -c 'SELECT 1' > /dev/null 2>&1"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
+      start_period: 40s
+    networks:
+      - idop-net
 
 volumes:
   pgdata:
-EOF
+
+networks:
+  idop-net:
+    name: idop-net
+COMPOSEEOF
 ```
 
 ### 7.5 Create Initial .env File (One-Time Manual Setup)
@@ -742,7 +776,9 @@ ENV_STATE=production
 ECR_REGISTRY=221691784496.dkr.ecr.us-east-1.amazonaws.com
 AWS_REGION=us-east-1
 
-POSTGRES_PASSWORD=your_secure_password_here
+# POSTGRES_PASSWORD is hardcoded in cd.yml (idop_checkpoint_2026)
+# Do NOT change below — the CD pipeline will overwrite this on deploy
+POSTGRES_PASSWORD=idop_checkpoint_2026
 OPENAI_API_KEY=sk-proj-your-key-here
 VOYAGE_API_KEY=your-voyage-key-here
 TAVILY_API_KEY=tvly-your-key-here

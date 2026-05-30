@@ -51,12 +51,19 @@ env:
 # └──────────────────────────┴─────────────────────────────────────────────┘
 #
 # ┌──────────────────────────────────────────────────────────────────────────┐
-# │ 🔐 CATEGORY 3: INTERNAL DATABASE CREDENTIALS                           │
+# │ 🔐 CATEGORY 3: INTERNAL DATABASE CREDENTIALS (HARDCODED)                 │
 # ├──────────────────────────┬─────────────────────────────────────────────┤
-# │ POSTGRES_PASSWORD        │ Password for the internal Postgres Docker   │
-# │                          │ container (LangGraph checkpointing)         │
-# │                          │ Example: MyStr0ng!P@ssw0rd2026              │
-# │                          │ Source: You choose this password            │
+# │ POSTGRES_PASSWORD        │ HARDCODED in cd.yml — NOT a GitHub secret   │
+# │                          │ Value: idop_checkpoint_2026                  │
+# │                          │                                              │
+# │                          │ The internal Docker Postgres (checkpoint-db)│
+# │                          │ has no exposed ports — only reachable from  │
+# │                          │ inside the Docker network by the app        │
+# │                          │ container. Hardcoding is safe.              │
+# │                          │                                              │
+# │                          │ ⚠️ DO NOT set POSTGRES_PASSWORD as a        │
+# │                          │    GitHub secret — it is NOT read from       │
+# │                          │    secrets and will be silently ignored.     │
 # └──────────────────────────┴─────────────────────────────────────────────┘
 #
 # ┌──────────────────────────────────────────────────────────────────────────┐
