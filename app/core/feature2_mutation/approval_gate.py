@@ -19,16 +19,17 @@ class MutationApprovalGate:
 
     def _get_connection(self):
         """
-        Get connection to the checkpointer Postgres database.
+        Get connection to the Supabase database (company data) for token persistence.
+        Falls back to in-memory if Supabase is unavailable.
         """
         settings = get_settings()
-        if not settings.database_url:
+        if not settings.supabase_db_url:
             return None
         try:
-            conn = psycopg2.connect(settings.database_url)
+            conn = psycopg2.connect(settings.supabase_db_url)
             return conn
         except Exception as e:
-            logger.debug(f"PostgreSQL connection failed (falling back to memory): {e}")
+            logger.debug(f"Supabase connection failed (falling back to memory): {e}")
             return None
 
     def _ensure_table(self, conn) -> bool:

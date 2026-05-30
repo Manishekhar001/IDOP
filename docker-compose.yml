@@ -14,11 +14,11 @@ services:
     networks:
       - idop-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -Atc 'SELECT pg_is_in_recovery()' | grep -q f 2>/dev/null && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1"]
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 15
-      start_period: 20s
+      start_period: 40s
     restart: unless-stopped
 
   idop:

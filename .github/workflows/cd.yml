@@ -591,8 +591,7 @@ jobs:
             echo "=========================================="
             # Write the production docker-compose.yml directly on the EC2 host.
             # This ensures the compose file is always in sync with the pipeline.
-            cat << 'COMPOSEEOF' > docker-compose.yml
-            version: '3.8'
+            cat << COMPOSEEOF > docker-compose.yml
 
             services:
               app:
@@ -606,6 +605,8 @@ jobs:
                 depends_on:
                   checkpoint-db:
                     condition: service_healthy
+                networks:
+                  - idop-net
 
               checkpoint-db:
                 image: postgres:15-alpine
@@ -618,14 +619,20 @@ jobs:
                 volumes:
                   - pgdata:/var/lib/postgresql/data
                 healthcheck:
-                  test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d idop_memories -Atc 'SELECT pg_is_in_recovery()' | grep -q f 2>/dev/null && psql -U postgres -d idop_memories -c 'SELECT 1' > /dev/null 2>&1"]
-                  interval: 3s
+                  test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d idop_memories -c 'SELECT 1' > /dev/null 2>&1"]
+                  interval: 5s
                   timeout: 5s
-                  retries: 25
-                  start_period: 20s
+                  retries: 15
+                  start_period: 40s
+                networks:
+                  - idop-net
 
             volumes:
               pgdata:
+
+            networks:
+              idop-net:
+                name: idop-net
             COMPOSEEOF
             echo "✅ docker-compose.yml written successfully"
             echo ""

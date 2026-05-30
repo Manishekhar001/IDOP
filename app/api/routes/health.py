@@ -74,7 +74,6 @@ async def health_check(request: Request) -> Dict[str, Any]:
         pass
 
     # 2. Check Postgres Connection (checkpointer) — off the event loop
-    loop = asyncio.get_event_loop()
     postgres_connected = False
     try:
         def _check_postgres():
@@ -83,7 +82,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
                 cur.execute("SELECT 1;")
             conn.close()
             return True
-        postgres_connected = await loop.run_in_executor(None, _check_postgres)
+        postgres_connected = await asyncio.to_thread(_check_postgres)
     except Exception:
         pass
 
@@ -97,7 +96,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
                     cur.execute("SELECT 1;")
                 conn.close()
                 return True
-            supabase_connected = await loop.run_in_executor(None, _check_supabase)
+            supabase_connected = await asyncio.to_thread(_check_supabase)
         except Exception:
             pass
 
@@ -177,7 +176,6 @@ async def readiness(request: Request) -> Dict[str, Any]:
     Readiness probe validating underlying Qdrant, PostgreSQL, and Supabase connections.
     """
     settings = get_settings()
-    loop = asyncio.get_event_loop()
 
     # Qdrant Check
     vector_store = request.app.state.vector_store
@@ -193,7 +191,7 @@ async def readiness(request: Request) -> Dict[str, Any]:
                 cur.execute("SELECT 1;")
             conn.close()
             return True
-        postgres_connected = await loop.run_in_executor(None, _check_postgres)
+        postgres_connected = await asyncio.to_thread(_check_postgres)
     except Exception:
         pass
 
@@ -207,7 +205,7 @@ async def readiness(request: Request) -> Dict[str, Any]:
                     cur.execute("SELECT 1;")
                 conn.close()
                 return True
-            supabase_connected = await loop.run_in_executor(None, _check_supabase)
+            supabase_connected = await asyncio.to_thread(_check_supabase)
         except Exception:
             pass
 

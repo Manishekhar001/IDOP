@@ -117,13 +117,13 @@ async def lifespan(app: FastAPI):
         lambda: _connect_pg_resource(AsyncPostgresStore),
         "AsyncPostgresStore (LTM)",
         max_retries=5,
-        initial_delay=1.0,
+        initial_delay=3.0,
     )
     checkpointer_task = _retry_init(
         lambda: _connect_pg_resource(AsyncPostgresSaver),
         "AsyncPostgresSaver (checkpointer)",
         max_retries=5,
-        initial_delay=1.0,
+        initial_delay=3.0,
     )
     store, checkpointer = await asyncio.gather(store_task, checkpointer_task)
     app.state.store = store
