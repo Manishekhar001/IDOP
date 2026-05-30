@@ -25,6 +25,57 @@ settings = get_settings()
 __version__ = "0.1.0"
 
 
+async def _retry_init(
+    factory, name: str, max_retries: int = 3, initial_delay: float = 1.0
+):
+    """
+    Generic async retry wrapper for Postgres-backed resource initialization.
+
+    Freshly-restarted Postgres containers sometimes close the first few
+    connections during background recovery. Retrying the full connection
+    + migration cycle resolves this transient psycopg.OperationalError.
+
+    IMPORTANT: The factory must call __aenter__() itself so that on
+    failure we can properly __aexit__() to avoid connection leaks.
+    """
+    logger = get_logger(__name__)
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        resource = None
+        try:
+            resource = await factory()
+            logger.info(f"{name} ready on attempt {attempt}")
+            return resource
+        except Exception as e:
+            last_exc = e
+            logger.warning(
+                f"{name} init attempt {attempt}/{max_retries} failed: "
+                f"{type(e).__name__}: {e}"
+            )
+            # Prevent connection leaks: close the pool if __aenter__ succeeded
+            if resource is not None:
+                try:
+                    await resource.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            if attempt < max_retries:
+                delay = initial_delay * attempt
+                logger.info(f"Retrying {name} init in {delay}s...")
+                await asyncio.sleep(delay)
+    logger.critical(
+        f"All {max_retries} {name} init attempts failed. "
+        f"Last error: {last_exc}"
+    )
+    raise last_exc
+
+
+async def _connect_pg_resource(cls):
+    """Create pool via __aenter__, run migrations, return the resource."""
+    resource = await cls.from_conn_string(settings.database_url).__aenter__()
+    await resource.setup()
+    return resource
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging(settings.log_level)
@@ -36,16 +87,18 @@ async def lifespan(app: FastAPI):
     logger.info("VectorStoreService ready")
 
     logger.info("Connecting AsyncPostgresStore (LTM)...")
-    store = await AsyncPostgresStore.from_conn_string(settings.database_url).__aenter__()
-    await store.setup()
+    store = await _retry_init(
+        lambda: _connect_pg_resource(AsyncPostgresStore),
+        "AsyncPostgresStore (LTM)",
+    )
     app.state.store = store
-    logger.info("AsyncPostgresStore (LTM) ready")
 
     logger.info("Connecting AsyncPostgresSaver (STM checkpointer)...")
-    checkpointer = await AsyncPostgresSaver.from_conn_string(settings.database_url).__aenter__()
-    await checkpointer.setup()
+    checkpointer = await _retry_init(
+        lambda: _connect_pg_resource(AsyncPostgresSaver),
+        "AsyncPostgresSaver (checkpointer)",
+    )
     app.state.checkpointer = checkpointer
-    logger.info("AsyncPostgresSaver (STM checkpointer) ready")
 
     logger.info("Compiling IDOP Graph Engine...")
     app.state.engine = CSRAGEngine(
