@@ -59,7 +59,7 @@ async def _retry_init(
                 except Exception:
                     pass
             if attempt < max_retries:
-                delay = initial_delay * attempt
+                delay = initial_delay * (2 ** (attempt - 1))
                 logger.info(f"Retrying {name} init in {delay}s...")
                 await asyncio.sleep(delay)
     logger.critical(
@@ -86,18 +86,23 @@ async def lifespan(app: FastAPI):
     app.state.vector_store = VectorStoreService()
     logger.info("VectorStoreService ready")
 
-    logger.info("Connecting AsyncPostgresStore (LTM)...")
-    store = await _retry_init(
+    # Run both Postgres inits in parallel — they're independent and this cuts
+    # worst-case startup from ~34s to ~17s (exponential backoff: 1s, 2s, 4s, 8s).
+    logger.info("Connecting AsyncPostgresStore (LTM) and AsyncPostgresSaver...")
+    store_task = _retry_init(
         lambda: _connect_pg_resource(AsyncPostgresStore),
         "AsyncPostgresStore (LTM)",
+        max_retries=5,
+        initial_delay=1.0,
     )
-    app.state.store = store
-
-    logger.info("Connecting AsyncPostgresSaver (STM checkpointer)...")
-    checkpointer = await _retry_init(
+    checkpointer_task = _retry_init(
         lambda: _connect_pg_resource(AsyncPostgresSaver),
         "AsyncPostgresSaver (checkpointer)",
+        max_retries=5,
+        initial_delay=1.0,
     )
+    store, checkpointer = await asyncio.gather(store_task, checkpointer_task)
+    app.state.store = store
     app.state.checkpointer = checkpointer
 
     logger.info("Compiling IDOP Graph Engine...")

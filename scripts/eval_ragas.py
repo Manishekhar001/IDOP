@@ -103,8 +103,9 @@ async def _pg_connect_and_setup(cls, database_url: str, name: str, max_retries: 
                 except Exception:
                     pass
             if attempt < max_retries:
-                print(f"  [INFO] Retrying {name} in {delay * attempt}s...")
-                await asyncio.sleep(delay * attempt)
+                delay_secs = delay * (2 ** (attempt - 1))
+                print(f"  [INFO] Retrying {name} in {delay_secs}s...")
+                await asyncio.sleep(delay_secs)
     print(f"  [ERROR] All {max_retries} attempts for {name} failed.")
     raise last_exc  # type: ignore[misc]
 
@@ -123,8 +124,14 @@ async def run_pipeline(question: str, config: Dict[str, Any]) -> Dict[str, Any]:
 
     # Initialize services (with retry for Postgres startup race)
     vector_store = VectorStoreService()
-    store = await _pg_connect_and_setup(AsyncPostgresStore, settings.database_url, "AsyncPostgresStore")
-    checkpointer = await _pg_connect_and_setup(AsyncPostgresSaver, settings.database_url, "AsyncPostgresSaver")
+    store = await _pg_connect_and_setup(
+        AsyncPostgresStore, settings.database_url, "AsyncPostgresStore",
+        max_retries=5, delay=1.0,
+    )
+    checkpointer = await _pg_connect_and_setup(
+        AsyncPostgresSaver, settings.database_url, "AsyncPostgresSaver",
+        max_retries=5, delay=1.0,
+    )
 
     try:
         engine = CSRAGEngine(vector_store, store, checkpointer)
