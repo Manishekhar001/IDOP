@@ -159,6 +159,29 @@ def run_health_check():
         version = data.get("version")
         services = data.get("services", {})
 
+        # ────────────────────────────────────────────────────────────────────
+        # 0. Verify git_commit_sha to confirm correct code is deployed
+        # ────────────────────────────────────────────────────────────────────
+        git_commit_sha = data.get("git_commit_sha", "unknown")
+        print(f"   🔑 Git Commit SHA    : {git_commit_sha}")
+
+        if git_commit_sha == "unknown" or not git_commit_sha:
+            print(f"   ❌ git_commit_sha is '{git_commit_sha}' — the deployed image lacks the GIT_COMMIT_SHA build arg")
+            print("   📋 This means the Dockerfile is not passing GIT_COMMIT_SHA into the container.")
+            # Don't fail here — let the rest of the health check evaluate too
+
+        # Compare against expected SHA if provided via environment
+        expected_sha = os.getenv("EXPECTED_GIT_SHA")
+        if expected_sha and git_commit_sha not in ("unknown", None, ""):
+            if git_commit_sha == expected_sha:
+                print(f"   ✅ Git commit SHA matches expected value!")
+            else:
+                print(f"   ❌ Git commit SHA mismatch! Expected '{expected_sha}', got '{git_commit_sha}'")
+                print("   📋 The running container is serving old code — the new image was not deployed.")
+                return False
+        elif expected_sha and git_commit_sha in ("unknown", None, ""):
+            print(f"   ⚠️ Cannot verify SHA — deployed version reports '{git_commit_sha}'")
+
         # 1. Assert document cache backend is S3 (runtime check, not config check)
         doc_cache_backend = services.get("document_cache_backend", "unknown")
         doc_cache_error = services.get("document_cache_error")
@@ -179,7 +202,6 @@ def run_health_check():
             # Don't fail — the health check proves the API is live
         else:
             print(f"   ⚠️ Document cache backend is '{doc_cache_backend}' (expected 's3')")
-            print("   📋 This may indicate old code is running — check the git_commit_sha in health response")
             # Don't fail — the health check proves the API is live
 
         # 2. Assert query cache mode is Redis (not local_fallback or disabled)

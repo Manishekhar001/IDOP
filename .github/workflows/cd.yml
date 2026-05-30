@@ -255,6 +255,7 @@ jobs:
       # STEP 9: BUILD, TAG, AND PUSH DOCKER IMAGE TO ECR
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 9/12: Build, tag, and push Docker image to ECR"
+        id: build-push
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -268,8 +269,9 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 10: PRINT BUILD & ECR PUBLICATION SUMMARY
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 10/12: Print build summary"
+      - name: "Step 10/12: Print build summary and save image digest"
         run: |
+          DIGEST="${{ steps.build-push.outputs.digest }}"
           echo "=========================================="
           echo "✅ DOCKER IMAGE PUBLISHED TO AWS ECR"
           echo "=========================================="
@@ -277,9 +279,12 @@ jobs:
           echo "  Repository   : ${{ env.RESOLVED_ECR_REPOSITORY }}"
           echo "  Tags         : latest, ${{ github.sha }}"
           echo "  Architecture : linux/amd64"
+          echo "  Digest       : $DIGEST"
           echo "  AWS Region   : ${{ env.AWS_REGION }}"
           echo "=========================================="
           echo ""
+          echo "💾 Saving IMAGE_DIGEST to GITHUB_ENV for downstream verification..."
+          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 11: DEPLOY TO EC2 VIA SSH (AUTO-PROVISION + WRITE FILES + ORCHESTRATE)
@@ -562,7 +567,7 @@ jobs:
 
             services:
               app:
-                image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+                image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${GIT_COMMIT_SHA}
                 container_name: idop-app
                 restart: always
                 ports:
@@ -670,23 +675,51 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "💾 Step 11g: Backing up current stable image"
+            echo "💾 Step 11g: Tagging current deployed image as :stable backup"
             echo "=========================================="
+            # Tag the current (old) SHA-tagged image as :stable for rollback
+            # We use :latest here because docker-compose.yml previously referenced :latest
+            # (this backup happens BEFORE pulling the new image)
             $DOCKER_CMD tag ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest \
               ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable 2>/dev/null || \
-              echo "ℹ️ No existing image to backup (first deployment)"
+              echo "ℹ️ No existing :latest image to backup (first deployment)"
             echo ""
 
             echo "=========================================="
-            echo "📥 Step 11h: Pulling latest image from ECR"
+            echo "📥 Step 11h: Pulling exact SHA-tagged image from ECR"
             echo "=========================================="
-            $DOCKER_CMD pull ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest 2>&1
+            echo "   🔑 Image: ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }}"
+            $DOCKER_CMD pull ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }} 2>&1
             PULL_EXIT=$?
             if [ $PULL_EXIT -ne 0 ]; then
-              echo "⚠️ docker pull failed (exit $PULL_EXIT) — will use cached image"
-            else
-              echo "✅ Latest image pulled successfully!"
+              echo "❌ docker pull FAILED (exit $PULL_EXIT) — aborting deployment"
+              echo "   The image tag ${{ github.sha }} does not exist in ECR."
+              echo "   Check that Step 9 (docker build/push) completed successfully."
+              exit 1
             fi
+            echo "✅ Image ${{ github.sha }} pulled successfully!"
+
+            # ── Verify image digest matches the just-built image ──
+            PULLED_DIGEST=$($DOCKER_CMD inspect --format='{{index .RepoDigests 0}}' \
+              ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }} \
+              2>/dev/null | cut -d'@' -f2 || echo "")
+            if [ -n "$PULLED_DIGEST" ]; then
+              if [ "$PULLED_DIGEST" != "${{ env.IMAGE_DIGEST }}" ]; then
+                echo "❌ IMAGE DIGEST MISMATCH!"
+                echo "   Expected: ${{ env.IMAGE_DIGEST }}"
+                echo "   Got:      $PULLED_DIGEST"
+                echo "   📋 The pulled image content differs from what was just pushed."
+                echo "      The SHA tag may have been overwritten in ECR by another build."
+                exit 1
+              fi
+              echo "   ✅ Image digest verified: $PULLED_DIGEST"
+            else
+              echo "   ⚠️ Could not retrieve image digest — skipping verification"
+            fi
+
+            # Also tag as :latest for convenience (but deployment uses SHA tag)
+            $DOCKER_CMD tag ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }} \
+              ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest 2>/dev/null || true
             echo ""
 
             echo "=========================================="
@@ -699,29 +732,52 @@ jobs:
 
             # ── Verify what image version we have available ──
             echo "🔍 Current image state:"
-            $DOCKER_CMD images ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" 2>/dev/null || echo "   (no local image found)"
+            $DOCKER_CMD images ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }} --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" 2>/dev/null || echo "   (no local image found)"
             echo ""
 
             # ── Start fresh with docker compose (handles checkpoint-db + app together) ──
             # First bring down (doesn't remove named volumes) then spin up
             echo "♻️ Recreating containers via docker compose..."
             $COMPOSE_CMD down 2>&1 || echo "   ℹ️ compose down minor issue (continuing)"
-            # ── Always pull the latest image before recreating ──
-            echo "📥 Ensuring latest image is pulled..."
-            $COMPOSE_CMD pull 2>&1 || echo "   ⚠️ compose pull had issues (check ECR auth above)"
+            # ── Always pull the exact SHA-tagged image before recreating ──
+            echo "📥 Ensuring exact SHA-tagged image is pulled..."
+            $COMPOSE_CMD pull 2>&1
+            PULL_EXIT=$?
+            if [ $PULL_EXIT -ne 0 ]; then
+              echo "❌ compose pull FAILED (exit $PULL_EXIT) — aborting deployment"
+              echo "   ECR authentication may have failed. Check Step 11f output above."
+              exit 1
+            fi
+
+            # ── Verify digest after compose pull ──
+            COMPOSE_PULLED_DIGEST=$($DOCKER_CMD inspect --format='{{index .RepoDigests 0}}' \
+              ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }} \
+              2>/dev/null | cut -d'@' -f2 || echo "")
+            if [ -n "$COMPOSE_PULLED_DIGEST" ]; then
+              if [ "$COMPOSE_PULLED_DIGEST" != "${{ env.IMAGE_DIGEST }}" ]; then
+                echo "❌ COMPOSE PULL DIGEST MISMATCH!"
+                echo "   Expected: ${{ env.IMAGE_DIGEST }}"
+                echo "   Got:      $COMPOSE_PULLED_DIGEST"
+                echo "   📋 The compose pull fetched a different image than expected."
+                exit 1
+              fi
+              echo "   ✅ Compose pull digest verified: $COMPOSE_PULLED_DIGEST"
+            else
+              echo "   ⚠️ Could not retrieve compose pull digest — skipping verification"
+            fi
 
             # ── Recreate containers (image already pulled by $COMPOSE_CMD pull above) ──
             $COMPOSE_CMD up -d 2>&1
             COMPOSE_EXIT=$?
             if [ $COMPOSE_EXIT -ne 0 ]; then
               echo "⚠️ docker compose up failed with exit code $COMPOSE_EXIT — attempting direct container launch..."
-              echo "   🔄 Launching container directly with explicit image tag..."
+              echo "   🔄 Launching container directly with SHA-tagged image..."
               $DOCKER_CMD run -d \
                 --name idop-app \
                 --restart always \
                 -p 127.0.0.1:8000:8000 \
                 --env-file .env \
-                ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
+                ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }}
               DIRECT_EXIT=$?
               if [ $DIRECT_EXIT -ne 0 ]; then
                 echo "❌ Direct container launch also failed (exit $DIRECT_EXIT)"
@@ -776,10 +832,21 @@ jobs:
               # Automatic rollback to stable image
               echo "🔄 Rolling back to stable image..."
               $COMPOSE_CMD down
+              # Tag the local :stable image with the current SHA so compose finds it locally
+              # (instead of pulling a broken image from ECR)
               $DOCKER_CMD tag ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable \
-                ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest 2>/dev/null || true
-              $COMPOSE_CMD pull 2>&1 || true
-              $COMPOSE_CMD up -d
+                ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }} 2>/dev/null || true
+              # Don't pull — use the locally tagged stable image to avoid pulling broken image
+              $COMPOSE_CMD up -d 2>&1 || {
+                echo "❌ Rollback compose up also failed — deploying directly from :stable";
+                $DOCKER_CMD rm -f idop-app 2>/dev/null || true;
+                $DOCKER_CMD run -d \
+                  --name idop-app \
+                  --restart always \
+                  -p 127.0.0.1:8000:8000 \
+                  --env-file .env \
+                  ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable;
+              }
               echo "✅ Rollback complete. Stable state restored."
               exit 1
             fi
@@ -832,11 +899,14 @@ jobs:
       # STEP 12: DEPLOYMENT INTEGRATION SMOKE TESTS
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 12/13: Run post-deployment integration tests"
+        env:
+          EXPECTED_GIT_SHA: ${{ github.sha }}
         run: |
           echo "=========================================="
           echo "🧪 DEPLOYMENT INTEGRATION SMOKE TESTS"
           echo "=========================================="
           echo "   Target Host: ${{ secrets.EC2_HOST }}"
+          echo "   Expected SHA: ${{ github.sha }}"
           echo ""
           python -m pip install --upgrade pip
           pip install requests pydantic boto3
