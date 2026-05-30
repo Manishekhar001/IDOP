@@ -156,7 +156,7 @@ jobs:
       # STEP 2: CHECKOUT SOURCE CODE
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 2/12: Checkout code"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: "Step 2b/12: Resolve ECR Registry Variables"
         run: |
@@ -209,7 +209,7 @@ jobs:
       # STEP 4: CONFIGURE AWS CREDENTIALS
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 4/12: Configure AWS credentials"
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -243,20 +243,20 @@ jobs:
       # STEP 7: SETUP QEMU (MULTI-PLATFORM SUPPORT)
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 7/12: Set up QEMU"
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v3
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 8: SETUP DOCKER BUILDX
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 8/12: Set up Docker Buildx"
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 9: BUILD, TAG, AND PUSH DOCKER IMAGE TO ECR
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 9/12: Build, tag, and push Docker image to ECR"
         id: build-push
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile

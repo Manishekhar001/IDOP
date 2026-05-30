@@ -174,7 +174,7 @@ def run_health_check():
         expected_sha = os.getenv("EXPECTED_GIT_SHA")
         if expected_sha and git_commit_sha not in ("unknown", None, ""):
             if git_commit_sha == expected_sha:
-                print(f"   ✅ Git commit SHA matches expected value!")
+                print("   ✅ Git commit SHA matches expected value!")
             else:
                 print(f"   ❌ Git commit SHA mismatch! Expected '{expected_sha}', got '{git_commit_sha}'")
                 print("   📋 The running container is serving old code — the new image was not deployed.")
