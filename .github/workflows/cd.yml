@@ -46,7 +46,9 @@ env:
 # └──────────────────────────┴─────────────────────────────────────────────┘
 #
 #   ℹ️ The internal checkpoint-db Postgres password (idop_checkpoint_2026) is
-#      hardcoded in the docker-compose.yml and .env heredocs. NOT a secret.
+#      defined ONCE in the .env heredoc and referenced by docker-compose.yml via
+#      variable substitution (${POSTGRES_PASSWORD}). The .env file is the single
+#      source of truth. This prevents password mismatches when volumes persist.
 #      checkpoint-db has no exposed ports — only reachable from inside the
 #      Docker network. Do NOT set POSTGRES_PASSWORD as a GitHub secret.
 #
@@ -474,6 +476,12 @@ jobs:
             echo "=========================================="
             # NOTE: This heredoc is UNQUOTED (ENVEOF) so bash expands all $VARIABLE references.
             # The values are forwarded by appleboy/ssh-action via the envs parameter.
+            #
+            # PG_PASS is the single source of truth for the Postgres password.
+            # It is used for both POSTGRES_PASSWORD (in .env) and DATABASE_URL.
+            # docker-compose.yml references ${POSTGRES_PASSWORD} from .env via
+            # Docker Compose variable substitution — no hardcoding.
+            PG_PASS=idop_checkpoint_2026
             cat << ENVEOF > .env
             # ─────────────────────────────────────────────────────────
             # IDOP RUNTIME PRODUCTION SECRETS
@@ -487,8 +495,9 @@ jobs:
             ECR_REPOSITORY=$RESOLVED_ECR_REPOSITORY
 
             # Internal PostgreSQL (LangGraph checkpointing)
-            POSTGRES_PASSWORD=idop_checkpoint_2026
-            DATABASE_URL=postgresql://postgres:idop_checkpoint_2026@checkpoint-db:5432/idop_memories
+            # Password is defined once here — referenced by docker-compose.yml
+            POSTGRES_PASSWORD=$PG_PASS
+            DATABASE_URL=postgresql://postgres:$PG_PASS@checkpoint-db:5432/idop_memories
 
             # OpenAI
             OPENAI_API_KEY=$OPENAI_API_KEY
@@ -527,6 +536,9 @@ jobs:
             chmod 600 .env
             echo "✅ .env file created (chmod 600)"
             echo ""
+            echo "  Password source: bash variable PG_PASS (change in one place)"
+            echo ""
+
 
             echo "=========================================="
             echo "📝 Step 11e: Writing docker-compose.yml"
@@ -555,7 +567,8 @@ jobs:
                 restart: always
                 environment:
                   POSTGRES_USER: postgres
-                  POSTGRES_PASSWORD: idop_checkpoint_2026
+                  # Password sourced from .env (POSTGRES_PASSWORD) — single source of truth
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
                   POSTGRES_DB: idop_memories
                 volumes:
                   - pgdata:/var/lib/postgresql/data
@@ -710,7 +723,7 @@ jobs:
             if $DOCKER_CMD ps --format '{{.Names}}' | grep -q idop-checkpoint-db; then
               echo "🔧 Checking Postgres volume password..."
               PG_TEST=$($DOCKER_CMD run --rm --network idop-net \
-                postgres:15-alpine psql "postgresql://postgres:idop_checkpoint_2026@checkpoint-db:5432/idop_memories" \
+                postgres:15-alpine psql "postgresql://postgres:$PG_PASS@checkpoint-db:5432/idop_memories" \
                 -c 'SELECT 1' 2>&1 || echo "FAILED")
               if echo "$PG_TEST" | grep -q "password authentication failed"; then
                 USE_DOWN_V=true
