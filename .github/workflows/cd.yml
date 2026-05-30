@@ -586,9 +586,10 @@ jobs:
             echo "=========================================="
             echo "📝 Step 11e: Writing production docker-compose.yml"
             echo "=========================================="
-            # Write the production docker-compose.yml directly on the EC2 host.
-            # This ensures the compose file is always in sync with the pipeline.
-            cat << COMPOSEEOF | python3 -c "import sys; from textwrap import dedent; sys.stdout.write(dedent(sys.stdin.read()))" > docker-compose.yml
+            # Write production docker-compose.yml via quoted heredoc.
+            # Variables like ${ECR_REGISTRY} stay literal (no bash expansion)
+            # and Docker Compose expands them at runtime.
+            cat << 'COMPOSEEOF' > docker-compose.yml
 
             services:
               app:
