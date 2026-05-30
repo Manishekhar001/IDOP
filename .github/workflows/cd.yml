@@ -696,12 +696,40 @@ jobs:
               $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest 2>/dev/null || true
             echo ""
 
-            # ─── BRING DOWN OLD, UP WITH NEW ───
+            # ─── TEST POSTGRES PASSWORD, THEN BRING DOWN OLD, UP WITH NEW ───
             echo "=========================================="
             echo "🚀 Step 11j: Orchestrating containers"
             echo "=========================================="
+
+            # Test Postgres password BEFORE compose down (volume is in-use)
+            # Docker volumes persist across compose down/up. If the pgdata volume was
+            # initialized by an older pipeline with a different password, the current
+            # config (idop_checkpoint_2026) won't match. We detect this before shutting
+            # down so we can use down -v to delete the stale volume.
+            USE_DOWN_V=false
+            if $DOCKER_CMD ps --format '{{.Names}}' | grep -q idop-checkpoint-db; then
+              echo "🔧 Checking Postgres volume password..."
+              PG_TEST=$($DOCKER_CMD run --rm --network idop-net \
+                postgres:15-alpine psql "postgresql://postgres:idop_checkpoint_2026@checkpoint-db:5432/idop_memories" \
+                -c 'SELECT 1' 2>&1 || echo "FAILED")
+              if echo "$PG_TEST" | grep -q "password authentication failed"; then
+                USE_DOWN_V=true
+                echo "  ⚠️ Stale pgdata detected — old password doesn't match"
+                echo "  🗑️ Will delete volume and reinitialize with correct password"
+              else
+                echo "  ✅ pgdata password matches current config — preserving data"
+              fi
+            else
+              echo "  ℹ️ No existing Postgres container — will initialize fresh"
+            fi
+            echo ""
+
             echo "♻️ Bringing down old containers..."
-            $COMPOSE_CMD down 2>&1 || echo "  ℹ️ compose down completed (minor warnings)"
+            if [ "$USE_DOWN_V" = "true" ]; then
+              $COMPOSE_CMD down -v 2>&1  # -v deletes named volumes
+            else
+              $COMPOSE_CMD down 2>&1 || echo "  ℹ️ compose down completed (minor warnings)"
+            fi
             echo ""
 
             echo "🚀 Starting new containers..."
