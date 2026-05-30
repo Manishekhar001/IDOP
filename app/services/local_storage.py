@@ -17,7 +17,11 @@ class LocalStorageBackend(StorageBackend):
 
     def __init__(self, cache_dir: Path = None):
         settings = get_settings()
-        self.cache_dir = cache_dir or Path(settings.cache_dir if hasattr(settings, 'cache_dir') else "data/cached_chunks")
+        self.cache_dir = cache_dir or Path(
+            settings.cache_dir
+            if hasattr(settings, "cache_dir")
+            else "data/cached_chunks"
+        )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"LocalStorage initialized with cache_dir: {self.cache_dir}")
 

@@ -12,31 +12,48 @@ router = APIRouter(prefix="/cache", tags=["Cache Management"])
 # ─── Response Models ───────────────────────────────────────────────────
 class CacheStatsResponse(BaseModel):
     """Detailed statistics for both document and query caches."""
-    document_cache: Dict[str, Any] = Field(..., description="Document-level storage cache stats (local or S3)")
-    query_cache: Dict[str, Any] = Field(..., description="Query-level cache stats (Redis or local fallback)")
+
+    document_cache: Dict[str, Any] = Field(
+        ..., description="Document-level storage cache stats (local or S3)"
+    )
+    query_cache: Dict[str, Any] = Field(
+        ..., description="Query-level cache stats (Redis or local fallback)"
+    )
 
 
 class CacheClearResponse(BaseModel):
     """Result of a cache clear operation."""
-    document_cache: Optional[Dict[str, Any]] = Field(None, description="Document cache clear result")
-    query_cache: Optional[Dict[str, Any]] = Field(None, description="Query cache clear result")
+
+    document_cache: Optional[Dict[str, Any]] = Field(
+        None, description="Document cache clear result"
+    )
+    query_cache: Optional[Dict[str, Any]] = Field(
+        None, description="Query cache clear result"
+    )
 
 
 class CacheHealthResponse(BaseModel):
     """Health status of both cache layers."""
+
     document_cache: Dict[str, Any] = Field(..., description="Document cache health")
     query_cache: Dict[str, Any] = Field(..., description="Query cache health")
-    overall_status: str = Field(..., description="Overall cache system status: healthy / degraded / unhealthy")
+    overall_status: str = Field(
+        ..., description="Overall cache system status: healthy / degraded / unhealthy"
+    )
 
 
 class CacheTestResponse(BaseModel):
     """Result of a cache write-read-delete round-trip test."""
+
     test_passed: bool = Field(..., description="Whether the round-trip test succeeded")
-    cache_mode: str = Field(..., description="Cache mode used for the test (redis / local_fallback)")
+    cache_mode: str = Field(
+        ..., description="Cache mode used for the test (redis / local_fallback)"
+    )
     details: Dict[str, Any] = Field(..., description="Step-by-step test results")
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────
+
 
 @router.get(
     "/stats",
@@ -58,11 +75,17 @@ async def get_cache_stats() -> CacheStatsResponse:
             query_cache=(
                 query_cache.get_stats()
                 if query_cache
-                else {"enabled": False, "mode": "disabled", "error": "Query cache not initialized"}
+                else {
+                    "enabled": False,
+                    "mode": "disabled",
+                    "error": "Query cache not initialized",
+                }
             ),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch cache stats: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch cache stats: {str(e)}"
+        )
 
 
 @router.delete(
@@ -135,13 +158,20 @@ async def cache_health() -> CacheHealthResponse:
             "message": f"{backend_class} is accessible",
         }
     else:
-        doc_health = {"status": "unhealthy", "backend": "none", "message": "Document cache failed to initialize"}
+        doc_health = {
+            "status": "unhealthy",
+            "backend": "none",
+            "message": "Document cache failed to initialize",
+        }
 
     query_health: Dict[str, Any]
     if query_cache:
         query_health = query_cache.health_check()
     else:
-        query_health = {"status": "unhealthy", "message": "Query cache failed to initialize"}
+        query_health = {
+            "status": "unhealthy",
+            "message": "Query cache failed to initialize",
+        }
 
     doc_ok = doc_health.get("status") == "healthy"
     query_ok = query_health.get("status") == "healthy"
@@ -179,7 +209,11 @@ async def test_cache() -> CacheTestResponse:
             details={"error": "Query cache not initialized"},
         )
 
-    mode = "redis" if query_cache.enabled else ("local_fallback" if query_cache.use_local else "disabled")
+    mode = (
+        "redis"
+        if query_cache.enabled
+        else ("local_fallback" if query_cache.use_local else "disabled")
+    )
     test_key = "cache_test:round_trip"
     test_value = {"test": True, "message": "IDOP cache round-trip test"}
     details: Dict[str, Any] = {"mode": mode}

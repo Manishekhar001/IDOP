@@ -79,7 +79,6 @@ class CSRAGEngine:
             "retries": 0,
             "isuse": "",
             "use_reason": "",
-            
             # Advanced Corrective RAG Configs
             "search_mode": search_mode,
             "top_k": top_k,
@@ -89,7 +88,6 @@ class CSRAGEngine:
             "hyde_used": False,
             "hyde_hypotheses": [],
             "reranking_used": False,
-            
             # IDOP State variables
             "query_type": "",
             "sql_query": "",
@@ -106,7 +104,6 @@ class CSRAGEngine:
             "mutation_error": "",
             "mutation_result_count": 0,
             "approval_token": "",
-
             # SQL generation overrides
             "explain": explain,
             "vanna_temperature": vanna_temperature,
@@ -131,13 +128,17 @@ class CSRAGEngine:
         vanna_top_p: float = 0.1,
     ) -> dict:
         logger.info(
-            f"async query — thread={thread_id}, user={user_id}, "
-            f"q='{question[:80]}'"
+            f"async query — thread={thread_id}, user={user_id}, " f"q='{question[:80]}'"
         )
-        
+
         query_cache = get_query_cache()
         cache_key = query_cache.get_rag_key(question, top_k) if query_cache else None
-        if query_cache and (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
+        if (
+            query_cache
+            and (query_cache.enabled or query_cache.use_local)
+            and search_mode == "hybrid"
+            and not enable_hyde
+        ):
             cached_result = query_cache.get(cache_key, cache_type="rag")
             if cached_result:
                 logger.info(f"RAG Cache HIT for: '{question[:50]}'")
@@ -184,16 +185,30 @@ class CSRAGEngine:
                 formatted["ragas_scores"] = None
 
         # Check post-verification gates before writing to Redis/local cache
-        if query_cache and (query_cache.enabled or query_cache.use_local) and formatted.get("query_type") == "RAG":
+        if (
+            query_cache
+            and (query_cache.enabled or query_cache.use_local)
+            and formatted.get("query_type") == "RAG"
+        ):
             crag_verdict = formatted.get("crag_verdict")
             issup = formatted.get("issup")
             isuse = formatted.get("isuse")
-            
-            if crag_verdict == "CORRECT" and issup == "fully_supported" and isuse == "useful":
-                query_cache.set(cache_key, formatted, ttl=settings.cache_ttl_rag, cache_type="rag")
-                logger.info("✓ RAG Cache MISS - passed 3-tier quality gates and cached successfully.")
+
+            if (
+                crag_verdict == "CORRECT"
+                and issup == "fully_supported"
+                and isuse == "useful"
+            ):
+                query_cache.set(
+                    cache_key, formatted, ttl=settings.cache_ttl_rag, cache_type="rag"
+                )
+                logger.info(
+                    "✓ RAG Cache MISS - passed 3-tier quality gates and cached successfully."
+                )
             else:
-                logger.info(f"✗ RAG Cache write skipped - failed quality gates (crag={crag_verdict}, sup={issup}, use={isuse})")
+                logger.info(
+                    f"✗ RAG Cache write skipped - failed quality gates (crag={crag_verdict}, sup={issup}, use={isuse})"
+                )
 
         return formatted
 
@@ -242,7 +257,12 @@ class CSRAGEngine:
         cache_key = query_cache.get_rag_key(question, top_k) if query_cache else None
 
         # ── Cache hit path (short span) ──────────────────────────────────
-        if query_cache and (query_cache.enabled or query_cache.use_local) and search_mode == "hybrid" and not enable_hyde:
+        if (
+            query_cache
+            and (query_cache.enabled or query_cache.use_local)
+            and search_mode == "hybrid"
+            and not enable_hyde
+        ):
             cached_result = query_cache.get(cache_key, cache_type="rag")
             if cached_result:
                 answer_text = cached_result.get("answer", "")
@@ -259,16 +279,22 @@ class CSRAGEngine:
                             metadata={"cache_hit": True},
                             tags=["stream", "cache_hit"],
                         ):
-                            yield f"⏺ cache_hit=true  cost_saved=$0.05\n"
+                            yield "⏺ cache_hit=true  cost_saved=$0.05\n"
                             yield answer_text
 
                             # Update span & trace with output info
                             char_count = len(answer_text)
                             opik_context.update_current_span(
-                                output={"answer_length_chars": char_count, "cache_hit": True}
+                                output={
+                                    "answer_length_chars": char_count,
+                                    "cache_hit": True,
+                                }
                             )
                             opik_context.update_current_trace(
-                                output={"answer_length_chars": char_count, "cache_hit": True}
+                                output={
+                                    "answer_length_chars": char_count,
+                                    "cache_hit": True,
+                                }
                             )
                     return
 
@@ -312,7 +338,11 @@ class CSRAGEngine:
                         stream_mode="messages",
                     ):
                         node = metadata.get("langgraph_node", "")
-                        if node in _ANSWER_NODES and hasattr(msg, "content") and msg.content:
+                        if (
+                            node in _ANSWER_NODES
+                            and hasattr(msg, "content")
+                            and msg.content
+                        ):
                             chunk = msg.content
                             char_count += len(chunk)
                             yield chunk
@@ -378,7 +408,6 @@ class CSRAGEngine:
             "use_reason": state.get("use_reason", ""),
             "retries": state.get("retries", 0),
             "rewrite_tries": state.get("rewrite_tries", 0),
-            
             # Feature 1 & 2 execution states
             "query_type": state.get("query_type", ""),
             "sql_query": state.get("sql_query", ""),
@@ -386,7 +415,6 @@ class CSRAGEngine:
             "sql_status": state.get("sql_status", ""),
             "sql_results": state.get("sql_results", []),
             "approval_token": state.get("approval_token", ""),
-            
             # Mutation execution details
             "mutation_id": state.get("mutation_id", ""),
             "mutation_table": state.get("mutation_table", ""),
@@ -394,10 +422,8 @@ class CSRAGEngine:
             "mutation_status": state.get("mutation_status", ""),
             "mutation_error": state.get("mutation_error", ""),
             "mutation_result_count": state.get("mutation_result_count", 0),
-            
             # Context and Memories
             "ltm_context": state.get("ltm_context", ""),
-            
             # Advanced Corrective RAG Config outputs
             "hyde_used": state.get("hyde_used", False),
             "hyde_hypotheses": state.get("hyde_hypotheses", []),

@@ -26,7 +26,9 @@ class STMSummarizer:
         return len(messages) > self._threshold
 
     @track(name="stm_summarize")
-    async def summarize(self, messages: list, existing_summary: str) -> tuple[str, list]:
+    async def summarize(
+        self, messages: list, existing_summary: str
+    ) -> tuple[str, list]:
         if existing_summary:
             prompt_text = (
                 f"Existing summary:\n{existing_summary}\n\n"
@@ -39,7 +41,9 @@ class STMSummarizer:
                 "Capture key facts, user preferences, and conclusions."
             )
 
-        messages_for_summary = list(messages) + [HumanMessage(content=prompt_text, id=str(uuid.uuid4()))]
+        messages_for_summary = list(messages) + [
+            HumanMessage(content=prompt_text, id=str(uuid.uuid4()))
+        ]
 
         logger.info(
             f"Summarising conversation — {len(messages)} messages, "

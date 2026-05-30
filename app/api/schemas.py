@@ -1,11 +1,12 @@
 from typing import Any, Literal, List, Optional, Dict
 from pydantic import BaseModel, Field
 
-
 # ==================== System Health & Diagnostics Schemas ====================
+
 
 class ServiceStatus(BaseModel):
     """Detailed service-by-service health status rich model."""
+
     postgres_checkpointer: bool = Field(
         ..., description="Boolean indicating PostgreSQL checkpointer connectivity."
     )
@@ -19,16 +20,20 @@ class ServiceStatus(BaseModel):
         ..., description="Boolean indicating Upstash Redis query cache connectivity."
     )
     query_cache_mode: str = Field(
-        ..., description="Runtime query cache mode: 'redis', 'local_fallback', or 'disabled'."
+        ...,
+        description="Runtime query cache mode: 'redis', 'local_fallback', or 'disabled'.",
     )
     document_cache: bool = Field(
-        ..., description="Boolean indicating S3/local document cache service availability."
+        ...,
+        description="Boolean indicating S3/local document cache service availability.",
     )
     document_cache_backend: str = Field(
-        ..., description="Runtime document cache backend type: 's3', 's3_disabled', 'local', or 'unknown'."
+        ...,
+        description="Runtime document cache backend type: 's3', 's3_disabled', 'local', or 'unknown'.",
     )
     document_cache_error: Optional[str] = Field(
-        None, description="S3 initialization error detail when document cache fell back to local storage."
+        None,
+        description="S3 initialization error detail when document cache fell back to local storage.",
     )
 
     model_config = {
@@ -51,17 +56,22 @@ class ServiceStatus(BaseModel):
 
 class FeaturesAvailable(BaseModel):
     """Available IDOP feature flags model."""
+
     text_to_sql: bool = Field(
-        ..., description="Boolean flag — Text-to-SQL feature is always configured out-of-the-box."
+        ...,
+        description="Boolean flag — Text-to-SQL feature is always configured out-of-the-box.",
     )
     excel_mutations: bool = Field(
-        ..., description="Boolean flag — Governed transactional spreadsheet mutations are active."
+        ...,
+        description="Boolean flag — Governed transactional spreadsheet mutations are active.",
     )
     advanced_rag: bool = Field(
-        ..., description="Boolean flag — Advanced RAG with hybrid search, CRAG, and SRAG is active."
+        ...,
+        description="Boolean flag — Advanced RAG with hybrid search, CRAG, and SRAG is active.",
     )
     query_routing: bool = Field(
-        ..., description="Boolean flag — The 5-path semantic query router (SQL/MUTATION/RAG/CHAT/HYBRID) is active."
+        ...,
+        description="Boolean flag — The 5-path semantic query router (SQL/MUTATION/RAG/CHAT/HYBRID) is active.",
     )
 
     model_config = {
@@ -80,9 +90,8 @@ class FeaturesAvailable(BaseModel):
 
 class ConfigurationStatus(BaseModel):
     """External service configuration status flags model."""
-    openai_configured: bool = Field(
-        ..., description="True if OPENAI_API_KEY is set."
-    )
+
+    openai_configured: bool = Field(..., description="True if OPENAI_API_KEY is set.")
     voyage_configured: bool = Field(
         ..., description="True if VOYAGE_API_KEY is set for reranking."
     )
@@ -121,11 +130,14 @@ class ConfigurationStatus(BaseModel):
 
 class QdrantInfo(BaseModel):
     """Qdrant vector store collection information model."""
+
     status: str = Field(
-        default="unknown", description="Qdrant collection status flag (e.g. 'green', 'yellow', 'red')."
+        default="unknown",
+        description="Qdrant collection status flag (e.g. 'green', 'yellow', 'red').",
     )
     points_count: int = Field(
-        default=0, description="Total quantity of vector points stored in the collection."
+        default=0,
+        description="Total quantity of vector points stored in the collection.",
     )
     indexed_chunks: int = Field(
         default=0, description="Total number of indexed document chunks."
@@ -146,8 +158,10 @@ class QdrantInfo(BaseModel):
 
 class RedisCacheStatus(BaseModel):
     """Redis query cache status and metrics model."""
+
     status: str = Field(
-        ..., description="Cache status: 'redis' for connected, 'local_fallback' or 'disabled' otherwise."
+        ...,
+        description="Cache status: 'redis' for connected, 'local_fallback' or 'disabled' otherwise.",
     )
     message: str = Field(
         ..., description="Human-readable description of the cache state."
@@ -185,17 +199,22 @@ class DetailedHealthResponse(BaseModel):
     Returns per-service flags, feature availability, external API configuration status,
     Qdrant collection info, and Redis cache metrics in a single rich payload.
     """
+
     status: str = Field(
-        ..., description="Core operational status: 'healthy', 'degraded', or 'unhealthy'."
+        ...,
+        description="Core operational status: 'healthy', 'degraded', or 'unhealthy'.",
     )
     service: str = Field(
-        ..., description="Service identifier string (e.g. 'IDOP — Intelligent Data Operations Platform API')."
+        ...,
+        description="Service identifier string (e.g. 'IDOP — Intelligent Data Operations Platform API').",
     )
     timestamp: str = Field(
-        ..., description="ISO 8601 UTC timestamp of when the health check was performed."
+        ...,
+        description="ISO 8601 UTC timestamp of when the health check was performed.",
     )
     version: str = Field(
-        ..., description="Semantic version string of the currently deployed IDOP backend."
+        ...,
+        description="Semantic version string of the currently deployed IDOP backend.",
     )
     git_commit_sha: str = Field(
         ..., description="Git commit SHA of the currently deployed build."
@@ -204,16 +223,19 @@ class DetailedHealthResponse(BaseModel):
         ..., description="Per-service connectivity status flags."
     )
     features_available: FeaturesAvailable = Field(
-        ..., description="Feature availability flags indicating which IDOP subsystems are operational."
+        ...,
+        description="Feature availability flags indicating which IDOP subsystems are operational.",
     )
     configuration: ConfigurationStatus = Field(
-        ..., description="External service API key and endpoint configuration status flags."
+        ...,
+        description="External service API key and endpoint configuration status flags.",
     )
     qdrant_info: QdrantInfo = Field(
         ..., description="Qdrant vector store collection metadata and point counts."
     )
     redis_cache: RedisCacheStatus = Field(
-        ..., description="Redis query cache current operational status and performance metrics."
+        ...,
+        description="Redis query cache current operational status and performance metrics.",
     )
 
     model_config = {
@@ -271,20 +293,24 @@ class DetailedReadinessResponse(BaseModel):
     System readiness probe model validating all underlying database and vector store connections.
     Returns 'ready' only when Qdrant, PostgreSQL, and Supabase are all connected.
     """
+
     status: str = Field(
-        ..., description="Readiness state: 'ready' (all systems online) or 'not_ready' (connection drops detected)."
+        ...,
+        description="Readiness state: 'ready' (all systems online) or 'not_ready' (connection drops detected).",
     )
     qdrant_connected: bool = Field(
         ..., description="Boolean connection status of the Qdrant hybrid vector store."
     )
     postgres_connected: bool = Field(
-        ..., description="Boolean connection status of the PostgreSQL checkpointer database."
+        ...,
+        description="Boolean connection status of the PostgreSQL checkpointer database.",
     )
     supabase_connected: bool = Field(
         ..., description="Boolean connection status of the Supabase company database."
     )
     collection_info: Dict[str, Any] = Field(
-        ..., description="Key-value dictionary showing the Qdrant collection status, vector counts, and indexing progress."
+        ...,
+        description="Key-value dictionary showing the Qdrant collection status, vector counts, and indexing progress.",
     )
 
     model_config = {
@@ -312,20 +338,24 @@ class SystemInfoResponse(BaseModel):
     Returns application metadata, implementation phases, feature descriptions,
     Python runtime version, and full endpoint mapping documentation.
     """
+
     application: Dict[str, str] = Field(
         ..., description="Application metadata: name, version, and environment."
     )
     phases: Dict[str, str] = Field(
-        ..., description="IDOP implementation phases mapped to completion status strings."
+        ...,
+        description="IDOP implementation phases mapped to completion status strings.",
     )
     features: Dict[str, Any] = Field(
-        ..., description="Active platform features including router pathways and cache tier descriptions."
+        ...,
+        description="Active platform features including router pathways and cache tier descriptions.",
     )
     system: Dict[str, str] = Field(
         ..., description="System runtime information including Python version."
     )
     endpoints: Dict[str, str] = Field(
-        ..., description="Complete API endpoint documentation with descriptions and HTTP methods."
+        ...,
+        description="Complete API endpoint documentation with descriptions and HTTP methods.",
     )
 
     model_config = {
@@ -361,17 +391,22 @@ class SystemStatsResponse(BaseModel):
     Returns document indexing metrics, query cache performance with cost savings estimates,
     system runtime info, and current configuration parameters.
     """
+
     indexing: Dict[str, Any] = Field(
-        ..., description="Document indexing metrics: total Qdrant vectors, cached document count and storage size."
+        ...,
+        description="Document indexing metrics: total Qdrant vectors, cached document count and storage size.",
     )
     query_cache: Dict[str, Any] = Field(
-        ..., description="Query cache performance metrics: enabled status, per-type hit counts, and estimated cost savings."
+        ...,
+        description="Query cache performance metrics: enabled status, per-type hit counts, and estimated cost savings.",
     )
     system: Dict[str, str] = Field(
-        ..., description="System runtime information including check timestamp and Python version."
+        ...,
+        description="System runtime information including check timestamp and Python version.",
     )
     configuration: Dict[str, Any] = Field(
-        ..., description="Current operational configuration: chunk size, overlap, and per-cache-type TTL values."
+        ...,
+        description="Current operational configuration: chunk size, overlap, and per-cache-type TTL values.",
     )
 
     model_config = {
@@ -409,35 +444,35 @@ class SystemStatsResponse(BaseModel):
 
 # ==================== Document Upload & Vector Collection Schemas ====================
 
+
 class DocumentUploadResponse(BaseModel):
     """Response model for file ingestion detailing the vector indexing results."""
+
     message: str = Field(
-        ..., 
-        description="Human-readable execution message indicating successful ingestion or parse error."
+        ...,
+        description="Human-readable execution message indicating successful ingestion or parse error.",
     )
     filename: str = Field(
-        ..., 
-        description="The sanitised name of the file uploaded and parsed (e.g. 'Q2_Marketing_Guidelines.pdf')."
+        ...,
+        description="The sanitised name of the file uploaded and parsed (e.g. 'Q2_Marketing_Guidelines.pdf').",
     )
     chunks_created: int = Field(
-        ..., 
-        description="The exact count of text chunks extracted, processed, and embedded."
+        ...,
+        description="The exact count of text chunks extracted, processed, and embedded.",
     )
     document_ids: list[str] = Field(
-        ..., 
-        description="A list of unique UUID string hashes created for each chunk stored in Qdrant."
+        ...,
+        description="A list of unique UUID string hashes created for each chunk stored in Qdrant.",
     )
     chunk_size_applied: Optional[int] = Field(
-        None, 
-        description="The chunk size used during document parsing and chunking."
+        None, description="The chunk size used during document parsing and chunking."
     )
     chunk_overlap_applied: Optional[int] = Field(
-        None, 
-        description="The chunk overlap used during document parsing and chunking."
+        None, description="The chunk overlap used during document parsing and chunking."
     )
     cache_hit: bool = Field(
-        default=False, 
-        description="True if the document was served from the chunk/embedding cache instead of being re-processed."
+        default=False,
+        description="True if the document was served from the chunk/embedding cache instead of being re-processed.",
     )
 
     model_config = {
@@ -449,11 +484,11 @@ class DocumentUploadResponse(BaseModel):
                     "chunks_created": 42,
                     "document_ids": [
                         "8f8e8b0a-7f6c-5b4a-3a2b-1a0f9e8d7c6b",
-                        "7f7e7b0b-6f5c-4b3a-2a1b-0a9f8e7d6c5b"
+                        "7f7e7b0b-6f5c-4b3a-2a1b-0a9f8e7d6c5b",
                     ],
                     "chunk_size_applied": 512,
                     "chunk_overlap_applied": 50,
-                    "cache_hit": False
+                    "cache_hit": False,
                 }
             ]
         }
@@ -462,17 +497,18 @@ class DocumentUploadResponse(BaseModel):
 
 class CollectionInfoResponse(BaseModel):
     """Detailed vector collection model showing active dataset scale."""
+
     collection_name: str = Field(
-        ..., 
-        description="The active namespace name of the Qdrant collection (e.g. 'idop_documents')."
+        ...,
+        description="The active namespace name of the Qdrant collection (e.g. 'idop_documents').",
     )
     total_documents: int = Field(
-        ..., 
-        description="Total quantity of indexed text chunks stored across this collection."
+        ...,
+        description="Total quantity of indexed text chunks stored across this collection.",
     )
     status: str = Field(
-        ..., 
-        description="Status flag showing Qdrant performance state (e.g. 'green', 'yellow', 'red')."
+        ...,
+        description="Status flag showing Qdrant performance state (e.g. 'green', 'yellow', 'red').",
     )
 
     model_config = {
@@ -481,7 +517,7 @@ class CollectionInfoResponse(BaseModel):
                 {
                     "collection_name": "idop_documents",
                     "total_documents": 1420,
-                    "status": "green"
+                    "status": "green",
                 }
             ]
         }
@@ -490,69 +526,67 @@ class CollectionInfoResponse(BaseModel):
 
 # ==================== Chat & RAG Interaction Schemas ====================
 
+
 class ChatRequest(BaseModel):
     """The central request model for chatting, querying, and launching workflows."""
+
     question: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=2000, 
-        description="The user's question or command in natural language."
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="The user's question or command in natural language.",
     )
     thread_id: str = Field(
-        ..., 
+        ...,
         description=(
             "Conversation thread identifier. Supply the same thread ID across turns "
             "to preserve rolling Short-Term Memory. Generate a new UUID to clear history."
-        )
+        ),
     )
     user_id: str = Field(
-        ..., 
+        ...,
         description=(
             "User identifier for Long-Term Memory. Facts and profile insights extracted "
             "from interactions are indexed against this user ID for personalization."
-        )
+        ),
     )
     include_sources: bool = Field(
-        default=True, 
-        description="Include references to source document chunks (Qdrant) or web items in response."
+        default=True,
+        description="Include references to source document chunks (Qdrant) or web items in response.",
     )
     search_mode: Literal["dense", "sparse", "hybrid"] = Field(
-        default="hybrid", 
-        description="Search mode: dense (semantic), sparse (keyword), or hybrid (RRF fusion)"
+        default="hybrid",
+        description="Search mode: dense (semantic), sparse (keyword), or hybrid (RRF fusion)",
     )
     top_k: int = Field(
-        default=4, 
-        ge=1, 
-        le=20, 
-        description="Quantity of documents to retrieve."
+        default=4, ge=1, le=20, description="Quantity of documents to retrieve."
     )
     enable_hyde: bool = Field(
-        default=False, 
-        description="Use HYDE (Hypothetical Document Embeddings) for query expansion"
+        default=False,
+        description="Use HYDE (Hypothetical Document Embeddings) for query expansion",
     )
     enable_reranking: bool = Field(
-        default=False, 
-        description="Use cross-encoder reranking for improved precision"
+        default=False, description="Use cross-encoder reranking for improved precision"
     )
     enable_ragas: bool = Field(
         default=False,
-        description="Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness, context_precision) computed via LLM after generation."
+        description="Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness, context_precision) computed via LLM after generation.",
     )
     explain: bool = Field(
-        default=True, 
-        description="Whether the judge should perform a semantic audit and explanation if a SQL query is generated."
+        default=True,
+        description="Whether the judge should perform a semantic audit and explanation if a SQL query is generated.",
     )
     vanna_temperature: float = Field(
-        default=0.0, 
-        description="Temperature for SQL generation LLM if SQL query is generated."
+        default=0.0,
+        description="Temperature for SQL generation LLM if SQL query is generated.",
     )
     vanna_seed: int = Field(
-        default=42, 
-        description="Random seed for SQL generation LLM if SQL query is generated."
+        default=42,
+        description="Random seed for SQL generation LLM if SQL query is generated.",
     )
     vanna_top_p: float = Field(
-        default=0.1, 
-        description="Top-p for SQL generation LLM if SQL query is generated."
+        default=0.1,
+        description="Top-p for SQL generation LLM if SQL query is generated.",
     )
 
     model_config = {
@@ -566,7 +600,7 @@ class ChatRequest(BaseModel):
                     "explain": True,
                     "vanna_temperature": 0.0,
                     "vanna_seed": 42,
-                    "vanna_top_p": 0.1
+                    "vanna_top_p": 0.1,
                 }
             ]
         }
@@ -575,17 +609,18 @@ class ChatRequest(BaseModel):
 
 class SourceDocument(BaseModel):
     """Reference chunk or source link used to form the final answer."""
+
     content: str = Field(
-        ..., 
-        description="The raw text snippet retrieved from the document chunk (truncated to max 500 chars)."
+        ...,
+        description="The raw text snippet retrieved from the document chunk (truncated to max 500 chars).",
     )
     metadata: dict[str, Any] = Field(
-        ..., 
-        description="Document metadata parameters containing filename, source path, score, or page numbers."
+        ...,
+        description="Document metadata parameters containing filename, source path, score, or page numbers.",
     )
     origin: Literal["internal", "web"] = Field(
-        ..., 
-        description="The source origin. 'internal' represents local Qdrant vectors; 'web' indicates Tavily search results."
+        ...,
+        description="The source origin. 'internal' represents local Qdrant vectors; 'web' indicates Tavily search results.",
     )
 
     model_config = {
@@ -596,9 +631,9 @@ class SourceDocument(BaseModel):
                     "metadata": {
                         "filename": "Marketing_Rules.pdf",
                         "page": 4,
-                        "score": 0.89
+                        "score": 0.89,
                     },
-                    "origin": "internal"
+                    "origin": "internal",
                 }
             ]
         }
@@ -607,113 +642,105 @@ class SourceDocument(BaseModel):
 
 class ChatResponse(BaseModel):
     """The rich multi-channel response model returning synthesized answers, sources, and database metrics."""
+
     question: str = Field(
-        ..., 
-        description="The original natural language question requested by the user."
+        ..., description="The original natural language question requested by the user."
     )
     answer: str = Field(
-        ..., 
-        description="The beautifully formatted, synthesized markdown response compiled by the LLM."
+        ...,
+        description="The beautifully formatted, synthesized markdown response compiled by the LLM.",
     )
     sources: Optional[list[SourceDocument]] = Field(
-        None, 
-        description="The complete list of cited source document chunks or web links backing the answer."
+        None,
+        description="The complete list of cited source document chunks or web links backing the answer.",
     )
     processing_time_ms: float = Field(
-        ..., 
-        description="The end-to-end query processing and generation latency in milliseconds."
+        ...,
+        description="The end-to-end query processing and generation latency in milliseconds.",
     )
     crag_verdict: str = Field(
-        "", 
-        description="Corrective RAG relevance classification verdict: CORRECT | AMBIGUOUS | INCORRECT."
+        "",
+        description="Corrective RAG relevance classification verdict: CORRECT | AMBIGUOUS | INCORRECT.",
     )
     crag_reason: str = Field(
-        "", 
-        description="Short justification of the CRAG relevance checker explaining vector score alignment."
+        "",
+        description="Short justification of the CRAG relevance checker explaining vector score alignment.",
     )
     issup: str = Field(
-        "", 
-        description="Self-Reflective RAG (SRAG) support verdict: fully_supported | partially_supported | no_support | skipped."
+        "",
+        description="Self-Reflective RAG (SRAG) support verdict: fully_supported | partially_supported | no_support | skipped.",
     )
     evidence: list[str] = Field(
-        default_factory=list, 
-        description="Direct quotes extracted from the text context proving the validity of the answer."
+        default_factory=list,
+        description="Direct quotes extracted from the text context proving the validity of the answer.",
     )
     isuse: str = Field(
-        "", 
-        description="SRAG usefulness and user friendliness check verdict: useful | not_useful."
+        "",
+        description="SRAG usefulness and user friendliness check verdict: useful | not_useful.",
     )
     use_reason: str = Field(
-        "", 
-        description="Justification explaining whether the answer directly matches the user's intent."
+        "",
+        description="Justification explaining whether the answer directly matches the user's intent.",
     )
     retries: int = Field(
-        0, 
-        description="The quantity of self-reflection correction loops executed before finalizing output."
+        0,
+        description="The quantity of self-reflection correction loops executed before finalizing output.",
     )
     rewrite_tries: int = Field(
-        0, 
-        description="The quantity of query reformulations and Qdrant scroll iterations executed."
+        0,
+        description="The quantity of query reformulations and Qdrant scroll iterations executed.",
     )
     sql_query: Optional[str] = Field(
-        None, 
-        description="The SQL query statement compiled (returned only for hybrid RAG + SQL and pure SQL paths)."
+        None,
+        description="The SQL query statement compiled (returned only for hybrid RAG + SQL and pure SQL paths).",
     )
     sql_results: Optional[List[Dict[str, Any]]] = Field(
-        None, 
-        description="SQL execution result rows retrieved directly from PostgreSQL (only for hybrid)."
+        None,
+        description="SQL execution result rows retrieved directly from PostgreSQL (only for hybrid).",
     )
     hyde_used: bool = Field(
-        default=False, 
-        description="True if HYDE query expansion was executed."
+        default=False, description="True if HYDE query expansion was executed."
     )
     hyde_hypotheses: Optional[list[str]] = Field(
-        None, 
-        description="The hypothetical passages generated by the HyDE model."
+        None, description="The hypothetical passages generated by the HyDE model."
     )
     reranking_used: bool = Field(
-        default=False, 
-        description="True if cross-encoder reranking was applied."
+        default=False, description="True if cross-encoder reranking was applied."
     )
     ragas_scores: Optional[Dict[str, Any]] = Field(
         None,
-        description="RAGAS evaluation metrics computed when enable_ragas=True. Contains answer_relevancy, faithfulness, context_precision scores."
+        description="RAGAS evaluation metrics computed when enable_ragas=True. Contains answer_relevancy, faithfulness, context_precision scores.",
     )
     query_type: Optional[str] = Field(
-        None, 
-        description="The classified query type from the 5-path LLM semantic router."
+        None,
+        description="The classified query type from the 5-path LLM semantic router.",
     )
     ltm_context: Optional[str] = Field(
-        None, 
-        description="The personalized long-term user memory context loaded."
+        None, description="The personalized long-term user memory context loaded."
     )
     mutation_id: Optional[str] = Field(
-        None, 
-        description="The unique session ID of the spreadsheet mutation pending approval."
+        None,
+        description="The unique session ID of the spreadsheet mutation pending approval.",
     )
     mutation_table: Optional[str] = Field(
-        None, 
-        description="The parsed destination database table targets."
+        None, description="The parsed destination database table targets."
     )
     mutation_op: Optional[str] = Field(
-        None, 
-        description="The classified database operation type: INSERT | UPDATE | DELETE."
+        None,
+        description="The classified database operation type: INSERT | UPDATE | DELETE.",
     )
     mutation_status: Optional[str] = Field(
-        None, 
-        description="Mutation workflow status."
+        None, description="Mutation workflow status."
     )
     mutation_error: Optional[str] = Field(
-        None, 
-        description="Detailed execution exception message if database operations failed."
+        None,
+        description="Detailed execution exception message if database operations failed.",
     )
     mutation_result_count: Optional[int] = Field(
-        None, 
-        description="Affected rows count for database mutations."
+        None, description="Affected rows count for database mutations."
     )
     approval_token: Optional[str] = Field(
-        None, 
-        description="The secure token generated for human-in-the-loop validation."
+        None, description="The secure token generated for human-in-the-loop validation."
     )
 
     model_config = {
@@ -725,8 +752,11 @@ class ChatResponse(BaseModel):
                     "sources": [
                         {
                             "content": "Q2 sales guidelines mandate...",
-                            "metadata": {"filename": "Q2_guidelines.pdf", "score": 0.85},
-                            "origin": "internal"
+                            "metadata": {
+                                "filename": "Q2_guidelines.pdf",
+                                "score": 0.85,
+                            },
+                            "origin": "internal",
                         }
                     ],
                     "processing_time_ms": 125.4,
@@ -739,7 +769,7 @@ class ChatResponse(BaseModel):
                     "retries": 0,
                     "rewrite_tries": 0,
                     "sql_query": None,
-                    "sql_results": None
+                    "sql_results": None,
                 }
             ]
         }
@@ -748,22 +778,17 @@ class ChatResponse(BaseModel):
 
 class ChatMessage(BaseModel):
     """A single conversation turn storing conversation roles and message strings."""
+
     role: Literal["human", "assistant"] = Field(
-        ..., 
-        description="The sender role: 'human' for user input; 'assistant' for AI output."
+        ...,
+        description="The sender role: 'human' for user input; 'assistant' for AI output.",
     )
-    content: str = Field(
-        ..., 
-        description="The text content of the message."
-    )
+    content: str = Field(..., description="The text content of the message.")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {
-                    "role": "human",
-                    "content": "Hello! How does this platform work?"
-                }
+                {"role": "human", "content": "Hello! How does this platform work?"}
             ]
         }
     }
@@ -771,21 +796,21 @@ class ChatMessage(BaseModel):
 
 class ChatHistoryResponse(BaseModel):
     """The complete message history return payload for a specific thread."""
+
     thread_id: str = Field(
-        ..., 
-        description="The conversation thread identifier (UUID)."
+        ..., description="The conversation thread identifier (UUID)."
     )
     messages: list[ChatMessage] = Field(
-        ..., 
-        description="The list of all conversation turns stored, sorted oldest to newest."
+        ...,
+        description="The list of all conversation turns stored, sorted oldest to newest.",
     )
     summary: str = Field(
-        "", 
-        description="The active rolling Short-Term Memory summary compressing older context turns."
+        "",
+        description="The active rolling Short-Term Memory summary compressing older context turns.",
     )
     message_count: int = Field(
-        ..., 
-        description="Total quantity of messages recorded in this conversation history."
+        ...,
+        description="Total quantity of messages recorded in this conversation history.",
     )
 
     model_config = {
@@ -795,10 +820,13 @@ class ChatHistoryResponse(BaseModel):
                     "thread_id": "thread-abc-123-uuid",
                     "messages": [
                         {"role": "human", "content": "Hi"},
-                        {"role": "assistant", "content": "Hello! How can I assist you with your data operations today?"}
+                        {
+                            "role": "assistant",
+                            "content": "Hello! How can I assist you with your data operations today?",
+                        },
                     ],
                     "summary": "User greeted assistant, assistant offered help.",
-                    "message_count": 2
+                    "message_count": 2,
                 }
             ]
         }
@@ -807,19 +835,19 @@ class ChatHistoryResponse(BaseModel):
 
 # ==================== Personalization & LTM Memory Schemas ====================
 
+
 class MemoryItem(BaseModel):
     """A single persistent profile fact extracted and stored in Long-Term Memory."""
+
     data: str = Field(
-        ..., 
-        description="The compiled profile fact extracted from conversations (e.g. 'User prefers CSV files')."
+        ...,
+        description="The compiled profile fact extracted from conversations (e.g. 'User prefers CSV files').",
     )
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {
-                    "data": "User acts as a Sales Manager specializing in SMB segments."
-                }
+                {"data": "User acts as a Sales Manager specializing in SMB segments."}
             ]
         }
     }
@@ -827,17 +855,15 @@ class MemoryItem(BaseModel):
 
 class MemoryListResponse(BaseModel):
     """The list of persistent personalization profile facts retrieved for a user."""
+
     user_id: str = Field(
-        ..., 
-        description="The user identifier associated with the memories."
+        ..., description="The user identifier associated with the memories."
     )
     memories: list[MemoryItem] = Field(
-        ..., 
-        description="The complete list of personalization profile facts extracted."
+        ..., description="The complete list of personalization profile facts extracted."
     )
     count: int = Field(
-        ..., 
-        description="Total count of profile facts recorded in Long-Term Memory."
+        ..., description="Total count of profile facts recorded in Long-Term Memory."
     )
 
     model_config = {
@@ -846,10 +872,12 @@ class MemoryListResponse(BaseModel):
                 {
                     "user_id": "user-sales-manager-456",
                     "memories": [
-                        {"data": "User acts as a Sales Manager specializing in SMB segments."},
-                        {"data": "User is based in Canada."}
+                        {
+                            "data": "User acts as a Sales Manager specializing in SMB segments."
+                        },
+                        {"data": "User is based in Canada."},
                     ],
-                    "count": 2
+                    "count": 2,
                 }
             ]
         }
@@ -858,13 +886,12 @@ class MemoryListResponse(BaseModel):
 
 class DeleteMemoryResponse(BaseModel):
     """Deletion notification showing successful memory clearance."""
+
     message: str = Field(
-        ..., 
-        description="Status message indicating memory successfully cleared."
+        ..., description="Status message indicating memory successfully cleared."
     )
     user_id: str = Field(
-        ..., 
-        description="The user identifier whose memories were deleted."
+        ..., description="The user identifier whose memories were deleted."
     )
 
     model_config = {
@@ -872,7 +899,7 @@ class DeleteMemoryResponse(BaseModel):
             "examples": [
                 {
                     "message": "Long-term memories successfully cleared for user.",
-                    "user_id": "user-sales-manager-456"
+                    "user_id": "user-sales-manager-456",
                 }
             ]
         }
@@ -881,37 +908,39 @@ class DeleteMemoryResponse(BaseModel):
 
 # ==================== IDOP SQL Endpoints (Feature 1) ====================
 
+
 class SQLGenerationRequest(BaseModel):
     """Pydantic model for dynamic SQL query generation from natural language."""
+
     question: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=2000, 
-        description="The natural language question about the database schema to convert to SQL."
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="The natural language question about the database schema to convert to SQL.",
     )
     explain: bool = Field(
-        default=True, 
-        description="Whether the judge should perform a semantic audit and explanation of the generated SQL."
+        default=True,
+        description="Whether the judge should perform a semantic audit and explanation of the generated SQL.",
     )
     enable_ragas: bool = Field(
         default=False,
-        description="Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness) computed via LLM after generation."
+        description="Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness) computed via LLM after generation.",
     )
     vanna_temperature: float = Field(
-        default=0.0, 
-        ge=0.0, 
-        le=1.0, 
-        description="Temperature setting for the SQL generation LLM. 0.0 is deterministic, 1.0 is creative."
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Temperature setting for the SQL generation LLM. 0.0 is deterministic, 1.0 is creative.",
     )
     vanna_seed: int = Field(
-        default=42, 
-        description="Random seed value for deterministic and reproducible SQL generation."
+        default=42,
+        description="Random seed value for deterministic and reproducible SQL generation.",
     )
     vanna_top_p: float = Field(
-        default=0.1, 
-        ge=0.0, 
-        le=1.0, 
-        description="Nucleus sampling threshold. Lower values concentrate probability mass."
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Nucleus sampling threshold. Lower values concentrate probability mass.",
     )
 
     model_config = {
@@ -922,7 +951,7 @@ class SQLGenerationRequest(BaseModel):
                     "explain": True,
                     "vanna_temperature": 0.0,
                     "vanna_seed": 42,
-                    "vanna_top_p": 0.1
+                    "vanna_top_p": 0.1,
                 }
             ]
         }
@@ -931,17 +960,18 @@ class SQLGenerationRequest(BaseModel):
 
 class SQLApprovalRequest(BaseModel):
     """Pydantic model for human-in-the-loop SQL execution approval."""
+
     query_id: str = Field(
-        ..., 
-        description="The unique session ID of the generated SQL query awaiting approval."
+        ...,
+        description="The unique session ID of the generated SQL query awaiting approval.",
     )
     approved: bool = Field(
-        ..., 
-        description="Supply True to execute the query against Postgres; False will reject and cancel it."
+        ...,
+        description="Supply True to execute the query against Postgres; False will reject and cancel it.",
     )
     token: str = Field(
-        ..., 
-        description="The cryptographic single-use session token generated by the approval gate."
+        ...,
+        description="The cryptographic single-use session token generated by the approval gate.",
     )
 
     model_config = {
@@ -950,7 +980,7 @@ class SQLApprovalRequest(BaseModel):
                 {
                     "query_id": "8f8e8b0a-7f6c-5b4a-3a2b-1a0f9e8d7c6b",
                     "approved": True,
-                    "token": "cryptographic_validation_token_string"
+                    "token": "cryptographic_validation_token_string",
                 }
             ]
         }
@@ -959,33 +989,30 @@ class SQLApprovalRequest(BaseModel):
 
 class SQLResponse(BaseModel):
     """SQL generation payload returning the compiled query and judge explanation."""
+
     query_id: str = Field(
-        ..., 
-        description="The unique session ID generated for this query session."
+        ..., description="The unique session ID generated for this query session."
     )
     question: str = Field(
-        ..., 
-        description="The original user natural language question."
+        ..., description="The original user natural language question."
     )
     sql: str = Field(
-        ..., 
-        description="The generated SQL statement compiled by the Vanna agent."
+        ..., description="The generated SQL statement compiled by the Vanna agent."
     )
     explanation: str = Field(
-        ..., 
-        description="Detailed judge analysis, security comments, and SQL schema explanations."
+        ...,
+        description="Detailed judge analysis, security comments, and SQL schema explanations.",
     )
     status: str = Field(
-        ..., 
-        description="The workflow status state (e.g. 'pending_approval', 'error')."
+        ..., description="The workflow status state (e.g. 'pending_approval', 'error')."
     )
     cache_hit: bool = Field(
-        default=False, 
-        description="True if the SQL generation matched an existing query key in the cache."
+        default=False,
+        description="True if the SQL generation matched an existing query key in the cache.",
     )
     token: Optional[str] = Field(
         None,
-        description="The cryptographic single-use session token generated by the approval gate."
+        description="The cryptographic single-use session token generated by the approval gate.",
     )
 
     model_config = {
@@ -998,7 +1025,7 @@ class SQLResponse(BaseModel):
                     "explanation": "Generates a standard SELECT statement counting all rows in table customers.",
                     "status": "pending_approval",
                     "cache_hit": False,
-                    "token": "cryptographic_validation_token_string"
+                    "token": "cryptographic_validation_token_string",
                 }
             ]
         }
@@ -1007,29 +1034,23 @@ class SQLResponse(BaseModel):
 
 class SQLExecuteResponse(BaseModel):
     """The database results return payload after successful execution."""
-    query_id: str = Field(
-        ..., 
-        description="The query session ID executed."
-    )
-    sql: str = Field(
-        ..., 
-        description="The SQL query statement executed."
-    )
+
+    query_id: str = Field(..., description="The query session ID executed.")
+    sql: str = Field(..., description="The SQL query statement executed.")
     results: List[Dict[str, Any]] = Field(
-        default_factory=list, 
-        description="The complete list of query result rows retrieved from the database."
+        default_factory=list,
+        description="The complete list of query result rows retrieved from the database.",
     )
     result_count: int = Field(
-        ..., 
-        description="The total row count of the retrieved dataset."
+        ..., description="The total row count of the retrieved dataset."
     )
     status: str = Field(
-        ..., 
-        description="Execution status flag (e.g. 'executed', 'failed', 'rejected')."
+        ...,
+        description="Execution status flag (e.g. 'executed', 'failed', 'rejected').",
     )
     cache_hit: bool = Field(
-        default=False, 
-        description="True if the results were fetched directly from the SQL result cache."
+        default=False,
+        description="True if the results were fetched directly from the SQL result cache.",
     )
 
     model_config = {
@@ -1038,12 +1059,10 @@ class SQLExecuteResponse(BaseModel):
                 {
                     "query_id": "8f8e8b0a-7f6c-5b4a-3a2b-1a0f9e8d7c6b",
                     "sql": "SELECT COUNT(*) as customer_count FROM customers;",
-                    "results": [
-                        {"customer_count": 142}
-                    ],
+                    "results": [{"customer_count": 142}],
                     "result_count": 1,
                     "status": "executed",
-                    "cache_hit": False
+                    "cache_hit": False,
                 }
             ]
         }
@@ -1052,19 +1071,21 @@ class SQLExecuteResponse(BaseModel):
 
 # ==================== IDOP Mutation Endpoints (Feature 2) ====================
 
+
 class MutationApprovalRequest(BaseModel):
     """Human-in-the-loop Excel spreadsheet mutation execution request."""
+
     mutation_id: str = Field(
-        ..., 
-        description="The unique session ID of the spreadsheet mutation pending approval."
+        ...,
+        description="The unique session ID of the spreadsheet mutation pending approval.",
     )
     approved: bool = Field(
-        ..., 
-        description="Supply True to execute mutations inside a safe transaction block; False will discard."
+        ...,
+        description="Supply True to execute mutations inside a safe transaction block; False will discard.",
     )
     token: str = Field(
-        ..., 
-        description="The cryptographic single-use session token generated by the mutation approval gate."
+        ...,
+        description="The cryptographic single-use session token generated by the mutation approval gate.",
     )
 
     model_config = {
@@ -1073,7 +1094,7 @@ class MutationApprovalRequest(BaseModel):
                 {
                     "mutation_id": "9f9e9b0a-8f7c-6b5a-4a3b-2a1f0e9d8c7b",
                     "approved": True,
-                    "token": "mutation_validation_token_string"
+                    "token": "mutation_validation_token_string",
                 }
             ]
         }
@@ -1082,37 +1103,37 @@ class MutationApprovalRequest(BaseModel):
 
 class MutationResponse(BaseModel):
     """Spradsheet parsing and business rules validation report."""
+
     mutation_id: str = Field(
-        ..., 
-        description="The unique session ID generated for this mutation task."
+        ..., description="The unique session ID generated for this mutation task."
     )
     table_name: str = Field(
-        ..., 
-        description="The parsed destination database table targets (e.g. 'products')."
+        ...,
+        description="The parsed destination database table targets (e.g. 'products').",
     )
     op_type: str = Field(
-        ..., 
-        description="The classified database operation type: INSERT | UPDATE | DELETE."
+        ...,
+        description="The classified database operation type: INSERT | UPDATE | DELETE.",
     )
     row_count: int = Field(
-        ..., 
-        description="The total quantity of rows parsed and alignment-checked from the file."
+        ...,
+        description="The total quantity of rows parsed and alignment-checked from the file.",
     )
     status: str = Field(
-        ..., 
-        description="Mutation workflow status (e.g. 'pending_approval', 'rules_violation')."
+        ...,
+        description="Mutation workflow status (e.g. 'pending_approval', 'rules_violation').",
     )
     mappings: Dict[str, str] = Field(
-        default_factory=dict, 
-        description="Key-value mapping showing how file columns align with database fields."
+        default_factory=dict,
+        description="Key-value mapping showing how file columns align with database fields.",
     )
     errors: List[str] = Field(
-        default_factory=list, 
-        description="Detailed list of specific business rule violation messages (pricing boundaries, segments, etc.)."
+        default_factory=list,
+        description="Detailed list of specific business rule violation messages (pricing boundaries, segments, etc.).",
     )
     token: Optional[str] = Field(
         None,
-        description="The cryptographic single-use session token generated by the mutation approval gate."
+        description="The cryptographic single-use session token generated by the mutation approval gate.",
     )
 
     model_config = {
@@ -1128,10 +1149,10 @@ class MutationResponse(BaseModel):
                         "Product Name": "name",
                         "Category": "category",
                         "Price": "price",
-                        "Stock": "stock_quantity"
+                        "Stock": "stock_quantity",
                     },
                     "errors": [],
-                    "token": "mutation_validation_token_string"
+                    "token": "mutation_validation_token_string",
                 }
             ]
         }
@@ -1140,21 +1161,19 @@ class MutationResponse(BaseModel):
 
 class MutationExecuteResponse(BaseModel):
     """Spreadsheet mutation transaction execution result."""
-    mutation_id: str = Field(
-        ..., 
-        description="The mutation session ID executed."
-    )
+
+    mutation_id: str = Field(..., description="The mutation session ID executed.")
     rows_affected: int = Field(
-        ..., 
-        description="The quantity of rows successfully inserted, updated, or deleted."
+        ...,
+        description="The quantity of rows successfully inserted, updated, or deleted.",
     )
     status: str = Field(
-        ..., 
-        description="Commit state flag (e.g. 'executed', 'rolled_back', 'rejected')."
+        ...,
+        description="Commit state flag (e.g. 'executed', 'rolled_back', 'rejected').",
     )
     error: Optional[str] = Field(
-        None, 
-        description="Detailed Postgres execution exception message if database operations failed."
+        None,
+        description="Detailed Postgres execution exception message if database operations failed.",
     )
 
     model_config = {
@@ -1164,7 +1183,7 @@ class MutationExecuteResponse(BaseModel):
                     "mutation_id": "9f9e9b0a-8f7c-6b5a-4a3b-2a1f0e9d8c7b",
                     "rows_affected": 5,
                     "status": "executed",
-                    "error": None
+                    "error": None,
                 }
             ]
         }
@@ -1173,17 +1192,15 @@ class MutationExecuteResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Standardized operational error response payload."""
+
     error: str = Field(
-        ..., 
-        description="Operational error classification class (e.g. 'DatabaseError', 'ValidationError')."
+        ...,
+        description="Operational error classification class (e.g. 'DatabaseError', 'ValidationError').",
     )
-    message: str = Field(
-        ..., 
-        description="Human-readable summary of the failure."
-    )
+    message: str = Field(..., description="Human-readable summary of the failure.")
     detail: Optional[str] = Field(
-        None, 
-        description="Technical trace logs, exception codes, or parameters to aid debugging."
+        None,
+        description="Technical trace logs, exception codes, or parameters to aid debugging.",
     )
 
     model_config = {
@@ -1192,7 +1209,7 @@ class ErrorResponse(BaseModel):
                 {
                     "error": "DatabaseError",
                     "message": "Failed to connect to the relational database.",
-                    "detail": "Connection timeout after 5000ms targeting postgres://..."
+                    "detail": "Connection timeout after 5000ms targeting postgres://...",
                 }
             ]
         }

@@ -1,5 +1,11 @@
 from fastapi import APIRouter, HTTPException
-from app.api.schemas import SQLApprovalRequest, SQLResponse, SQLExecuteResponse, ErrorResponse, SQLGenerationRequest
+from app.api.schemas import (
+    SQLApprovalRequest,
+    SQLResponse,
+    SQLExecuteResponse,
+    ErrorResponse,
+    SQLGenerationRequest,
+)
 from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
@@ -49,7 +55,9 @@ async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
         HTTPException 400: If the question is invalid or parameters are out of range.
         HTTPException 500: If LLM generation, cache, or database operations fail.
     """
-    logger.info(f"SQL generation request: {body.question} (temp={body.vanna_temperature})")
+    logger.info(
+        f"SQL generation request: {body.question} (temp={body.vanna_temperature})"
+    )
     try:
         res = await sql_service.generate_sql_for_approval(
             question=body.question,
@@ -68,7 +76,7 @@ async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
             "question": res["question"],
             "sql": res["sql"],
             "status": "pending_approval",
-            "token": token
+            "token": token,
         }
 
         return SQLResponse(
@@ -78,7 +86,7 @@ async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
             explanation=res["explanation"],
             status=res["status"],
             cache_hit=res["cache_hit"],
-            token=token
+            token=token,
         )
     except Exception as e:
         logger.error(f"SQL generation endpoint failed: {e}")
@@ -89,7 +97,10 @@ async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
     "/approve",
     response_model=SQLExecuteResponse,
     responses={
-        403: {"model": ErrorResponse, "description": "Invalid or expired approval token"},
+        403: {
+            "model": ErrorResponse,
+            "description": "Invalid or expired approval token",
+        },
         404: {"model": ErrorResponse, "description": "Query session not found"},
         500: {"model": ErrorResponse, "description": "Database execution error"},
     },
@@ -118,12 +129,17 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
         HTTPException 404: If the query session ID is not found in the pending register.
         HTTPException 500: If the database execution fails.
     """
-    logger.info(f"SQL approval request for Query ID: {body.query_id}, Approved: {body.approved}")
+    logger.info(
+        f"SQL approval request for Query ID: {body.query_id}, Approved: {body.approved}"
+    )
 
     # 1. Verify Cryptographic Token
     if body.approved:
         if not gate.verify_and_close_session(body.query_id, body.token):
-            raise HTTPException(status_code=403, detail="Invalid, expired or already used cryptographic approval token.")
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid, expired or already used cryptographic approval token.",
+            )
 
     # 2. Handle Rejection
     if not body.approved:
@@ -134,12 +150,14 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
             sql="",
             results=[],
             result_count=0,
-            status="rejected"
+            status="rejected",
         )
 
     # 3. Handle Execution
     if body.query_id not in shared_pending_queries:
-        raise HTTPException(status_code=404, detail="Query session not found in pending register.")
+        raise HTTPException(
+            status_code=404, detail="Query session not found in pending register."
+        )
 
     query_info = shared_pending_queries[body.query_id]
     sql = query_info["sql"]
@@ -158,11 +176,13 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
             sql=sql,
             results=results,
             result_count=len(results),
-            status="executed"
+            status="executed",
         )
     except Exception as e:
         logger.error(f"SQL execution endpoint failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Database execution failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Database execution failed: {str(e)}"
+        )
 
 
 @router.get(

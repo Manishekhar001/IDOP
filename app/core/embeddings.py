@@ -15,7 +15,7 @@ def get_embeddings() -> OpenAIEmbeddings:
     )
     embeddings = OpenAIEmbeddings(
         openai_api_key=settings.openai_api_key,
-        model="text-embedding-3-small", # standard dimensions is 1536
+        model="text-embedding-3-small",  # standard dimensions is 1536
     )
     logger.info("OpenAI embeddings initialized successfully")
     return embeddings

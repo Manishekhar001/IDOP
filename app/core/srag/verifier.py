@@ -109,8 +109,12 @@ class SRAGVerifier:
             temperature=settings.llm_temperature,
             api_key=settings.openai_api_key,
         )
-        self._support_chain = _SUPPORT_PROMPT | llm.with_structured_output(SupportDecision)
-        self._usefulness_chain = _USEFULNESS_PROMPT | llm.with_structured_output(UsefulnessDecision)
+        self._support_chain = _SUPPORT_PROMPT | llm.with_structured_output(
+            SupportDecision
+        )
+        self._usefulness_chain = _USEFULNESS_PROMPT | llm.with_structured_output(
+            UsefulnessDecision
+        )
         self._revise_chain = _REVISE_PROMPT | llm
         logger.info("SRAGVerifier ready")
 

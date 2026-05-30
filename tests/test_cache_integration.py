@@ -61,7 +61,7 @@ class TestCacheInitSingleton:
         reset_caches()
         cache = get_doc_cache()
         assert cache is not None
-        assert hasattr(cache, 'storage')
+        assert hasattr(cache, "storage")
         assert cache.storage is not None
 
 
@@ -160,8 +160,8 @@ class TestQueryCacheRoundTrip:
     def test_stats_accumulate_correctly(self, cache):
         """Stats should accumulate across operations."""
         cache.set("test:k1", {"v": 1}, ttl=3600, cache_type="rag")
-        cache.get("test:k1", cache_type="rag")      # hit
-        cache.get("test:miss", cache_type="rag")     # miss
+        cache.get("test:k1", cache_type="rag")  # hit
+        cache.get("test:miss", cache_type="rag")  # miss
         cache.get("test:miss2", cache_type="sql_gen")  # miss
 
         stats = cache.get_stats()

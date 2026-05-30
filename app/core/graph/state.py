@@ -25,7 +25,9 @@ class CSRAGState(TypedDict):
     kept_strips: list[str]
     refined_context: str
     answer: str
-    issup: Literal["fully_supported", "partially_supported", "no_support", "skipped", ""]
+    issup: Literal[
+        "fully_supported", "partially_supported", "no_support", "skipped", ""
+    ]
     evidence: list[str]
     retries: int
     # Advanced Corrective RAG Configs
@@ -37,7 +39,7 @@ class CSRAGState(TypedDict):
     hyde_used: bool
     hyde_hypotheses: list[str]
     reranking_used: bool
-    
+
     # Existing state continues...
     isuse: Literal["useful", "not_useful", "skipped", ""]
     use_reason: str

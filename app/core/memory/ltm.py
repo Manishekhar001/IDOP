@@ -99,7 +99,9 @@ class LTMService:
                     written += 1
                     logger.debug(f"LTM stored: '{mem.text.strip()}'")
 
-        logger.info(f"LTM extraction done — {written} new facts stored for user={user_id}")
+        logger.info(
+            f"LTM extraction done — {written} new facts stored for user={user_id}"
+        )
         return written
 
 

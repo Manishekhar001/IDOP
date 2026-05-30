@@ -34,7 +34,6 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-
 @lru_cache
 def _get_chat_llm() -> ChatOpenAI:
     settings = get_settings()
@@ -67,6 +66,7 @@ def _build_system_prompt(ltm_context: str, summary: str) -> str:
 # IDOP Top-Level Router Node
 # ---------------------------------------------------------------------------
 
+
 @track(name="graph_router")
 async def router_node(state: CSRAGState) -> dict:
     """Classifies user input into SQL, MUTATION, RAG, CHAT, or HYBRID."""
@@ -84,6 +84,7 @@ async def router_node(state: CSRAGState) -> dict:
 # Feature 1: SQL Generation Node
 # ---------------------------------------------------------------------------
 
+
 @track(name="graph_sql_generation")
 async def sql_generation_node(state: CSRAGState) -> dict:
     """Generates SQL query, performs validation, runs LLM Judge, and creates approval session."""
@@ -91,6 +92,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
     logger.info(f"Feature 1 SQL Node triggered: '{question}'")
 
     from app.services.pending_store import pending_queries as shared_pending_queries
+
     validator = SQLValidator()
     judge = LLMJudge()
 
@@ -114,11 +116,13 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             return {
                 "sql_query": sql,
                 "sql_status": "error",
-                "sql_explanation": error_msg
+                "sql_explanation": error_msg,
             }
 
         # Run semantic audit judge
-        is_correct, explanation = await asyncio.to_thread(judge.judge_sql, question, sql)
+        is_correct, explanation = await asyncio.to_thread(
+            judge.judge_sql, question, sql
+        )
         if not is_correct:
             logger.warning(f"SQL semantic failure: {explanation}")
             # Still offer with warning or mark rejected
@@ -132,7 +136,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             "question": question,
             "sql": sql,
             "status": "pending_approval",
-            "token": token
+            "token": token,
         }
 
         return {
@@ -140,20 +144,21 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             "sql_query_id": query_id,
             "sql_status": "pending_approval",
             "sql_explanation": explanation,
-            "approval_token": token
+            "approval_token": token,
         }
 
     except Exception as e:
         logger.error(f"SQL generation failed: {e}")
         return {
             "sql_status": "error",
-            "sql_explanation": f"Generation failed: {str(e)}"
+            "sql_explanation": f"Generation failed: {str(e)}",
         }
 
 
 # ---------------------------------------------------------------------------
 # Feature 2: Mutation Processing Node
 # ---------------------------------------------------------------------------
+
 
 @track(name="graph_mutation")
 async def mutation_node(state: CSRAGState) -> dict:
@@ -165,13 +170,14 @@ async def mutation_node(state: CSRAGState) -> dict:
     # Here we default to setting up state for pending mutations.
     return {
         "mutation_status": "pending_approval",
-        "mutation_error": " Spreadsheet upload required to generate column mapping and parameterized SQL."
+        "mutation_error": " Spreadsheet upload required to generate column mapping and parameterized SQL.",
     }
 
 
 # ---------------------------------------------------------------------------
 # LTM
 # ---------------------------------------------------------------------------
+
 
 @track(name="graph_ltm_remember")
 async def ltm_remember_node(
@@ -200,10 +206,11 @@ async def ltm_remember_node(
 # Retrieval decision
 # ---------------------------------------------------------------------------
 
+
 class RetrieveDecision(BaseModel):
     should_retrieve: bool = Field(
         ...,
-        description="True ONLY if the question requires specific private/domain documents."
+        description="True ONLY if the question requires specific private/domain documents.",
     )
     reason: str = Field(..., description="One-sentence justification.")
 
@@ -242,6 +249,7 @@ async def decide_retrieval_node(state: CSRAGState) -> dict:
 # Direct generation (no retrieval path)
 # ---------------------------------------------------------------------------
 
+
 @track(name="graph_generate_direct")
 async def generate_direct_node(state: CSRAGState) -> dict:
     import uuid
@@ -251,7 +259,9 @@ async def generate_direct_node(state: CSRAGState) -> dict:
         state.get("ltm_context", ""),
         state.get("summary", ""),
     )
-    messages = [SystemMessage(content=system_msg, id=str(uuid.uuid4()))] + list(state["messages"])
+    messages = [SystemMessage(content=system_msg, id=str(uuid.uuid4()))] + list(
+        state["messages"]
+    )
     response = await llm.ainvoke(messages)
     answer = response.content
     return {
@@ -265,29 +275,37 @@ async def generate_direct_node(state: CSRAGState) -> dict:
 # Document retrieval
 # ---------------------------------------------------------------------------
 
+
 @track(name="graph_retrieve_docs")
-async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreService) -> dict:
+async def retrieve_docs_node(
+    state: CSRAGState, *, vector_store: VectorStoreService
+) -> dict:
     query = state.get("retrieval_query") or state["question"]
-    
+
     # Get custom dynamic settings from state
     top_k = state.get("top_k") or get_settings().retrieval_k
     search_mode = state.get("search_mode") or "hybrid"
     enable_hyde = state.get("enable_hyde", False)
     enable_reranking = state.get("enable_reranking", False)
-    
-    logger.info(f"Retrieving docs for: '{query[:80]}' (top_k={top_k}, search_mode={search_mode}, hyde={enable_hyde}, reranking={enable_reranking})")
-    
+
+    logger.info(
+        f"Retrieving docs for: '{query[:80]}' (top_k={top_k}, search_mode={search_mode}, hyde={enable_hyde}, reranking={enable_reranking})"
+    )
+
     # Generate HyDE hypotheses if enabled!
     hyde_used = False
     hyde_hypotheses = []
     retrieval_query = query
-    
+
     if enable_hyde:
         try:
             from app.core.feature3_rag.hyde import HydeService
+
             hyde_service = HydeService()
             # Generate hypothetical passages (async call)
-            hyde_hypotheses = await hyde_service.generate_hypothetical_documents_async(query)
+            hyde_hypotheses = await hyde_service.generate_hypothetical_documents_async(
+                query
+            )
             if hyde_hypotheses:
                 # Use the first hypothesis for query expansion
                 retrieval_query = hyde_hypotheses[0]
@@ -295,15 +313,18 @@ async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreServ
                 logger.info(f"HyDE: Query expanded to '{retrieval_query[:80]}'")
         except Exception as e:
             logger.error(f"HyDE pipeline in node failed: {e}")
-            
+
     # Call vector store search with k and search_mode!
-    docs = await asyncio.to_thread(vector_store.search, retrieval_query, k=top_k, mode=search_mode)
-    
+    docs = await asyncio.to_thread(
+        vector_store.search, retrieval_query, k=top_k, mode=search_mode
+    )
+
     # Reranking if enabled!
     reranking_used = False
     if enable_reranking and docs:
         try:
             from app.core.feature3_rag.reranking import RerankingService
+
             reranker = RerankingService()
             docs = reranker.rerank(query, docs, top_k=min(top_k, len(docs)))
             reranking_used = True
@@ -314,8 +335,11 @@ async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreServ
     # Perform Context Enrichment Window (pad with neighbors)
     try:
         from app.core.feature3_rag.context_enrichment import ContextEnrichmentService
+
         enricher = ContextEnrichmentService()
-        docs = enricher.enrich_documents(docs, num_neighbors=1, chunk_overlap=get_settings().chunk_overlap)
+        docs = enricher.enrich_documents(
+            docs, num_neighbors=1, chunk_overlap=get_settings().chunk_overlap
+        )
     except Exception as e:
         logger.error(f"Context enrichment failed: {e}")
 
@@ -331,6 +355,7 @@ async def retrieve_docs_node(state: CSRAGState, *, vector_store: VectorStoreServ
 # ---------------------------------------------------------------------------
 # CRAG evaluation
 # ---------------------------------------------------------------------------
+
 
 @track(name="graph_evaluate_docs")
 async def evaluate_docs_node(state: CSRAGState) -> dict:
@@ -349,6 +374,7 @@ async def evaluate_docs_node(state: CSRAGState) -> dict:
 # ---------------------------------------------------------------------------
 # Web search
 # ---------------------------------------------------------------------------
+
 
 @track(name="graph_rewrite_query")
 async def rewrite_query_node(state: CSRAGState) -> dict:
@@ -369,6 +395,7 @@ async def web_search_node(state: CSRAGState) -> dict:
 # Context refinement
 # ---------------------------------------------------------------------------
 
+
 def _decompose_to_sentences(text: str) -> list[str]:
     text = re.sub(r"\s+", " ", text).strip()
     sentences = re.split(r"(?<=[.!?])\s+", text)
@@ -378,7 +405,7 @@ def _decompose_to_sentences(text: str) -> list[str]:
 class BatchFilterResult(BaseModel):
     kept_indices: list[int] = Field(
         ...,
-        description="0-based indices of sentences directly helping answer the question."
+        description="0-based indices of sentences directly helping answer the question.",
     )
 
 
@@ -478,6 +505,7 @@ async def generate_answer_node(state: CSRAGState) -> dict:
 # SRAG verification & usefulness
 # ---------------------------------------------------------------------------
 
+
 @track(name="graph_verify_support")
 async def verify_support_node(state: CSRAGState) -> dict:
     verifier = get_srag_verifier()
@@ -514,6 +542,7 @@ async def verify_usefulness_node(state: CSRAGState) -> dict:
 # ---------------------------------------------------------------------------
 # Question rewrite & STM summarization
 # ---------------------------------------------------------------------------
+
 
 class RewrittenQuestion(BaseModel):
     query: str = Field(..., description="Rewritten retrieval query.")
@@ -570,6 +599,7 @@ async def stm_summarize_node(state: CSRAGState) -> dict:
 # Hybrid SQL + RAG Generation Node
 # ---------------------------------------------------------------------------
 
+
 @track(name="graph_hybrid_generation")
 async def hybrid_generation_node(state: CSRAGState) -> dict:
     """
@@ -582,13 +612,13 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
     sql_service = TextToSQLService(query_cache_service=get_query_cache())
     validator = SQLValidator()
     executor = SQLExecutor()
-    
+
     # 1. SQL Generation & Execution
     sql_query = ""
     sql_results = []
     sql_status = "skipped"
     sql_error = None
-    
+
     try:
         # Generate raw SQL
         logger.info("Hybrid: Generating SQL query...")
@@ -602,7 +632,7 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
         )
         sql = gen_res["sql"]
         query_id = gen_res["query_id"]
-        
+
         # Validate query safety (SELECT only)
         is_safe, error_msg = validator.validate(sql)
         if is_safe:
@@ -613,14 +643,16 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
                 sql_results = executor.execute_and_log(query_id, question, sql)
                 sql_status = "executed"
             else:
-                logger.warning("Hybrid: Generated query was not a SELECT statement. Skipped direct execution.")
+                logger.warning(
+                    "Hybrid: Generated query was not a SELECT statement. Skipped direct execution."
+                )
                 sql_status = "failed_safety"
                 sql_error = "Only SELECT queries are supported in hybrid execution."
         else:
             logger.warning(f"Hybrid SQL safety violation: {error_msg}")
             sql_status = "failed_safety"
             sql_error = error_msg
-            
+
     except Exception as e:
         logger.error(f"Hybrid SQL execution failed: {e}")
         sql_status = "error"
@@ -630,43 +662,53 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
     good_docs = []
     refined_context = ""
     crag_verdict = "INCORRECT"
-    
+
     # Get custom dynamic settings from state
     top_k = state.get("top_k") or get_settings().retrieval_k
     search_mode = state.get("search_mode") or "hybrid"
     enable_hyde = state.get("enable_hyde", False)
     enable_reranking = state.get("enable_reranking", False)
-    
+
     hyde_used = False
     hyde_hypotheses = []
     retrieval_query = question
-    
+
     try:
         # Generate HyDE hypotheses if enabled!
         if enable_hyde:
             try:
                 from app.core.feature3_rag.hyde import HydeService
+
                 hyde_service = HydeService()
-                hyde_hypotheses = await hyde_service.generate_hypothetical_documents_async(question)
+                hyde_hypotheses = (
+                    await hyde_service.generate_hypothetical_documents_async(question)
+                )
                 if hyde_hypotheses:
                     retrieval_query = hyde_hypotheses[0]
                     hyde_used = True
-                    logger.info(f"Hybrid HyDE: Query expanded to '{retrieval_query[:80]}'")
+                    logger.info(
+                        f"Hybrid HyDE: Query expanded to '{retrieval_query[:80]}'"
+                    )
             except Exception as hyde_err:
                 logger.error(f"Hybrid HyDE failed: {hyde_err}")
-                
-        logger.info(f"Hybrid: Querying Qdrant vector store (top_k={top_k}, search_mode={search_mode})...")
+
+        logger.info(
+            f"Hybrid: Querying Qdrant vector store (top_k={top_k}, search_mode={search_mode})..."
+        )
         settings = get_settings()
         vector_store = VectorStoreService()
-        
+
         # Call vector store hybrid search (runs synchronously under asyncio.to_thread)
-        docs = await asyncio.to_thread(vector_store.search, retrieval_query, k=top_k, mode=search_mode)
-        
+        docs = await asyncio.to_thread(
+            vector_store.search, retrieval_query, k=top_k, mode=search_mode
+        )
+
         # Reranking if enabled!
         reranking_used = False
         if enable_reranking and docs:
             try:
                 from app.core.feature3_rag.reranking import RerankingService
+
                 reranker = RerankingService()
                 docs = reranker.rerank(question, docs, top_k=min(top_k, len(docs)))
                 reranking_used = True
@@ -676,58 +718,72 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
 
         # Context enrichment window
         try:
-            from app.core.feature3_rag.context_enrichment import ContextEnrichmentService
+            from app.core.feature3_rag.context_enrichment import (
+                ContextEnrichmentService,
+            )
+
             enricher = ContextEnrichmentService()
-            docs = enricher.enrich_documents(docs, num_neighbors=1, chunk_overlap=settings.chunk_overlap)
+            docs = enricher.enrich_documents(
+                docs, num_neighbors=1, chunk_overlap=settings.chunk_overlap
+            )
         except Exception as enrich_err:
             logger.error(f"Hybrid RAG context enrichment failed: {enrich_err}")
-            
+
         # CRAG verification
         if docs:
             evaluator = get_crag_evaluator()
             verdict, reason, crag_good_docs = await evaluator.evaluate(question, docs)
             crag_verdict = verdict
             good_docs = crag_good_docs
-            
+
             # Sentence refinement
             raw_context = "\n\n".join(d.page_content for d in good_docs).strip()
             if raw_context:
                 strips = _decompose_to_sentences(raw_context)
                 if strips:
                     llm = _get_chat_llm()
-                    filter_chain = _BATCH_FILTER_PROMPT | llm.with_structured_output(BatchFilterResult)
+                    filter_chain = _BATCH_FILTER_PROMPT | llm.with_structured_output(
+                        BatchFilterResult
+                    )
                     try:
-                        result = await filter_chain.ainvoke({"question": question, "sentences_json": json.dumps(strips)})
-                        valid_indices = {i for i in result.kept_indices if 0 <= i < len(strips)}
+                        result = await filter_chain.ainvoke(
+                            {"question": question, "sentences_json": json.dumps(strips)}
+                        )
+                        valid_indices = {
+                            i for i in result.kept_indices if 0 <= i < len(strips)
+                        }
                         kept = [strips[i] for i in sorted(valid_indices)]
                         refined_context = "\n".join(kept)
                     except Exception as filter_err:
-                        logger.warning(f"Sentence filter failed in hybrid: {filter_err}")
+                        logger.warning(
+                            f"Sentence filter failed in hybrid: {filter_err}"
+                        )
                         refined_context = raw_context
                 else:
                     refined_context = raw_context
         else:
             logger.info("Hybrid: No document chunks retrieved.")
-            
+
     except Exception as e:
         logger.error(f"Hybrid RAG retrieval failed: {e}")
-        
+
     # 3. Final Synthesis Answering
     logger.info("Hybrid: Synthesizing database results and document chunks...")
     llm = _get_chat_llm()
-    
+
     # Format database data for LLM
     db_context = "No database results retrieved."
     if sql_results:
         import pandas as pd
+
         df = pd.DataFrame(sql_results)
         db_context = f"SQL Query Executed:\n{sql_query}\n\nQuery Results (CSV Format):\n{df.to_csv(index=False)}"
-        
+
     system_prompt = _build_system_prompt(
         state.get("ltm_context", ""),
         state.get("summary", ""),
     )
-    
+
     synthesis_prompt = f"""
 You are an expert enterprise business analyst for IDOP.
 Provide a unified, highly precise, and well-organized business report answering the user's question.
@@ -744,12 +800,14 @@ Answer the question thoroughly, citing specific numbers from the database result
 Explain how the database facts align, match, or conflict with the manual guidelines.
 Provide your answer in professional markdown with clear headings, bullet points, or tables.
 """
-    
+
     try:
-        response = await llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=synthesis_prompt)
-        ])
+        response = await llm.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=synthesis_prompt),
+            ]
+        )
         answer = response.content
     except Exception as e:
         logger.error(f"Hybrid synthesis prompt failed: {e}")
@@ -774,7 +832,10 @@ Provide your answer in professional markdown with clear headings, bullet points,
 # Routing Pure Logic Functions
 # ---------------------------------------------------------------------------
 
-def route_after_router(state: CSRAGState) -> Literal["sql_gen", "mutation", "ltm_remember", "chat", "hybrid"]:
+
+def route_after_router(
+    state: CSRAGState,
+) -> Literal["sql_gen", "mutation", "ltm_remember", "chat", "hybrid"]:
     q_type = state.get("query_type", "CHAT")
     if q_type == "SQL":
         return "sql_gen"
@@ -788,7 +849,9 @@ def route_after_router(state: CSRAGState) -> Literal["sql_gen", "mutation", "ltm
         return "chat"
 
 
-def route_after_decide(state: CSRAGState) -> Literal["generate_direct", "retrieve_docs"]:
+def route_after_decide(
+    state: CSRAGState,
+) -> Literal["generate_direct", "retrieve_docs"]:
     return "retrieve_docs" if state["need_retrieval"] else "generate_direct"
 
 
@@ -796,7 +859,9 @@ def route_after_crag(state: CSRAGState) -> Literal["refine_context", "rewrite_qu
     return "refine_context" if state["crag_verdict"] == "CORRECT" else "rewrite_query"
 
 
-def route_after_support(state: CSRAGState) -> Literal["revise_answer", "verify_usefulness"]:
+def route_after_support(
+    state: CSRAGState,
+) -> Literal["revise_answer", "verify_usefulness"]:
     issup = state.get("issup", "fully_supported")
     retries = state.get("retries", 0)
     if issup != "fully_supported" and retries < get_settings().srag_max_retries:
@@ -804,7 +869,9 @@ def route_after_support(state: CSRAGState) -> Literal["revise_answer", "verify_u
     return "verify_usefulness"
 
 
-def route_after_usefulness(state: CSRAGState) -> Literal["rewrite_question", "stm_summarize"]:
+def route_after_usefulness(
+    state: CSRAGState,
+) -> Literal["rewrite_question", "stm_summarize"]:
     isuse = state.get("isuse", "useful")
     rewrite_tries = state.get("rewrite_tries", 0)
     if isuse == "not_useful" and rewrite_tries < get_settings().max_rewrite_tries:

@@ -110,18 +110,29 @@ async def chat(
         sql_query=result.get("sql_query") if result.get("sql_query") else None,
         sql_results=result.get("sql_results") if result.get("sql_results") else None,
         hyde_used=result.get("hyde_used", False),
-        hyde_hypotheses=result.get("hyde_hypotheses") if result.get("hyde_hypotheses") else None,
+        hyde_hypotheses=(
+            result.get("hyde_hypotheses") if result.get("hyde_hypotheses") else None
+        ),
         reranking_used=result.get("reranking_used", False),
-        
         # New rich operational detail fields
         query_type=result.get("query_type") if result.get("query_type") else None,
         ltm_context=result.get("ltm_context") if result.get("ltm_context") else None,
         mutation_id=result.get("mutation_id") if result.get("mutation_id") else None,
-        mutation_table=result.get("mutation_table") if result.get("mutation_table") else None,
+        mutation_table=(
+            result.get("mutation_table") if result.get("mutation_table") else None
+        ),
         mutation_op=result.get("mutation_op") if result.get("mutation_op") else None,
-        mutation_status=result.get("mutation_status") if result.get("mutation_status") else None,
-        mutation_error=result.get("mutation_error") if result.get("mutation_error") else None,
-        mutation_result_count=result.get("mutation_result_count") if result.get("mutation_result_count") else None,
+        mutation_status=(
+            result.get("mutation_status") if result.get("mutation_status") else None
+        ),
+        mutation_error=(
+            result.get("mutation_error") if result.get("mutation_error") else None
+        ),
+        mutation_result_count=(
+            result.get("mutation_result_count")
+            if result.get("mutation_result_count")
+            else None
+        ),
         # approval_token intentionally excluded from chat response for security — use POST /sql/generate or GET /sql/pending
         ragas_scores=result.get("ragas_scores") if result.get("ragas_scores") else None,
     )

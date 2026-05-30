@@ -58,7 +58,7 @@ class MutationApprovalGate:
         Generate a secure, single-use approval token. Writes to Postgres and updates memory.
         """
         token = secrets.token_hex(32)
-        
+
         # Always update memory for tests/fallback
         self.active_sessions[mutation_id] = token
 
@@ -75,18 +75,24 @@ class MutationApprovalGate:
                             ON CONFLICT (mutation_id) 
                             DO UPDATE SET token = EXCLUDED.token
                             """,
-                            (mutation_id, token)
+                            (mutation_id, token),
                         )
                     conn.commit()
-                    logger.info(f"Persisted mutation approval session token for ID {mutation_id} in PostgreSQL")
+                    logger.info(
+                        f"Persisted mutation approval session token for ID {mutation_id} in PostgreSQL"
+                    )
             except Exception as e:
-                logger.error(f"Failed to persist mutation approval token in PostgreSQL: {e}")
+                logger.error(
+                    f"Failed to persist mutation approval token in PostgreSQL: {e}"
+                )
                 if conn:
                     conn.rollback()
             finally:
                 conn.close()
         else:
-            logger.info(f"Generated ephemeral mutation approval session for ID {mutation_id}")
+            logger.info(
+                f"Generated ephemeral mutation approval session for ID {mutation_id}"
+            )
 
         return token
 
@@ -102,12 +108,14 @@ class MutationApprovalGate:
                     with conn.cursor() as cur:
                         cur.execute(
                             "SELECT token FROM idop_mutation_approval_tokens WHERE mutation_id = %s",
-                            (mutation_id,)
+                            (mutation_id,),
                         )
                         row = cur.fetchone()
-                    
+
                     if not row:
-                        logger.warning(f"Verification failed: Mutation ID {mutation_id} not found in database")
+                        logger.warning(
+                            f"Verification failed: Mutation ID {mutation_id} not found in database"
+                        )
                         # Synchronize memory state if database is source of truth
                         if mutation_id in self.active_sessions:
                             del self.active_sessions[mutation_id]
@@ -120,23 +128,29 @@ class MutationApprovalGate:
                         with conn.cursor() as cur:
                             cur.execute(
                                 "DELETE FROM idop_mutation_approval_tokens WHERE mutation_id = %s",
-                                (mutation_id,)
+                                (mutation_id,),
                             )
                         conn.commit()
-                        
+
                         # Sync memory
                         if mutation_id in self.active_sessions:
                             del self.active_sessions[mutation_id]
-                            
-                        logger.info(f"✓ Verification success: Database mutation session closed for ID {mutation_id}")
+
+                        logger.info(
+                            f"✓ Verification success: Database mutation session closed for ID {mutation_id}"
+                        )
                         conn.close()
                         return True
 
-                    logger.warning(f"Verification failed: Incorrect token in DB for Mutation ID {mutation_id}")
+                    logger.warning(
+                        f"Verification failed: Incorrect token in DB for Mutation ID {mutation_id}"
+                    )
                     conn.close()
                     return False
             except Exception as e:
-                logger.error(f"Database mutation token verification failed: {e}. Falling back to memory validation.")
+                logger.error(
+                    f"Database mutation token verification failed: {e}. Falling back to memory validation."
+                )
                 if conn:
                     conn.rollback()
                     conn.close()
@@ -146,14 +160,20 @@ class MutationApprovalGate:
 
         # Ephemeral memory fallback (used in unit tests / database outages)
         if mutation_id not in self.active_sessions:
-            logger.warning(f"Verification failed (Memory Fallback): Mutation ID {mutation_id} not found")
+            logger.warning(
+                f"Verification failed (Memory Fallback): Mutation ID {mutation_id} not found"
+            )
             return False
 
         stored_token = self.active_sessions[mutation_id]
         if secrets.compare_digest(stored_token, token):
             del self.active_sessions[mutation_id]
-            logger.info(f"✓ Verification success (Memory Fallback): Mutation session closed for ID {mutation_id}")
+            logger.info(
+                f"✓ Verification success (Memory Fallback): Mutation session closed for ID {mutation_id}"
+            )
             return True
 
-        logger.warning(f"Verification failed (Memory Fallback): Incorrect token for Mutation ID {mutation_id}")
+        logger.warning(
+            f"Verification failed (Memory Fallback): Incorrect token for Mutation ID {mutation_id}"
+        )
         return False

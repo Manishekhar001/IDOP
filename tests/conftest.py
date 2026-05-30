@@ -23,13 +23,14 @@ os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/ido
 os.environ.setdefault("TAVILY_API_KEY", "tvly-test-fake-key")
 
 
-
 # ---------------------------------------------------------------------------
 # Mock Settings — avoids needing a real .env file during tests
 # ---------------------------------------------------------------------------
 
+
 class MockSettings:
     """Minimal mock of app.config.Settings for offline testing."""
+
     app_name = "IDOP Test Suite"
     app_version = "0.1.0-test"
     environment = "test"
@@ -91,11 +92,16 @@ def mock_settings():
     Resets cache singletons to prevent cross-test contamination.
     """
     from app.services.cache_init import reset_caches
+
     reset_caches()
     mock = MockSettings()
-    with patch("app.config.get_settings", return_value=mock), \
-         patch("app.core.feature1_sql.approval_gate.ApprovalGate._get_connection", return_value=None), \
-         patch("app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection", return_value=None):
+    with patch("app.config.get_settings", return_value=mock), patch(
+        "app.core.feature1_sql.approval_gate.ApprovalGate._get_connection",
+        return_value=None,
+    ), patch(
+        "app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection",
+        return_value=None,
+    ):
         yield mock
     reset_caches()
 
@@ -103,6 +109,7 @@ def mock_settings():
 # ---------------------------------------------------------------------------
 # Sample Data Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_chunks():

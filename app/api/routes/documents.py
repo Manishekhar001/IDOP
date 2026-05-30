@@ -3,7 +3,11 @@ import hashlib
 import os
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from typing import Optional
-from app.api.schemas import CollectionInfoResponse, DocumentUploadResponse, ErrorResponse
+from app.api.schemas import (
+    CollectionInfoResponse,
+    DocumentUploadResponse,
+    ErrorResponse,
+)
 from app.core.document_processor import DocumentProcessor
 from app.core.vector_store import VectorStoreService
 from app.services.cache_init import get_doc_cache
@@ -54,7 +58,9 @@ def _validate_file_size(file_bytes: bytes) -> None:
 @track(name="upload_document")
 async def upload_document(
     file: UploadFile = File(..., description="Document to upload (PDF, TXT, CSV)"),
-    chunk_size: Optional[str] = Form(None, description="Custom target chunk size for parsing"),
+    chunk_size: Optional[str] = Form(
+        None, description="Custom target chunk size for parsing"
+    ),
     chunk_overlap: Optional[str] = Form(None, description="Custom chunk overlap"),
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> DocumentUploadResponse:
@@ -79,7 +85,9 @@ async def upload_document(
         HTTPException 413: If the file exceeds the maximum allowed size.
         HTTPException 500: If embedding, indexing, or cache operations fail.
     """
-    logger.info(f"Document upload: {file.filename} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})")
+    logger.info(
+        f"Document upload: {file.filename} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})"
+    )
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required.")
@@ -98,7 +106,9 @@ async def upload_document(
             try:
                 parsed_chunk_size = int(val)
             except ValueError:
-                raise HTTPException(status_code=400, detail="chunk_size must be an integer.")
+                raise HTTPException(
+                    status_code=400, detail="chunk_size must be an integer."
+                )
 
     # Safely parse chunk_overlap
     parsed_chunk_overlap = None
@@ -108,7 +118,9 @@ async def upload_document(
             try:
                 parsed_chunk_overlap = int(val)
             except ValueError:
-                raise HTTPException(status_code=400, detail="chunk_overlap must be an integer.")
+                raise HTTPException(
+                    status_code=400, detail="chunk_overlap must be an integer."
+                )
 
     try:
         file_bytes = await file.read()
@@ -120,7 +132,9 @@ async def upload_document(
 
         # Compute document ID (SHA-256 of file content)
         doc_id = hashlib.sha256(file_bytes).hexdigest()
-        logger.info(f"Computed doc_id={doc_id[:12]}... for {filename} ({len(file_bytes) / 1024:.1f} KB)")
+        logger.info(
+            f"Computed doc_id={doc_id[:12]}... for {filename} ({len(file_bytes) / 1024:.1f} KB)"
+        )
 
         loop = asyncio.get_event_loop()
 
@@ -151,23 +165,35 @@ async def upload_document(
                     None, vector_store.add_documents_with_embeddings, chunks, embeddings
                 )
 
-                logger.info(f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs")
+                logger.info(
+                    f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs"
+                )
                 return DocumentUploadResponse(
                     message="Document uploaded and indexed successfully (from cache)",
                     filename=filename,
                     chunks_created=len(chunks),
                     document_ids=document_ids,
-                    chunk_size_applied=cached["metadata"].get("chunk_size", parsed_chunk_size),
-                    chunk_overlap_applied=cached["metadata"].get("chunk_overlap", parsed_chunk_overlap),
+                    chunk_size_applied=cached["metadata"].get(
+                        "chunk_size", parsed_chunk_size
+                    ),
+                    chunk_overlap_applied=cached["metadata"].get(
+                        "chunk_overlap", parsed_chunk_overlap
+                    ),
                     cache_hit=True,
                 )
             else:
-                logger.warning(f"Cache load returned None for doc_id={doc_id[:12]}... despite cache_exists=True — re-processing")
+                logger.warning(
+                    f"Cache load returned None for doc_id={doc_id[:12]}... despite cache_exists=True — re-processing"
+                )
 
         # --- Cache MISS: Process document normally ---
-        logger.info(f"Cache MISS for {filename} (doc_id={doc_id[:12]}...) — processing from scratch")
+        logger.info(
+            f"Cache MISS for {filename} (doc_id={doc_id[:12]}...) — processing from scratch"
+        )
 
-        processor = DocumentProcessor(chunk_size=parsed_chunk_size, chunk_overlap=parsed_chunk_overlap)
+        processor = DocumentProcessor(
+            chunk_size=parsed_chunk_size, chunk_overlap=parsed_chunk_overlap
+        )
 
         # Process file from bytes directly (avoids redundant BytesIO wrapper)
         def _process():
@@ -178,9 +204,14 @@ async def upload_document(
         # Compute embeddings ONCE for both Qdrant upsert and cache storage
         texts = [doc.page_content for doc in chunks]
         if not texts:
-            raise HTTPException(status_code=400, detail="No text content could be extracted from the document.")
+            raise HTTPException(
+                status_code=400,
+                detail="No text content could be extracted from the document.",
+            )
 
-        logger.info(f"Embedding {len(chunks)} chunks ({sum(len(t) for t in texts)} chars) via OpenAI...")
+        logger.info(
+            f"Embedding {len(chunks)} chunks ({sum(len(t) for t in texts)} chars) via OpenAI..."
+        )
         embeddings = await loop.run_in_executor(
             None, vector_store.embeddings.embed_documents, texts
         )
@@ -217,7 +248,9 @@ async def upload_document(
             except Exception as cache_err:
                 logger.warning(f"Failed to cache document {filename}: {cache_err}")
 
-        logger.info(f"Indexed {filename}: {len(chunks)} chunks, {len(document_ids)} IDs")
+        logger.info(
+            f"Indexed {filename}: {len(chunks)} chunks, {len(document_ids)} IDs"
+        )
         return DocumentUploadResponse(
             message="Document uploaded and indexed successfully",
             filename=filename,
@@ -234,7 +267,9 @@ async def upload_document(
         raise
     except Exception as e:
         logger.error(f"Upload error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process document: {str(e)}"
+        )
 
 
 @router.get(
@@ -256,7 +291,9 @@ async def collection_info(
         )
     except Exception as e:
         logger.error(f"Collection info error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve collection info: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve collection info: {str(e)}"
+        )
 
 
 @router.delete(
@@ -275,4 +312,6 @@ async def delete_collection(
         return {"message": "Collection deleted successfully"}
     except Exception as e:
         logger.error(f"Collection deletion error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete collection: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete collection: {str(e)}"
+        )

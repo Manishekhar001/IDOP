@@ -83,7 +83,9 @@ def run_security_group_check():
         reservations = response.get("Reservations", [])
         if not reservations:
             print(f"   ⚠️ No EC2 instance found with IP: {target_ip}")
-            print("   (Instance may be behind a load balancer or the IP may have changed)")
+            print(
+                "   (Instance may be behind a load balancer or the IP may have changed)"
+            )
             return True  # Not a blocker — could be a different deployment model
 
         instance = reservations[0]["Instances"][0]
@@ -135,7 +137,9 @@ def run_security_group_check():
         error_code = e.response["Error"]["Code"]
         print(f"   ⚠️ AWS API error ({error_code}): {e}")
         if error_code == "UnauthorizedOperation":
-            print("   📋 The IAM user needs ec2:DescribeInstances and ec2:DescribeSecurityGroups permissions")
+            print(
+                "   📋 The IAM user needs ec2:DescribeInstances and ec2:DescribeSecurityGroups permissions"
+            )
         return True  # Don't block on AWS API errors
     except Exception as e:
         print(f"   ⚠️ Unexpected error checking security group: {e}")
@@ -148,11 +152,11 @@ def run_health_check():
     try:
         response = requests.get(endpoint, timeout=30)
         print(f"   HTTP Status: {response.status_code}")
-        
+
         if response.status_code != 200:
             print(f"   ❌ Health check failed with status: {response.status_code}")
             return False
-            
+
         data = response.json()
 
         status = data.get("status")
@@ -166,8 +170,12 @@ def run_health_check():
         print(f"   🔑 Git Commit SHA    : {git_commit_sha}")
 
         if git_commit_sha == "unknown" or not git_commit_sha:
-            print(f"   ❌ git_commit_sha is '{git_commit_sha}' — the deployed image lacks the GIT_COMMIT_SHA build arg")
-            print("   📋 This means the Dockerfile is not passing GIT_COMMIT_SHA into the container.")
+            print(
+                f"   ❌ git_commit_sha is '{git_commit_sha}' — the deployed image lacks the GIT_COMMIT_SHA build arg"
+            )
+            print(
+                "   📋 This means the Dockerfile is not passing GIT_COMMIT_SHA into the container."
+            )
             # Don't fail here — let the rest of the health check evaluate too
 
         # Compare against expected SHA if provided via environment
@@ -176,11 +184,17 @@ def run_health_check():
             if git_commit_sha == expected_sha:
                 print("   ✅ Git commit SHA matches expected value!")
             else:
-                print(f"   ❌ Git commit SHA mismatch! Expected '{expected_sha}', got '{git_commit_sha}'")
-                print("   📋 The running container is serving old code — the new image was not deployed.")
+                print(
+                    f"   ❌ Git commit SHA mismatch! Expected '{expected_sha}', got '{git_commit_sha}'"
+                )
+                print(
+                    "   📋 The running container is serving old code — the new image was not deployed."
+                )
                 return False
         elif expected_sha and git_commit_sha in ("unknown", None, ""):
-            print(f"   ⚠️ Cannot verify SHA — deployed version reports '{git_commit_sha}'")
+            print(
+                f"   ⚠️ Cannot verify SHA — deployed version reports '{git_commit_sha}'"
+            )
 
         # 1. Assert document cache backend is S3 (runtime check, not config check)
         doc_cache_backend = services.get("document_cache_backend", "unknown")
@@ -194,24 +208,30 @@ def run_health_check():
             print("   ✅ Document cache backend is S3")
         elif doc_cache_backend == "local":
             print("   ⚠️ Document cache fell back to local storage (S3 unavailable)")
-            print("   📋 Expected S3 — check S3_CACHE_BUCKET secret, bucket existence, and IAM permissions")
+            print(
+                "   📋 Expected S3 — check S3_CACHE_BUCKET secret, bucket existence, and IAM permissions"
+            )
             # Don't fail — app is still functional with local fallback
         elif "unavailable" in doc_cache_backend:
             print(f"   ⚠️ Document cache is unavailable: {doc_cache_backend}")
             print("   📋 Check S3 bucket and IAM permissions on EC2")
             # Don't fail — the health check proves the API is live
         else:
-            print(f"   ⚠️ Document cache backend is '{doc_cache_backend}' (expected 's3')")
+            print(
+                f"   ⚠️ Document cache backend is '{doc_cache_backend}' (expected 's3')"
+            )
             # Don't fail — the health check proves the API is live
 
         # 2. Assert query cache mode is Redis (not local_fallback or disabled)
         query_cache_mode = services.get("query_cache_mode", "unknown")
         print(f"   ⚡ Query Cache Mode     : {query_cache_mode}")
         if query_cache_mode == "disabled":
-            print(f"   ❌ Query cache mode is '{query_cache_mode}' — Redis unavailable and no fallback active")
+            print(
+                f"   ❌ Query cache mode is '{query_cache_mode}' — Redis unavailable and no fallback active"
+            )
             return False
         elif query_cache_mode == "local_fallback":
-            print(f"   ⚠️ Query cache fell back to local in-memory (Redis unavailable)")
+            print("   ⚠️ Query cache fell back to local in-memory (Redis unavailable)")
         else:
             print(f"   ✅ Query cache is connected ({query_cache_mode})")
 
@@ -222,7 +242,7 @@ def run_health_check():
         else:
             print(f"   ❌ Health endpoint reported degraded status: {status}")
             return False
-            
+
     except Exception as e:
         print(f"   ❌ Network/Request error during health check: {e}")
         return False
@@ -234,22 +254,24 @@ def run_collection_info():
     try:
         response = requests.get(endpoint, timeout=30)
         print(f"   HTTP Status: {response.status_code}")
-        
+
         if response.status_code != 200:
             print(f"   ❌ Collection info failed with status: {response.status_code}")
             return False
-            
+
         data = response.json()
         print(f"   Response: {data}")
-        
+
         collection_name = data.get("collection_name")
         total_documents = data.get("total_documents")
         status = data.get("status")
-        
-        print(f"   ✅ Vector store active: {collection_name} (Points: {total_documents}, Status: {status})")
+
+        print(
+            f"   ✅ Vector store active: {collection_name} (Points: {total_documents}, Status: {status})"
+        )
         print("")
         return True
-            
+
     except Exception as e:
         print(f"   ❌ Network/Request error during collection check: {e}")
         return False
@@ -258,40 +280,42 @@ def run_collection_info():
 def run_document_upload():
     print(f"🧪 Test 3: Uploading Temp Document ({test_filename})...")
     endpoint = f"{API_URL}/documents/upload"
-    
+
     # Create temporary text file locally
     with open(test_filename, "w", encoding="utf-8") as f:
         f.write(test_doc_content)
-        
+
     try:
         # Perform multipart file upload
         with open(test_filename, "rb") as f:
             files = {"file": (test_filename, f, "text/plain")}
             response = requests.post(endpoint, files=files, timeout=45)
-            
+
         print(f"   HTTP Status: {response.status_code}")
-        
+
         # Clean up temp file
         if os.path.exists(test_filename):
             os.remove(test_filename)
-            
+
         if response.status_code not in (200, 201):
             print(f"   ❌ Document upload failed with status: {response.status_code}")
             print(f"   Response Body: {response.text}")
             return False
-            
+
         data = response.json()
         print(f"   Response Chunks Created: {data.get('chunks_created')}")
         print(f"   Indexed Point IDs Count: {len(data.get('document_ids', []))}")
-        
+
         if data.get("chunks_created", 0) > 0:
-            print("   ✅ Document successfully parsed, embedded, and indexed in Qdrant!")
+            print(
+                "   ✅ Document successfully parsed, embedded, and indexed in Qdrant!"
+            )
             print("")
             return True
         else:
             print("   ❌ Document uploaded but no vector chunks were created!")
             return False
-            
+
     except Exception as e:
         if os.path.exists(test_filename):
             os.remove(test_filename)
@@ -312,7 +336,9 @@ def run_cache_stats():
         print(f"   HTTP Status: {response.status_code}")
 
         if response.status_code != 200:
-            print(f"   ❌ Cache stats endpoint failed with status: {response.status_code}")
+            print(
+                f"   ❌ Cache stats endpoint failed with status: {response.status_code}"
+            )
             return False
 
         data = response.json()
@@ -325,12 +351,16 @@ def run_cache_stats():
 
         # After uploading a test document, we expect at least 1 cached document
         if cached_count > 0:
-            print(f"   ✅ S3 document cache is operational with {cached_count} document(s)!")
+            print(
+                f"   ✅ S3 document cache is operational with {cached_count} document(s)!"
+            )
             print("")
             return True
         else:
             print("   ⚠️ Document cache is empty (no cached documents yet)")
-            print("   (This may be expected if the upload failed earlier or cache was cleared)")
+            print(
+                "   (This may be expected if the upload failed earlier or cache was cleared)"
+            )
             print("")
             # Don't fail the test suite — the upload may not have actually hit the cache
             # (e.g., if the document was already in the cache from a previous test)
@@ -344,7 +374,7 @@ def run_cache_stats():
 def run_chat_query():
     print("🧪 Test 5: Querying LangGraph RAG Multi-Agent Pipeline...")
     endpoint = f"{API_URL}/chat"
-    
+
     # Construct ChatRequest schema body
     payload = {
         "question": "What is the security verification code mentioned in the smoke test document?",
@@ -354,46 +384,50 @@ def run_chat_query():
         "search_mode": "hybrid",
         "top_k": 3,
         "enable_hyde": False,
-        "enable_reranking": False
+        "enable_reranking": False,
     }
-    
+
     try:
         start_time = time.time()
         response = requests.post(endpoint, json=payload, timeout=60)
         latency = (time.time() - start_time) * 1000
-        
+
         print(f"   HTTP Status: {response.status_code}")
         print(f"   Network roundtrip time: {latency:.2f} ms")
-        
+
         if response.status_code != 200:
             print(f"   ❌ Chat query failed with status: {response.status_code}")
             print(f"   Response Body: {response.text}")
             return False
-            
+
         data = response.json()
         answer = data.get("answer", "")
         crag_verdict = data.get("crag_verdict", "")
         issup = data.get("issup", "")
         sources = data.get("sources", [])
-        
+
         print("\n   [RAG PIPELINE EXECUTION SUMMARY]")
         print(f"   ├─ CRAG Verdict      : {crag_verdict}")
         print(f"   ├─ SRAG Support      : {issup}")
         print(f"   └─ Source Chunks     : {len(sources)} items retrieved")
         print("\n   [AGENT RESPONSE]")
         print(f"   {answer}\n")
-        
+
         # Verify the answer contains the correct validation keyword
         verification_code = "IDOP-SEC-9988X"
         if verification_code in answer:
-            print("   ✅ Multi-Agent RAG reasoning completed and verified answer successfully!")
+            print(
+                "   ✅ Multi-Agent RAG reasoning completed and verified answer successfully!"
+            )
             print("")
             return True
         else:
-            print(f"   ❌ RAG failed to retrieve or state verification code: {verification_code}")
+            print(
+                f"   ❌ RAG failed to retrieve or state verification code: {verification_code}"
+            )
             print("   (Verify the dense/sparse hybrid embeddings indexing process)")
             return False
-            
+
     except Exception as e:
         print(f"   ❌ Network/Request error during chat query: {e}")
         return False
@@ -404,15 +438,16 @@ def run_tests():
     if not os.getenv("API_TARGET_URL"):
         print("❌ ERROR: API_TARGET_URL environment variable is not set!")
         sys.exit(1)
-        
+
     API_URL = os.getenv("API_TARGET_URL").rstrip("/")
 
-    
     print("==================================================")
     print("🚀 STARTING IDOP POST-DEPLOYMENT SMOKE TEST SUITE")
     print("==================================================")
     print(f"📡 API Endpoint Target : {API_URL}")
-    print(f"⏱️  Timestamp          : {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}")
+    print(
+        f"⏱️  Timestamp          : {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}"
+    )
     print("==================================================\n")
 
     # Execute the tests sequentially
@@ -422,15 +457,15 @@ def run_tests():
         run_collection_info,
         run_document_upload,
         run_cache_stats,
-        run_chat_query
+        run_chat_query,
     ]
-    
+
     success = True
     for test in tests:
         if not test():
             success = False
             break
-            
+
     print("==================================================")
     if success:
         print("🎉 SUCCESS: IDOP Integration Smoke Tests PASSED!")

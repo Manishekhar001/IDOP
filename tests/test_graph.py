@@ -13,10 +13,10 @@ from app.core.graph.nodes import (
     route_after_usefulness,
 )
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # CSRAGState Shape Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestCSRAGState:
     """Tests for the LangGraph TypedDict state definition."""
@@ -25,9 +25,16 @@ class TestCSRAGState:
         """Test that CSRAGState declares all expected core RAG fields."""
         annotations = CSRAGState.__annotations__
         core_fields = [
-            "messages", "summary", "user_id", "ltm_context",
-            "need_retrieval", "question", "retrieval_query",
-            "rewrite_tries", "docs", "good_docs",
+            "messages",
+            "summary",
+            "user_id",
+            "ltm_context",
+            "need_retrieval",
+            "question",
+            "retrieval_query",
+            "rewrite_tries",
+            "docs",
+            "good_docs",
         ]
         for field in core_fields:
             assert field in annotations, f"Missing core field: {field}"
@@ -36,8 +43,13 @@ class TestCSRAGState:
         """Test that CSRAGState declares CRAG verdict fields."""
         annotations = CSRAGState.__annotations__
         crag_fields = [
-            "crag_verdict", "crag_reason", "web_query", "web_docs",
-            "strips", "kept_strips", "refined_context",
+            "crag_verdict",
+            "crag_reason",
+            "web_query",
+            "web_docs",
+            "strips",
+            "kept_strips",
+            "refined_context",
         ]
         for field in crag_fields:
             assert field in annotations, f"Missing CRAG field: {field}"
@@ -46,8 +58,12 @@ class TestCSRAGState:
         """Test that CSRAGState declares SRAG verification fields."""
         annotations = CSRAGState.__annotations__
         srag_fields = [
-            "answer", "issup", "evidence", "retries",
-            "isuse", "use_reason",
+            "answer",
+            "issup",
+            "evidence",
+            "retries",
+            "isuse",
+            "use_reason",
         ]
         for field in srag_fields:
             assert field in annotations, f"Missing SRAG field: {field}"
@@ -56,8 +72,13 @@ class TestCSRAGState:
         """Test that CSRAGState declares advanced RAG configuration fields."""
         annotations = CSRAGState.__annotations__
         rag_config_fields = [
-            "search_mode", "top_k", "enable_hyde", "enable_reranking",
-            "hyde_used", "hyde_hypotheses", "reranking_used",
+            "search_mode",
+            "top_k",
+            "enable_hyde",
+            "enable_reranking",
+            "hyde_used",
+            "hyde_hypotheses",
+            "reranking_used",
         ]
         for field in rag_config_fields:
             assert field in annotations, f"Missing RAG config field: {field}"
@@ -74,8 +95,11 @@ class TestCSRAGState:
         """Test that CSRAGState declares Feature 1 SQL fields."""
         annotations = CSRAGState.__annotations__
         sql_fields = [
-            "sql_query", "sql_results", "sql_query_id",
-            "sql_explanation", "sql_status",
+            "sql_query",
+            "sql_results",
+            "sql_query_id",
+            "sql_explanation",
+            "sql_status",
         ]
         for field in sql_fields:
             assert field in annotations, f"Missing SQL field: {field}"
@@ -84,9 +108,14 @@ class TestCSRAGState:
         """Test that CSRAGState declares Feature 2 mutation fields."""
         annotations = CSRAGState.__annotations__
         mutation_fields = [
-            "mutation_id", "mutation_table", "mutation_op",
-            "mutation_rows", "mutation_mapped_rows",
-            "mutation_status", "mutation_error", "mutation_result_count",
+            "mutation_id",
+            "mutation_table",
+            "mutation_op",
+            "mutation_rows",
+            "mutation_mapped_rows",
+            "mutation_status",
+            "mutation_error",
+            "mutation_result_count",
         ]
         for field in mutation_fields:
             assert field in annotations, f"Missing mutation field: {field}"
@@ -100,6 +129,7 @@ class TestCSRAGState:
 # ═══════════════════════════════════════════════════════════════════════
 # Conditional Routing Function Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestRouteAfterDecide:
     """Tests for the route_after_decide routing function."""
@@ -176,6 +206,7 @@ class TestRouteAfterUsefulness:
 # ═══════════════════════════════════════════════════════════════════════
 # CSRAGEngine._format_result Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestFormatResult:
     """Tests for the engine's static result formatter."""
@@ -256,8 +287,14 @@ class TestFormatResult:
 
         state = {
             "answer": "Combined answer",
-            "good_docs": [Document(page_content="Internal doc", metadata={"file": "policy.pdf"})],
-            "web_docs": [Document(page_content="Web result", metadata={"url": "https://example.com"})],
+            "good_docs": [
+                Document(page_content="Internal doc", metadata={"file": "policy.pdf"})
+            ],
+            "web_docs": [
+                Document(
+                    page_content="Web result", metadata={"url": "https://example.com"}
+                )
+            ],
             "crag_verdict": "AMBIGUOUS",
             "crag_reason": "",
             "issup": "",
@@ -300,6 +337,7 @@ class TestFormatResult:
 # ═══════════════════════════════════════════════════════════════════════
 # CSRAGEngine._initial_state Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestInitialState:
     """Tests for the engine's initial state factory."""

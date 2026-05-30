@@ -16,7 +16,15 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver  # noqa: E402
 from langgraph.store.postgres.aio import AsyncPostgresStore  # noqa: E402
 
-from app.api.routes import chat, documents, health, memory, sql, mutation, cache  # noqa: E402
+from app.api.routes import (  # noqa: E402
+    chat,
+    documents,
+    health,
+    memory,
+    sql,
+    mutation,
+    cache,
+)
 from app.config import get_settings  # noqa: E402
 from app.core.csrag_engine import CSRAGEngine  # noqa: E402
 from app.core.vector_store import VectorStoreService  # noqa: E402
@@ -71,8 +79,7 @@ async def _retry_init(
                 logger.info(f"Retrying {name} init in {delay}s...")
                 await asyncio.sleep(delay)
     logger.critical(
-        f"All {max_retries} {name} init attempts failed. "
-        f"Last error: {last_exc}"
+        f"All {max_retries} {name} init attempts failed. " f"Last error: {last_exc}"
     )
     raise last_exc
 

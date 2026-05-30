@@ -12,10 +12,10 @@ from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature1_sql.approval_gate import ApprovalGate
 from app.core.feature2_mutation.rule_validator import RuleValidator
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Feature 1: SQL Validator Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestSQLValidator:
     """Tests for the SQL safety validator preventing destructive operations."""
@@ -71,7 +71,9 @@ class TestSQLValidator:
 
     def test_alter_table_blocked(self, validator):
         """Test that ALTER TABLE is blocked."""
-        is_valid, error = validator.validate("ALTER TABLE customers ADD COLUMN phone VARCHAR(20)")
+        is_valid, error = validator.validate(
+            "ALTER TABLE customers ADD COLUMN phone VARCHAR(20)"
+        )
         assert is_valid is False
         assert "ALTER" in error
 
@@ -95,7 +97,9 @@ class TestSQLValidator:
 
     def test_replace_blocked(self, validator):
         """Test that REPLACE is blocked."""
-        is_valid, error = validator.validate("REPLACE INTO products VALUES (1, 'test', 99.99)")
+        is_valid, error = validator.validate(
+            "REPLACE INTO products VALUES (1, 'test', 99.99)"
+        )
         assert is_valid is False
         assert "REPLACE" in error
 
@@ -133,19 +137,25 @@ class TestSQLValidator:
 
     def test_insert_is_blocked(self, validator):
         """Test that INSERT is blocked in the read-only query pipeline."""
-        is_valid, error = validator.validate("INSERT INTO products VALUES (1, 'Widget', 9.99)")
+        is_valid, error = validator.validate(
+            "INSERT INTO products VALUES (1, 'Widget', 9.99)"
+        )
         assert is_valid is False
         assert "SELECT" in error or "INSERT" in error
 
     def test_update_is_blocked(self, validator):
         """Test that UPDATE is blocked in the read-only query pipeline."""
-        is_valid, error = validator.validate("UPDATE products SET price = 10.99 WHERE id = 1")
+        is_valid, error = validator.validate(
+            "UPDATE products SET price = 10.99 WHERE id = 1"
+        )
         assert is_valid is False
         assert "SELECT" in error or "UPDATE" in error
 
     def test_delete_is_blocked(self, validator):
         """Test that DELETE is blocked in the read-only query pipeline."""
-        is_valid, error = validator.validate("DELETE FROM orders WHERE status = 'Cancelled'")
+        is_valid, error = validator.validate(
+            "DELETE FROM orders WHERE status = 'Cancelled'"
+        )
         assert is_valid is False
         assert "SELECT" in error or "DELETE" in error
 
@@ -153,6 +163,7 @@ class TestSQLValidator:
 # ═══════════════════════════════════════════════════════════════════════
 # Feature 1: Approval Gate Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestApprovalGate:
     """Tests for the cryptographic session-based approval gate."""
@@ -229,6 +240,7 @@ class TestApprovalGate:
 # ═══════════════════════════════════════════════════════════════════════
 # Feature 2: Rule Validator Tests
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestRuleValidator:
     """Tests for the business rules validator using rules.json configuration."""

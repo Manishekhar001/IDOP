@@ -45,7 +45,11 @@ def get_query_cache() -> Optional[QueryCacheService]:
         _query_cache_init_attempted = True
         try:
             _query_cache = QueryCacheService()
-            mode = "redis" if _query_cache.enabled else ("local_fallback" if _query_cache.use_local else "disabled")
+            mode = (
+                "redis"
+                if _query_cache.enabled
+                else ("local_fallback" if _query_cache.use_local else "disabled")
+            )
             logger.info(f"Query cache initialized (mode: {mode})")
         except Exception as e:
             logger.error(f"Failed to initialize query cache: {e}", exc_info=True)

@@ -20,14 +20,18 @@ class ColumnMapper:
         self.model = settings.memory_llm_model
 
     @track(name="column_mapper_map")
-    def get_semantic_mapping(self, table_name: str, file_headers: List[str]) -> Dict[str, str]:
+    def get_semantic_mapping(
+        self, table_name: str, file_headers: List[str]
+    ) -> Dict[str, str]:
         """
         Map spreadsheet headers to target DB table column names using semantic matching.
         """
         # Schema definitions from central registry — add new tables in schema_registry.py
         db_columns = TABLE_SCHEMAS.get(table_name, [])
         if not db_columns:
-            raise ValueError(f"Target table '{table_name}' is not supported for mutations.")
+            raise ValueError(
+                f"Target table '{table_name}' is not supported for mutations."
+            )
 
         prompt = f"""
 You are an expert data migration specialist.
@@ -56,11 +60,13 @@ Respond strictly in this JSON format:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             result = json.loads(response.choices[0].message.content)
             mappings = result.get("mappings", {})
-            logger.info(f"Generated semantic column mapping for {table_name}: {mappings}")
+            logger.info(
+                f"Generated semantic column mapping for {table_name}: {mappings}"
+            )
             return mappings
         except Exception as e:
             logger.error(f"Failed to generate semantic column mapping: {e}")

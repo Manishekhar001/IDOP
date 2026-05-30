@@ -27,7 +27,9 @@ class RuleValidator:
             logger.error(f"Failed to load business rules from {self.rules_path}: {e}")
 
     @track(name="rule_validator_validate")
-    def validate_rows(self, table_name: str, rows: List[Dict[str, Any]]) -> Tuple[bool, List[str]]:
+    def validate_rows(
+        self, table_name: str, rows: List[Dict[str, Any]]
+    ) -> Tuple[bool, List[str]]:
         """
         Validate all rows. Returns (is_valid, list_of_error_messages).
         """
@@ -35,7 +37,9 @@ class RuleValidator:
         max_rows = self.rules.get("max_bulk_rows", 1000)
 
         if len(rows) > max_rows:
-            return False, [f"Payload rows ({len(rows)}) exceeds maximum allowed bulk operations limit ({max_rows})"]
+            return False, [
+                f"Payload rows ({len(rows)}) exceeds maximum allowed bulk operations limit ({max_rows})"
+            ]
 
         table_rules = self.rules.get("field_validation_rules", {}).get(table_name, {})
         if not table_rules:
@@ -49,7 +53,9 @@ class RuleValidator:
                     continue  # Optional checks, handle null safety
 
                 rule_type = rule.get("type")
-                message = rule.get("message", f"Field '{field}' failed validation rule.")
+                message = rule.get(
+                    "message", f"Field '{field}' failed validation rule."
+                )
 
                 if rule_type == "numeric":
                     try:
@@ -59,7 +65,9 @@ class RuleValidator:
                         if "max" in rule and num_val > rule["max"]:
                             errors.append(f"Row {idx}: {message} (Value: {val})")
                     except ValueError:
-                        errors.append(f"Row {idx}: Field '{field}' must be a valid numeric type.")
+                        errors.append(
+                            f"Row {idx}: Field '{field}' must be a valid numeric type."
+                        )
 
                 elif rule_type == "integer":
                     try:
@@ -69,7 +77,9 @@ class RuleValidator:
                         if "max" in rule and int_val > rule["max"]:
                             errors.append(f"Row {idx}: {message} (Value: {val})")
                     except ValueError:
-                        errors.append(f"Row {idx}: Field '{field}' must be a valid integer type.")
+                        errors.append(
+                            f"Row {idx}: Field '{field}' must be a valid integer type."
+                        )
 
                 elif rule_type == "regex":
                     pattern = rule.get("pattern")

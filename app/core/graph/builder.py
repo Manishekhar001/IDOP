@@ -23,7 +23,6 @@ from app.core.graph.nodes import (
     rewrite_question_node,
     stm_summarize_node,
     hybrid_generation_node,
-    
     route_after_router,
     route_after_decide,
     route_after_crag,
@@ -82,14 +81,16 @@ def build_graph(
             "mutation": "mutation",
             "ltm_remember": "ltm_remember",
             "chat": "generate_direct",
-            "hybrid": "hybrid_gen"
-        }
+            "hybrid": "hybrid_gen",
+        },
     )
 
     # Terminate direct branch endpoints
     builder.add_edge("sql_gen", END)
     builder.add_edge("mutation", END)
-    builder.add_edge("generate_direct", "stm_summarize")  # LOGIC-01: summarize conversation even for direct responses
+    builder.add_edge(
+        "generate_direct", "stm_summarize"
+    )  # LOGIC-01: summarize conversation even for direct responses
     builder.add_edge("hybrid_gen", "stm_summarize")
 
     # Ingest document RAG pipeline sequence
@@ -140,7 +141,9 @@ def build_graph(
         },
     )
 
-    builder.add_edge("rewrite_question", "ltm_remember")  # LOGIC-02: re-check LTM on rewritten query
+    builder.add_edge(
+        "rewrite_question", "ltm_remember"
+    )  # LOGIC-02: re-check LTM on rewritten query
     builder.add_edge("stm_summarize", END)
 
     graph = builder.compile(

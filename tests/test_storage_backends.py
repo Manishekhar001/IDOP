@@ -12,10 +12,10 @@ import numpy as np
 from app.services.local_storage import LocalStorageBackend
 from app.services.s3_storage import S3StorageBackend
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Tests for LocalStorageBackend
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestLocalStorageBackend:
     """Tests for the local filesystem storage backend."""
@@ -99,7 +99,9 @@ class TestLocalStorageBackend:
 
         assert local_storage.exists(doc_id, file_ext)
 
-    def test_exists_returns_false_when_partial_files(self, local_storage, sample_chunks):
+    def test_exists_returns_false_when_partial_files(
+        self, local_storage, sample_chunks
+    ):
         """Test exists() returns False when only some files are present."""
         doc_id = "test_doc_partial"
         file_ext = "pdf"
@@ -200,6 +202,7 @@ class TestLocalStorageBackend:
 # Tests for S3StorageBackend (using moto for mocking)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestS3StorageBackend:
     """Tests for the S3 storage backend (mocked with moto)."""
 
@@ -264,7 +267,12 @@ class TestS3StorageBackend:
         assert s3_storage._object_exists(key)
 
     def test_exists_all_files(
-        self, s3_storage, sample_chunks, sample_embeddings, sample_metadata, temp_document
+        self,
+        s3_storage,
+        sample_chunks,
+        sample_embeddings,
+        sample_metadata,
+        temp_document,
     ):
         """Test exists() returns True when all S3 files are present."""
         doc_id = "s3_doc_full"
@@ -288,7 +296,12 @@ class TestS3StorageBackend:
         assert not s3_storage.exists(doc_id, file_ext)
 
     def test_delete(
-        self, s3_storage, sample_chunks, sample_embeddings, sample_metadata, temp_document
+        self,
+        s3_storage,
+        sample_chunks,
+        sample_embeddings,
+        sample_metadata,
+        temp_document,
     ):
         """Test deleting all S3 files for a document."""
         doc_id = "s3_doc_delete"
@@ -355,6 +368,7 @@ class TestS3StorageBackend:
 # Backend Interface Compatibility Tests (parametrized)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestStorageBackendCompatibility:
     """Test that both backends implement the same interface correctly."""
 
@@ -376,7 +390,12 @@ class TestStorageBackendCompatibility:
                 yield S3StorageBackend(bucket_name="idop-test-bucket")
 
     def test_full_lifecycle(
-        self, storage_backend, sample_chunks, sample_embeddings, sample_metadata, temp_document
+        self,
+        storage_backend,
+        sample_chunks,
+        sample_embeddings,
+        sample_metadata,
+        temp_document,
     ):
         """Test save → exists → load → delete lifecycle on both backends."""
         doc_id = "compat_test_lifecycle"

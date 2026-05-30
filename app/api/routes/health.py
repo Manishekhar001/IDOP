@@ -22,10 +22,13 @@ router = APIRouter(tags=["System Diagnostics"])
 def _format_redis_cache(query_cache) -> dict:
     """Format query cache stats into RedisCacheStatus-compatible dict."""
     if not query_cache or (not query_cache.enabled and not query_cache.use_local):
-        return {"status": "disabled", "message": "Redis not connected and local fallback not active"}
+        return {
+            "status": "disabled",
+            "message": "Redis not connected and local fallback not active",
+        }
 
     mode = "redis" if query_cache.enabled else "local_fallback"
-    stats = query_cache.get_stats() if hasattr(query_cache, 'get_stats') else {}
+    stats = query_cache.get_stats() if hasattr(query_cache, "get_stats") else {}
     cache_types = stats.get("cache_types", {})
 
     total_hits = sum(ct.get("hits", 0) for ct in cache_types.values())
@@ -33,7 +36,12 @@ def _format_redis_cache(query_cache) -> dict:
     hit_rate = f"{(total_hits / max(total_queries, 1)) * 100:.1f}%"
 
     # Estimate cost savings (same logic as /stats route)
-    cost_estimates = {"rag": 0.05, "embedding": 0.0001, "sql_gen": 0.08, "sql_result": 0.01}
+    cost_estimates = {
+        "rag": 0.05,
+        "embedding": 0.0001,
+        "sql_gen": 0.08,
+        "sql_result": 0.01,
+    }
     total_savings = sum(
         ct.get("hits", 0) * cost_estimates.get(ct_name, 0)
         for ct_name, ct in cache_types.items()
@@ -78,12 +86,14 @@ async def health_check(request: Request) -> Dict[str, Any]:
     # 2. Check Postgres Connection (checkpointer) — off the event loop
     postgres_connected = False
     try:
+
         def _check_postgres():
             conn = psycopg2.connect(settings.database_url)
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
             conn.close()
             return True
+
         postgres_connected = await asyncio.to_thread(_check_postgres)
     except Exception:
         pass
@@ -92,12 +102,14 @@ async def health_check(request: Request) -> Dict[str, Any]:
     supabase_connected = False
     if settings.supabase_db_url:
         try:
+
             def _check_supabase():
                 conn = psycopg2.connect(settings.supabase_db_url)
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1;")
                 conn.close()
                 return True
+
             supabase_connected = await asyncio.to_thread(_check_supabase)
         except Exception:
             pass
@@ -106,20 +118,28 @@ async def health_check(request: Request) -> Dict[str, Any]:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
     query_cache_status = query_cache.enabled if query_cache else False
-    query_cache_mode = "redis" if query_cache_status else ("local_fallback" if getattr(query_cache, 'use_local', False) else "disabled")
+    query_cache_mode = (
+        "redis"
+        if query_cache_status
+        else (
+            "local_fallback" if getattr(query_cache, "use_local", False) else "disabled"
+        )
+    )
 
     # Determine the actual document cache backend at runtime
     doc_cache_backend = "unknown"
     doc_cache_enabled = False
     doc_cache_error = None
-    if doc_cache and hasattr(doc_cache, 'storage'):
+    if doc_cache and hasattr(doc_cache, "storage"):
         doc_cache_enabled = True
         # Capture any init error for diagnostics
-        doc_cache_error = getattr(doc_cache, 'init_error', None)
+        doc_cache_error = getattr(doc_cache, "init_error", None)
         backend_class = type(doc_cache.storage).__name__
-        if backend_class == 'S3StorageBackend':
-            doc_cache_backend = "s3" if getattr(doc_cache.storage, 'enabled', False) else "s3_disabled"
-        elif backend_class == 'LocalStorageBackend':
+        if backend_class == "S3StorageBackend":
+            doc_cache_backend = (
+                "s3" if getattr(doc_cache.storage, "enabled", False) else "s3_disabled"
+            )
+        elif backend_class == "LocalStorageBackend":
             doc_cache_backend = "local"
         else:
             doc_cache_backend = backend_class
@@ -143,7 +163,11 @@ async def health_check(request: Request) -> Dict[str, Any]:
     # Only check boolean values — string entries like "disabled" or "local" are always truthy
     boolean_statuses = [v for v in services_status.values() if isinstance(v, bool)]
     any_service_available = any(boolean_statuses)
-    health_status = "healthy" if (postgres_connected and supabase_connected and qdrant_connected) else "degraded" if any_service_available else "unhealthy"
+    health_status = (
+        "healthy"
+        if (postgres_connected and supabase_connected and qdrant_connected)
+        else "degraded" if any_service_available else "unhealthy"
+    )
 
     return {
         "status": health_status,
@@ -164,7 +188,9 @@ async def health_check(request: Request) -> Dict[str, Any]:
             "tavily_configured": bool(settings.tavily_api_key),
             "database_configured": bool(settings.database_url),
             "supabase_configured": bool(settings.supabase_db_url),
-            "redis_cache_configured": bool(settings.upstash_redis_url and settings.upstash_redis_token),
+            "redis_cache_configured": bool(
+                settings.upstash_redis_url and settings.upstash_redis_token
+            ),
             "s3_cache_configured": settings.storage_backend == "s3",
         },
         "qdrant_info": collection_info,
@@ -172,7 +198,9 @@ async def health_check(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.get("/health/ready", response_model=DetailedReadinessResponse, summary="Readiness check")
+@router.get(
+    "/health/ready", response_model=DetailedReadinessResponse, summary="Readiness check"
+)
 @track(name="readiness_check")
 async def readiness(request: Request) -> Dict[str, Any]:
     """
@@ -188,12 +216,14 @@ async def readiness(request: Request) -> Dict[str, Any]:
     # Postgres Check (checkpointer) — off the event loop
     postgres_connected = False
     try:
+
         def _check_postgres():
             conn = psycopg2.connect(settings.database_url)
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
             conn.close()
             return True
+
         postgres_connected = await asyncio.to_thread(_check_postgres)
     except Exception:
         pass
@@ -202,28 +232,39 @@ async def readiness(request: Request) -> Dict[str, Any]:
     supabase_connected = False
     if settings.supabase_db_url:
         try:
+
             def _check_supabase():
                 conn = psycopg2.connect(settings.supabase_db_url)
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1;")
                 conn.close()
                 return True
+
             supabase_connected = await asyncio.to_thread(_check_supabase)
         except Exception:
             pass
 
-    status = "ready" if (qdrant_connected and postgres_connected and supabase_connected) else "not_ready"
+    status = (
+        "ready"
+        if (qdrant_connected and postgres_connected and supabase_connected)
+        else "not_ready"
+    )
 
     return {
         "status": status,
         "qdrant_connected": qdrant_connected,
         "postgres_connected": postgres_connected,
         "supabase_connected": supabase_connected,
-        "collection_info": collection_info
+        "collection_info": collection_info,
     }
 
 
-@router.get("/info", response_model=SystemInfoResponse, status_code=status.HTTP_200_OK, summary="Get system layout and documentation info")
+@router.get(
+    "/info",
+    response_model=SystemInfoResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get system layout and documentation info",
+)
 @track(name="get_system_info")
 async def get_info() -> Dict[str, Any]:
     """
@@ -272,7 +313,12 @@ async def get_info() -> Dict[str, Any]:
     }
 
 
-@router.get("/stats", response_model=SystemStatsResponse, status_code=status.HTTP_200_OK, summary="Get platform statistics and query cache savings")
+@router.get(
+    "/stats",
+    response_model=SystemStatsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get platform statistics and query cache savings",
+)
 @track(name="get_system_stats")
 async def get_stats(request: Request) -> Dict[str, Any]:
     """
@@ -286,10 +332,23 @@ async def get_stats(request: Request) -> Dict[str, Any]:
     # Fetch document cache stats
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
-    doc_stats = doc_cache.get_cache_stats() if doc_cache else {"total_documents": 0, "total_size_human": "0 Bytes", "total_size_bytes": 0}
+    doc_stats = (
+        doc_cache.get_cache_stats()
+        if doc_cache
+        else {
+            "total_documents": 0,
+            "total_size_human": "0 Bytes",
+            "total_size_bytes": 0,
+        }
+    )
 
     # Get query cache Redis metrics
-    cache_stats = {"enabled": False, "mode": "disabled", "total_estimated_savings": "$0.0000", "overall_hit_rate": "0.0%"}
+    cache_stats = {
+        "enabled": False,
+        "mode": "disabled",
+        "total_estimated_savings": "$0.0000",
+        "overall_hit_rate": "0.0%",
+    }
     if query_cache and (query_cache.enabled or query_cache.use_local):
         try:
             cache_mode = "redis" if query_cache.enabled else "local_fallback"
@@ -298,10 +357,10 @@ async def get_stats(request: Request) -> Dict[str, Any]:
 
             # Dynamic retail cost estimations
             cost_estimates = {
-                "rag": 0.05,        # $0.05 per GPT-4/RAG query
-                "embeddings": 0.0001, # $0.0001 per embedding check
-                "sql_gen": 0.08,    # $0.08 per Golden Text-to-SQL query
-                "sql_result": 0.01, # $0.01 database transaction cost
+                "rag": 0.05,  # $0.05 per GPT-4/RAG query
+                "embeddings": 0.0001,  # $0.0001 per embedding check
+                "sql_gen": 0.08,  # $0.08 per Golden Text-to-SQL query
+                "sql_result": 0.01,  # $0.01 database transaction cost
             }
 
             for cache_type, cache_data in stats.get("cache_types", {}).items():
@@ -310,8 +369,12 @@ async def get_stats(request: Request) -> Dict[str, Any]:
                     cache_data["estimated_cost_saved"] = f"${savings:.4f}"
                     total_cost_saved += savings
 
-            total_queries = sum(c.get("total_queries", 0) for c in stats.get("cache_types", {}).values())
-            total_hits = sum(c.get("hits", 0) for c in stats.get("cache_types", {}).values())
+            total_queries = sum(
+                c.get("total_queries", 0) for c in stats.get("cache_types", {}).values()
+            )
+            total_hits = sum(
+                c.get("hits", 0) for c in stats.get("cache_types", {}).values()
+            )
             hit_rate = (total_hits / max(total_queries, 1)) * 100
 
             cache_stats = {
@@ -322,7 +385,10 @@ async def get_stats(request: Request) -> Dict[str, Any]:
                 "overall_hit_rate": f"{hit_rate:.1f}%",
             }
         except Exception as e:
-            cache_stats = {"enabled": True, "error": f"Failed to retrieve stats: {str(e)}"}
+            cache_stats = {
+                "enabled": True,
+                "error": f"Failed to retrieve stats: {str(e)}",
+            }
 
     return {
         "indexing": {

@@ -16,6 +16,7 @@ class TestStorageBackendDefault:
     def test_default_storage_backend_is_s3(self):
         """Verify the Settings class default for storage_backend is 's3'."""
         from app.config import Settings
+
         field = Settings.model_fields["storage_backend"]
         assert field.default == "s3", f"Expected default 's3', got '{field.default}'"
 
@@ -23,6 +24,7 @@ class TestStorageBackendDefault:
         """Verify /health reports s3_cache_configured: true when storage_backend is 's3'."""
         from fastapi.testclient import TestClient
         from app.main import app
+
         client = TestClient(app)
 
         mock_settings = MagicMock()
@@ -47,6 +49,7 @@ class TestStorageBackendDefault:
         """Verify /health reports s3_cache_configured: false when storage_backend is 'local'."""
         from fastapi.testclient import TestClient
         from app.main import app
+
         client = TestClient(app)
 
         mock_settings = MagicMock()
@@ -84,7 +87,7 @@ class TestEnhancedSchemas:
             mutation_op="INSERT",
             mutation_status="pending_approval",
             mutation_result_count=5,
-            approval_token="secure_token_999"
+            approval_token="secure_token_999",
         )
         assert response.query_type == "HYBRID"
         assert response.ltm_context == "User is based in Canada."
@@ -105,7 +108,7 @@ class TestEnhancedSchemas:
             status="pending_approval",
             mappings={"Name": "name"},
             errors=[],
-            token="mutation_secret_token_123"
+            token="mutation_secret_token_123",
         )
         assert response.token == "mutation_secret_token_123"
 
@@ -120,43 +123,46 @@ class TestEnhancedApiEndpoints:
     def test_chat_endpoint_returns_rich_fields(self, client):
         """Test that /chat returns the 5-path router classifications, memory context, and approval tokens."""
         mock_engine = MagicMock()
-        
+
         from app.api.routes.chat import get_engine
+
         app.dependency_overrides[get_engine] = lambda: mock_engine
-        
+
         try:
             # Setup mock return value with all rich fields populated
-            mock_engine.aquery = AsyncMock(return_value={
-                "answer": "This is a detailed response.",
-                "sources": [],
-                "crag_verdict": "CORRECT",
-                "issup": "fully_supported",
-                "evidence": [],
-                "retries": 0,
-                "rewrite_tries": 0,
-                "query_type": "HYBRID",
-                "ltm_context": "User prefers CSV reports.",
-                "sql_query": "SELECT * FROM orders;",
-                "sql_status": "executed",
-                "approval_token": "token-12345",
-                "mutation_id": "mut-777",
-                "mutation_table": "orders",
-                "mutation_op": "UPDATE",
-                "mutation_status": "pending_approval",
-                "mutation_result_count": 0
-            })
+            mock_engine.aquery = AsyncMock(
+                return_value={
+                    "answer": "This is a detailed response.",
+                    "sources": [],
+                    "crag_verdict": "CORRECT",
+                    "issup": "fully_supported",
+                    "evidence": [],
+                    "retries": 0,
+                    "rewrite_tries": 0,
+                    "query_type": "HYBRID",
+                    "ltm_context": "User prefers CSV reports.",
+                    "sql_query": "SELECT * FROM orders;",
+                    "sql_status": "executed",
+                    "approval_token": "token-12345",
+                    "mutation_id": "mut-777",
+                    "mutation_table": "orders",
+                    "mutation_op": "UPDATE",
+                    "mutation_status": "pending_approval",
+                    "mutation_result_count": 0,
+                }
+            )
 
             payload = {
                 "question": "Execute hybrid query",
                 "thread_id": "thread-111",
                 "user_id": "user-222",
-                "include_sources": False
+                "include_sources": False,
             }
-            
+
             response = client.post("/chat", json=payload)
             assert response.status_code == 200
             data = response.json()
-            
+
             # Assert detailed fields are serialized in the response JSON
             assert data["query_type"] == "HYBRID"
             assert data["ltm_context"] == "User prefers CSV reports."
@@ -177,8 +183,12 @@ class TestEnhancedApiEndpoints:
         mock_processor.chunk_overlap = 50
         # Return a non-empty Document so the route's "if not texts" check passes
         from langchain_core.documents import Document
+
         mock_processor.process_upload_bytes.return_value = [
-            Document(page_content="Hello testing world content", metadata={"source": "test.txt"})
+            Document(
+                page_content="Hello testing world content",
+                metadata={"source": "test.txt"},
+            )
         ]
 
         mock_vector_store = MagicMock()
@@ -186,6 +196,7 @@ class TestEnhancedApiEndpoints:
         mock_vector_store.add_documents_with_embeddings.return_value = ["id1"]
 
         from app.api.routes.documents import get_vector_store
+
         app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
 
         try:
@@ -193,7 +204,9 @@ class TestEnhancedApiEndpoints:
             form_data = {"chunk_size": "512", "chunk_overlap": "50"}
 
             response = client.post("/documents/upload", files=file_data, data=form_data)
-            assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+            assert (
+                response.status_code == 200
+            ), f"Expected 200, got {response.status_code}: {response.text}"
             data = response.json()
             assert data["filename"] == "test.txt"
             assert data["chunk_size_applied"] == 512
@@ -207,7 +220,16 @@ class TestEnhancedApiEndpoints:
     @patch("app.api.routes.mutation.generator")
     @patch("app.api.routes.mutation.judge")
     @patch("app.api.routes.mutation.gate")
-    def test_mutation_upload_with_options(self, mock_gate, mock_judge, mock_generator, mock_validator, mock_mapper, mock_parser, client):
+    def test_mutation_upload_with_options(
+        self,
+        mock_gate,
+        mock_judge,
+        mock_generator,
+        mock_validator,
+        mock_mapper,
+        mock_parser,
+        client,
+    ):
         """Test mutation upload with custom primary key, limit check, and validation skip."""
         mock_parser.parse_file.return_value = [{"id": 1, "name": "Prod1"}]
         mock_mapper.get_semantic_mapping.return_value = {"id": "id", "name": "name"}
@@ -215,7 +237,7 @@ class TestEnhancedApiEndpoints:
         mock_generator.generate_insert.return_value = ("INSERT INTO products", [])
         mock_judge.audit_mutation.return_value = (True, "Approved")
         mock_gate.generate_session.return_value = "gate-token-xyz"
-        
+
         file_data = {"file": ("mut.csv", b"id,name\n1,Prod1", "text/csv")}
         form_data = {
             "table_name": "products",
@@ -223,15 +245,15 @@ class TestEnhancedApiEndpoints:
             "max_bulk_rows": "5",
             "primary_key": "prod_id",
             "auto_map": "false",
-            "skip_validation": "true"
+            "skip_validation": "true",
         }
-        
+
         response = client.post("/mutation/upload", files=file_data, data=form_data)
         assert response.status_code == 200
         data = response.json()
         assert data["table_name"] == "products"
         assert data["token"] == "gate-token-xyz"
-        
+
         # Verify skip_validation was respected (validate_rows should not be called)
         mock_validator.validate_rows.assert_not_called()
         # Verify auto_map was false (semantic mapping should not be called)

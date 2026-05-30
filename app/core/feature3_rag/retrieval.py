@@ -24,7 +24,7 @@ class RetrievalService:
         query: str,
         top_k: int = 4,
         use_hyde: bool = False,
-        search_mode: str = "hybrid"
+        search_mode: str = "hybrid",
     ) -> List[Document]:
         """
         Retrieves relevant documents with optional HyDE expansion.
@@ -37,9 +37,7 @@ class RetrievalService:
             all_results = []
             for hypothesis in hypotheses:
                 results = self.vector_store.search(
-                    query=hypothesis,
-                    k=top_k,
-                    mode=search_mode
+                    query=hypothesis, k=top_k, mode=search_mode
                 )
                 all_results.extend(results)
 
@@ -49,23 +47,19 @@ class RetrievalService:
             return unique_docs
         else:
             # Standard retrieval
-            results = self.vector_store.search(
-                query=query,
-                k=top_k,
-                mode=search_mode
-            )
+            results = self.vector_store.search(query=query, k=top_k, mode=search_mode)
             logger.info(f"Standard retrieval: Retrieved {len(results)} documents")
             return results
 
-    def _merge_and_deduplicate(self, all_docs: List[Document], top_k: int) -> List[Document]:
+    def _merge_and_deduplicate(
+        self, all_docs: List[Document], top_k: int
+    ) -> List[Document]:
         seen_content = set()
         deduplicated = []
 
         # Sort by score descending (Qdrant search includes 'score' in metadata or returns it)
         sorted_docs = sorted(
-            all_docs,
-            key=lambda x: x.metadata.get("score", 0.0),
-            reverse=True
+            all_docs, key=lambda x: x.metadata.get("score", 0.0), reverse=True
         )
 
         for doc in sorted_docs:

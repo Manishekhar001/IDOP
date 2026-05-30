@@ -14,6 +14,7 @@ from fastapi import UploadFile
 
 class ValidationError(Exception):
     """Custom exception raised when request validation fails."""
+
     pass
 
 

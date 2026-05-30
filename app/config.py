@@ -11,14 +11,14 @@ class Settings(BaseSettings):
 
         if not getattr(self, "supabase_db_url", None):
             self.supabase_db_url = self.database_url or ""
-            
+
         for attr in ["database_url", "supabase_db_url"]:
             if hasattr(self, attr):
                 val = getattr(self, attr)
                 if val:
                     if val.startswith("postgresql+psycopg://"):
                         val = val.replace("postgresql+psycopg://", "postgresql://", 1)
-                    
+
                     try:
                         parsed = urllib.parse.urlsplit(val)
                         if parsed.password:
@@ -27,21 +27,20 @@ class Settings(BaseSettings):
                                 netloc = f"{parsed.username}:{encoded_pass}@{parsed.hostname}:{parsed.port}"
                             else:
                                 netloc = f"{parsed.username}:{encoded_pass}@{parsed.hostname}"
-                            
-                            val = urllib.parse.urlunsplit((
-                                parsed.scheme,
-                                netloc,
-                                parsed.path,
-                                parsed.query,
-                                parsed.fragment
-                            ))
+
+                            val = urllib.parse.urlunsplit(
+                                (
+                                    parsed.scheme,
+                                    netloc,
+                                    parsed.path,
+                                    parsed.query,
+                                    parsed.fragment,
+                                )
+                            )
                         setattr(self, attr, val)
                     except Exception:
                         pass
         return self
-
-
-
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -78,7 +77,9 @@ class Settings(BaseSettings):
     supabase_db_url: str = ""
 
     # Storage Backend Configuration (for bulk document ingestion cache)
-    storage_backend: str = "s3"  # 's3' or 'local' — override via STORAGE_BACKEND in .env
+    storage_backend: str = (
+        "s3"  # 's3' or 'local' — override via STORAGE_BACKEND in .env
+    )
     s3_cache_bucket: str = "idop-cache-docs"
     cache_dir: str = "data/cached_chunks"  # local storage directory for document chunks
     aws_region: str = "us-east-1"
@@ -91,9 +92,9 @@ class Settings(BaseSettings):
 
     # Cache TTL Configurations (in seconds)
     cache_ttl_embeddings: int = 604800  # 7 days
-    cache_ttl_rag: int = 3600           # 1 hour
-    cache_ttl_sql_gen: int = 86400      # 24 hours
-    cache_ttl_sql_result: int = 900     # 15 minutes
+    cache_ttl_rag: int = 3600  # 1 hour
+    cache_ttl_sql_gen: int = 86400  # 24 hours
+    cache_ttl_sql_result: int = 900  # 15 minutes
 
     # Search & Reranking APIs
     tavily_api_key: str

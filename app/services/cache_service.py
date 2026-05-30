@@ -28,9 +28,11 @@ class CacheService:
                     self.storage = S3StorageBackend()
                     if not self.storage.enabled:
                         # Capture the actual S3 validation error for diagnostics
-                        s3_err = getattr(self.storage, 'validation_error', None)
+                        s3_err = getattr(self.storage, "validation_error", None)
                         err_msg = (
-                            f"S3 disabled: {s3_err}" if s3_err else (
+                            f"S3 disabled: {s3_err}"
+                            if s3_err
+                            else (
                                 f"S3 storage initialized but reported disabled. "
                                 f"Bucket: '{settings.s3_cache_bucket}', Region: {settings.aws_region}. "
                                 f"Check bucket existence, IAM permissions (s3:HeadBucket, s3:PutObject, s3:GetObject), "
@@ -41,7 +43,9 @@ class CacheService:
                         logger.critical(err_msg)
                         self.storage = LocalStorageBackend()
                     else:
-                        logger.info(f"Using S3 storage (bucket: {settings.s3_cache_bucket})")
+                        logger.info(
+                            f"Using S3 storage (bucket: {settings.s3_cache_bucket})"
+                        )
                 except Exception as e:
                     err_msg = (
                         f"Failed to initialize S3 storage: {e}. "
@@ -59,7 +63,9 @@ class CacheService:
                 raise ValueError(f"Unknown storage backend: {backend_type}")
         else:
             self.storage = storage_backend
-            logger.info(f"Using custom storage backend: {type(storage_backend).__name__}")
+            logger.info(
+                f"Using custom storage backend: {type(storage_backend).__name__}"
+            )
 
     def compute_document_id(self, file_path: Path) -> str:
         if not file_path.exists():
@@ -109,7 +115,9 @@ class CacheService:
             self.storage.save_embeddings(doc_id, file_extension, embeddings_array)
             self.storage.save_metadata(doc_id, file_extension, metadata)
 
-            logger.info(f"Cached {len(chunks)} chunks for {doc_id} (type: {file_extension})")
+            logger.info(
+                f"Cached {len(chunks)} chunks for {doc_id} (type: {file_extension})"
+            )
 
         except Exception as e:
             logger.error(f"Failed to cache document {doc_id}: {e}")
@@ -133,7 +141,9 @@ class CacheService:
             embeddings = embeddings_array.tolist()
 
             if len(chunks) != len(embeddings):
-                logger.error(f"Cache corruption: {len(chunks)} chunks but {len(embeddings)} embeddings.")
+                logger.error(
+                    f"Cache corruption: {len(chunks)} chunks but {len(embeddings)} embeddings."
+                )
                 return None
 
             logger.info(f"Loaded {len(chunks)} chunks from cache for {doc_id}")
@@ -171,7 +181,9 @@ class CacheService:
             else:
                 if hasattr(self.storage, "delete_all"):
                     objects_deleted = self.storage.delete_all()
-                    logger.info(f"Cleared entire cache: {objects_deleted} objects deleted")
+                    logger.info(
+                        f"Cleared entire cache: {objects_deleted} objects deleted"
+                    )
                     return {
                         "cleared": True,
                         "message": f"Cleared entire cache ({objects_deleted} objects deleted)",
@@ -182,7 +194,7 @@ class CacheService:
                     # Fallback if no delete_all
                     doc_ids = self.storage.list_documents()
                     for did in doc_ids:
-                        self.storage.delete(did, "pdf") # best-effort deletion
+                        self.storage.delete(did, "pdf")  # best-effort deletion
                     return {
                         "cleared": True,
                         "message": "Cleared entire cache (best effort)",

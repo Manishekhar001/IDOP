@@ -17,10 +17,10 @@ import pytest
 from unittest.mock import patch, MagicMock
 from scripts import deploy_smoke
 
-
 # =========================================================================
 # Fixtures
 # =========================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_globals():
@@ -32,18 +32,21 @@ def reset_globals():
 @pytest.fixture
 def mock_response():
     """Build a mock requests.Response with configurable JSON body."""
+
     def _factory(status_code=200, json_data=None):
         resp = MagicMock()
         resp.status_code = status_code
         resp.json.return_value = json_data or {}
         resp.text = json.dumps(json_data) if json_data else "{}"
         return resp
+
     return _factory
 
 
 # =========================================================================
 # Git Commit SHA Matching Tests
 # =========================================================================
+
 
 class TestGitCommitSHAMatching:
     """Tests for the git_commit_sha verification logic in run_health_check()."""
@@ -60,8 +63,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123def456"}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": "abc123def456"}, clear=False
+        ):
             result = deploy_smoke.run_health_check()
             assert result is True
 
@@ -77,8 +81,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": "new-sha-value"}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": "new-sha-value"}, clear=False
+        ):
             result = deploy_smoke.run_health_check()
             assert result is False
 
@@ -94,8 +99,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        ):
             result = deploy_smoke.run_health_check()
             assert result is True
 
@@ -111,8 +117,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        ):
             result = deploy_smoke.run_health_check()
             assert result is True
 
@@ -128,8 +135,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        ):
             result = deploy_smoke.run_health_check()
             assert result is True
 
@@ -146,8 +154,9 @@ class TestGitCommitSHAMatching:
         }
         resp = mock_response(200, health_data)
         # Only remove EXPECTED_GIT_SHA — don't wipe all env vars
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": ""}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": ""}, clear=False
+        ):
             # Clear the value so os.getenv returns None
             if "EXPECTED_GIT_SHA" in os.environ:
                 del os.environ["EXPECTED_GIT_SHA"]
@@ -167,8 +176,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), \
-             patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False):
+        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
+            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        ):
             result = deploy_smoke.run_health_check()
             assert result is True
 
@@ -176,6 +186,7 @@ class TestGitCommitSHAMatching:
 # =========================================================================
 # Document Cache Backend Detection Tests
 # =========================================================================
+
 
 class TestDocumentCacheBackend:
     """Tests for the document cache backend detection logic in run_health_check()."""
@@ -283,6 +294,7 @@ class TestDocumentCacheBackend:
 # Query Cache Mode Tests
 # =========================================================================
 
+
 class TestQueryCacheMode:
     """Tests for the query cache mode detection logic in run_health_check()."""
 
@@ -355,6 +367,7 @@ class TestQueryCacheMode:
 # Health Status Tests
 # =========================================================================
 
+
 class TestHealthStatus:
     """Tests for the overall health status logic in run_health_check()."""
 
@@ -411,6 +424,7 @@ class TestHealthStatus:
 # HTTP Error & Network Failure Tests
 # =========================================================================
 
+
 class TestHTTPErrors:
     """Tests for HTTP and network error handling in run_health_check()."""
 
@@ -430,13 +444,19 @@ class TestHTTPErrors:
 
     def test_network_timeout_returns_false(self):
         """requests.get raises a timeout exception → returns False."""
-        with patch.object(deploy_smoke.requests, "get", side_effect=Exception("Connection timeout")):
+        with patch.object(
+            deploy_smoke.requests, "get", side_effect=Exception("Connection timeout")
+        ):
             result = deploy_smoke.run_health_check()
             assert result is False
 
     def test_connection_refused_returns_false(self):
         """requests.get raises ConnectionError → returns False."""
-        with patch.object(deploy_smoke.requests, "get", side_effect=ConnectionError("Connection refused")):
+        with patch.object(
+            deploy_smoke.requests,
+            "get",
+            side_effect=ConnectionError("Connection refused"),
+        ):
             result = deploy_smoke.run_health_check()
             assert result is False
 

@@ -48,13 +48,16 @@ Respond strictly in the following JSON format:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             import json
+
             result = json.loads(response.choices[0].message.content)
             is_correct = result.get("is_correct", True)
             explanation = result.get("explanation", "Matches semantic expectations.")
-            logger.info(f"LLM Judge verdict: is_correct={is_correct}, explanation={explanation}")
+            logger.info(
+                f"LLM Judge verdict: is_correct={is_correct}, explanation={explanation}"
+            )
             return is_correct, explanation
         except Exception as e:
             logger.error(f"LLM Judge execution failed: {e}")

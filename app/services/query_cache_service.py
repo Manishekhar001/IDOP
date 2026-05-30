@@ -126,10 +126,14 @@ class QueryCacheService:
             return 0
 
         if self.use_local:
-            keys_to_delete = [k for k in self._local_cache if fnmatch.fnmatch(k, pattern)]
+            keys_to_delete = [
+                k for k in self._local_cache if fnmatch.fnmatch(k, pattern)
+            ]
             for k in keys_to_delete:
                 del self._local_cache[k]
-            logger.info(f"Local cache invalidation: Deleted {len(keys_to_delete)} keys matching '{pattern}'")
+            logger.info(
+                f"Local cache invalidation: Deleted {len(keys_to_delete)} keys matching '{pattern}'"
+            )
             return len(keys_to_delete)
 
         try:
@@ -142,7 +146,9 @@ class QueryCacheService:
                 self.client.delete(key)
                 deleted += 1
 
-            logger.info(f"Cache invalidation: Deleted {deleted} keys matching '{pattern}'")
+            logger.info(
+                f"Cache invalidation: Deleted {deleted} keys matching '{pattern}'"
+            )
             return deleted
 
         except Exception as e:
@@ -203,7 +209,11 @@ class QueryCacheService:
                 "hit_rate": f"{hit_rate:.1f}%",
             }
 
-        mode = "redis" if self.enabled else ("local_fallback" if self.use_local else "disabled")
+        mode = (
+            "redis"
+            if self.enabled
+            else ("local_fallback" if self.use_local else "disabled")
+        )
         return {
             "enabled": self.enabled or self.use_local,
             "mode": mode,
@@ -217,7 +227,11 @@ class QueryCacheService:
 
     def health_check(self) -> Dict:
         if self.use_local:
-            return {"status": "healthy", "message": "Local in-memory cache active", "mode": "local"}
+            return {
+                "status": "healthy",
+                "message": "Local in-memory cache active",
+                "mode": "local",
+            }
         if not self.enabled:
             return {"status": "disabled", "message": "Redis cache not configured"}
 

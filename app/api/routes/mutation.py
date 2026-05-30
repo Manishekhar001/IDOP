@@ -1,7 +1,12 @@
 import uuid
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from app.api.schemas import MutationResponse, MutationApprovalRequest, MutationExecuteResponse, ErrorResponse
+from app.api.schemas import (
+    MutationResponse,
+    MutationApprovalRequest,
+    MutationExecuteResponse,
+    ErrorResponse,
+)
 
 # Feature 2 component imports
 from app.core.feature2_mutation.op_classifier import OpClassifier
@@ -34,7 +39,10 @@ executor = MutationExecutor()
     "/upload",
     response_model=MutationResponse,
     responses={
-        400: {"model": ErrorResponse, "description": "Invalid file, empty spreadsheet, or parameter error"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid file, empty spreadsheet, or parameter error",
+        },
         500: {"model": ErrorResponse, "description": "Processing or LLM error"},
     },
     summary="Upload Excel/CSV for mutation mapping, validation, and preview",
@@ -47,13 +55,31 @@ executor = MutationExecutor()
 )
 @track(name="upload_mutation")
 async def upload_mutation(
-    table_name: str = Form(..., description="Target database table name (e.g. 'products', 'customers')"),
-    request_intent: str = Form(..., description="Natural language description of the mutation intent (e.g. 'Add products', 'Update stock levels')"),
-    file: UploadFile = File(..., description="Excel (.xlsx/.xls) or CSV spreadsheet containing the mutation payload data"),
-    max_bulk_rows: Optional[str] = Form(None, description="Maximum allowed rows to prevent resource exhaustion (default: 1000)"),
-    primary_key: Optional[str] = Form("id", description="Primary key column name for UPDATE and DELETE operations"),
-    auto_map: Optional[str] = Form("true", description="Enable automatic LLM-based column mapping from file headers to database columns"),
-    skip_validation: Optional[str] = Form("false", description="Skip business rules validation checks"),
+    table_name: str = Form(
+        ..., description="Target database table name (e.g. 'products', 'customers')"
+    ),
+    request_intent: str = Form(
+        ...,
+        description="Natural language description of the mutation intent (e.g. 'Add products', 'Update stock levels')",
+    ),
+    file: UploadFile = File(
+        ...,
+        description="Excel (.xlsx/.xls) or CSV spreadsheet containing the mutation payload data",
+    ),
+    max_bulk_rows: Optional[str] = Form(
+        None,
+        description="Maximum allowed rows to prevent resource exhaustion (default: 1000)",
+    ),
+    primary_key: Optional[str] = Form(
+        "id", description="Primary key column name for UPDATE and DELETE operations"
+    ),
+    auto_map: Optional[str] = Form(
+        "true",
+        description="Enable automatic LLM-based column mapping from file headers to database columns",
+    ),
+    skip_validation: Optional[str] = Form(
+        "false", description="Skip business rules validation checks"
+    ),
 ) -> MutationResponse:
     """
     Upload and process a spreadsheet for database mutation (INSERT, UPDATE, or DELETE).
@@ -86,7 +112,9 @@ async def upload_mutation(
             try:
                 parsed_max_bulk_rows = int(val)
             except ValueError:
-                raise HTTPException(status_code=400, detail="max_bulk_rows must be an integer.")
+                raise HTTPException(
+                    status_code=400, detail="max_bulk_rows must be an integer."
+                )
 
     # Safely parse auto_map
     parsed_auto_map = True
@@ -116,7 +144,9 @@ async def upload_mutation(
             except ValueError:
                 parsed_skip_validation = False
 
-    logger.info(f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {parsed_auto_map}")
+    logger.info(
+        f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {parsed_auto_map}"
+    )
     try:
         content = await file.read()
         filename = file.filename
@@ -130,7 +160,7 @@ async def upload_mutation(
         if len(rows) > limit:
             raise HTTPException(
                 status_code=400,
-                detail=f"Spreadsheet contains {len(rows)} rows, which exceeds the allowed maximum of {limit} rows."
+                detail=f"Spreadsheet contains {len(rows)} rows, which exceeds the allowed maximum of {limit} rows.",
             )
 
         # 2. Column Mapping
@@ -152,7 +182,9 @@ async def upload_mutation(
         # 3. Business Rule Validation
         validation_errors = []
         if not parsed_skip_validation:
-            is_valid, validation_errors = validator.validate_rows(table_name, mapped_rows)
+            is_valid, validation_errors = validator.validate_rows(
+                table_name, mapped_rows
+            )
 
         # 4. Classify Mutation Type (INSERT, UPDATE, DELETE)
         classifier = OpClassifier()
@@ -170,10 +202,14 @@ async def upload_mutation(
         elif op_type == "UPDATE":
             updates = generator.generate_update(table_name, mapped_rows, primary_key=pk)
         elif op_type == "DELETE":
-            sql, ids = generator.generate_delete(table_name, mapped_rows, primary_key=pk)
+            sql, ids = generator.generate_delete(
+                table_name, mapped_rows, primary_key=pk
+            )
 
         # 5. LLM Judge Audit Check
-        is_approved, explanation = judge.audit_mutation(request_intent, table_name, op_type)
+        is_approved, explanation = judge.audit_mutation(
+            request_intent, table_name, op_type
+        )
         if not is_approved:
             validation_errors.append(f"Audit Warning: {explanation}")
 
@@ -189,7 +225,7 @@ async def upload_mutation(
             "params": params,
             "updates": updates,
             "ids": ids,
-            "token": token
+            "token": token,
         }
 
         return MutationResponse(
@@ -200,7 +236,7 @@ async def upload_mutation(
             status="pending_approval" if not validation_errors else "failed_validation",
             mappings=col_mappings,
             errors=validation_errors,
-            token=token
+            token=token,
         )
 
     except ValueError as val_err:
@@ -208,14 +244,19 @@ async def upload_mutation(
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as e:
         logger.error(f"Mutation upload endpoint failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process mutation upload: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process mutation upload: {str(e)}"
+        )
 
 
 @router.post(
     "/approve",
     response_model=MutationExecuteResponse,
     responses={
-        403: {"model": ErrorResponse, "description": "Invalid or expired approval token"},
+        403: {
+            "model": ErrorResponse,
+            "description": "Invalid or expired approval token",
+        },
         404: {"model": ErrorResponse, "description": "Mutation session not found"},
         500: {"model": ErrorResponse, "description": "Database transaction error"},
     },
@@ -248,26 +289,31 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
         HTTPException 404: If the mutation session ID is not found in the pending register.
         HTTPException 500: If the database transaction fails (changes are rolled back).
     """
-    logger.info(f"Mutation approval request for ID: {body.mutation_id}, Approved: {body.approved}")
+    logger.info(
+        f"Mutation approval request for ID: {body.mutation_id}, Approved: {body.approved}"
+    )
 
     # 1. Verify Cryptographic Token
     if body.approved:
         if not gate.verify_and_close_session(body.mutation_id, body.token):
-            raise HTTPException(status_code=403, detail="Invalid, expired or already used cryptographic approval token.")
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid, expired or already used cryptographic approval token.",
+            )
 
     # 2. Handle Rejection
     if not body.approved:
         if body.mutation_id in shared_pending_mutations:
             del shared_pending_mutations[body.mutation_id]
         return MutationExecuteResponse(
-            mutation_id=body.mutation_id,
-            rows_affected=0,
-            status="rejected"
+            mutation_id=body.mutation_id, rows_affected=0, status="rejected"
         )
 
     # 3. Handle Transaction Execution
     if body.mutation_id not in shared_pending_mutations:
-        raise HTTPException(status_code=404, detail="Mutation session not found in pending register.")
+        raise HTTPException(
+            status_code=404, detail="Mutation session not found in pending register."
+        )
 
     session_info = shared_pending_mutations[body.mutation_id]
     table_name = session_info["table_name"]
@@ -277,7 +323,10 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
         rows_affected = 0
         if op_type == "INSERT":
             rows_affected = executor.execute_insert_transaction(
-                body.mutation_id, table_name, session_info["sql"], session_info["params"]
+                body.mutation_id,
+                table_name,
+                session_info["sql"],
+                session_info["params"],
             )
         elif op_type == "UPDATE":
             rows_affected = executor.execute_updates_transaction(
@@ -293,13 +342,13 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
             del shared_pending_mutations[body.mutation_id]
 
         return MutationExecuteResponse(
-            mutation_id=body.mutation_id,
-            rows_affected=rows_affected,
-            status="executed"
+            mutation_id=body.mutation_id, rows_affected=rows_affected, status="executed"
         )
 
     except Exception as e:
-        logger.error(f"Mutation execution transaction failed - transaction rolled back successfully: {e}")
+        logger.error(
+            f"Mutation execution transaction failed - transaction rolled back successfully: {e}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 

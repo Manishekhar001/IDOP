@@ -11,9 +11,10 @@ logger = logging.getLogger("idop_app.hyde")
 
 class HydeHypotheses(BaseModel):
     """Structured hypothetical document excerpts for query expansion."""
+
     hypotheses: list[str] = Field(
         ...,
-        description="A list of 2-3 sentence hypothetical document passages that directly answer the query."
+        description="A list of 2-3 sentence hypothetical document passages that directly answer the query.",
     )
 
     model_config = {
@@ -22,7 +23,7 @@ class HydeHypotheses(BaseModel):
                 {
                     "hypotheses": [
                         "The refund policy states that customers can return products within 30 days for a full refund.",
-                        "For delivered orders, refunds are processed back to the original payment method within 5 business days."
+                        "For delivered orders, refunds are processed back to the original payment method within 5 business days.",
                     ]
                 }
             ]
@@ -59,24 +60,34 @@ class HydeService:
         self._hyde_chain = _HYDE_PROMPT | llm.with_structured_output(HydeHypotheses)
 
     @track(name="hyde_generate")
-    async def generate_hypothetical_documents_async(self, query: str, num_hypotheses: int = 3) -> list[str]:
+    async def generate_hypothetical_documents_async(
+        self, query: str, num_hypotheses: int = 3
+    ) -> list[str]:
         """
         Generate hypothetical answers to improve retrieval (async).
         """
-        logger.info(f"HyDE: Generating {num_hypotheses} hypothetical documents for: '{query[:50]}...'")
+        logger.info(
+            f"HyDE: Generating {num_hypotheses} hypothetical documents for: '{query[:50]}...'"
+        )
         try:
             result: HydeHypotheses = await self._hyde_chain.ainvoke(
                 {"query": query, "num_hypotheses": num_hypotheses}
             )
             if result and result.hypotheses:
-                logger.info(f"HyDE: Generated {len(result.hypotheses)} hypothetical documents successfully.")
+                logger.info(
+                    f"HyDE: Generated {len(result.hypotheses)} hypothetical documents successfully."
+                )
                 return result.hypotheses
             return [query]
         except Exception as e:
-            logger.error(f"HyDE generation failed: {e}. Falling back to original query.")
+            logger.error(
+                f"HyDE generation failed: {e}. Falling back to original query."
+            )
             return [query]
 
-    def generate_hypothetical_documents(self, query: str, num_hypotheses: int = 3) -> list[str]:
+    def generate_hypothetical_documents(
+        self, query: str, num_hypotheses: int = 3
+    ) -> list[str]:
         """
         Generate hypothetical answers to improve retrieval (sync wrapper).
         """
@@ -93,5 +104,7 @@ class HydeService:
                 self.generate_hypothetical_documents_async(query, num_hypotheses)
             )
         except Exception as e:
-            logger.warning(f"HyDE sync execution exception: {e}. Falling back to original query.")
+            logger.warning(
+                f"HyDE sync execution exception: {e}. Falling back to original query."
+            )
             return [query]

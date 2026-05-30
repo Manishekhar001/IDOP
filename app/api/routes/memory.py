@@ -9,7 +9,12 @@ interactions.
 
 from fastapi import APIRouter, HTTPException, Request
 
-from app.api.schemas import DeleteMemoryResponse, ErrorResponse, MemoryItem, MemoryListResponse
+from app.api.schemas import (
+    DeleteMemoryResponse,
+    ErrorResponse,
+    MemoryItem,
+    MemoryListResponse,
+)
 from app.opik import track
 from app.utils.logger import get_logger
 

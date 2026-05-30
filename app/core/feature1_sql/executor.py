@@ -38,7 +38,9 @@ class SQLExecutor:
             conn.rollback()
 
     @track(name="sql_executor_execute")
-    def execute_and_log(self, query_id: str, question: str, sql: str) -> List[Dict[str, Any]]:
+    def execute_and_log(
+        self, query_id: str, question: str, sql: str
+    ) -> List[Dict[str, Any]]:
         """
         Execute SQL query and log to audit table.
         """
@@ -59,7 +61,7 @@ class SQLExecutor:
                     INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                     VALUES (%s, %s, %s, %s)
                     """,
-                    (query_id, question, sql, "SUCCESS")
+                    (query_id, question, sql, "SUCCESS"),
                 )
             conn.commit()
             conn.close()
@@ -75,7 +77,7 @@ class SQLExecutor:
                         INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                         VALUES (%s, %s, %s, %s)
                         """,
-                        (query_id, question, sql, f"FAILED: {str(e)}")
+                        (query_id, question, sql, f"FAILED: {str(e)}"),
                     )
                 conn.commit()
             except Exception as log_err:

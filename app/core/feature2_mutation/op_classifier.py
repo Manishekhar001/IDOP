@@ -33,7 +33,7 @@ Respond with exactly one word: INSERT, UPDATE, or DELETE.
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.0
+                temperature=0.0,
             )
             verdict = response.choices[0].message.content.strip().upper()
             if verdict in ["INSERT", "UPDATE", "DELETE"]:

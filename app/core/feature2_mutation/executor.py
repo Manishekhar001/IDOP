@@ -36,11 +36,15 @@ class MutationExecutor:
             conn.rollback()
 
     @track(name="mutation_executor_insert")
-    def execute_insert_transaction(self, mutation_id: str, table_name: str, sql: str, params: List[Tuple[Any, ...]]) -> int:
+    def execute_insert_transaction(
+        self, mutation_id: str, table_name: str, sql: str, params: List[Tuple[Any, ...]]
+    ) -> int:
         """
         Execute bulk insert inside a single safe transaction.
         """
-        logger.info(f"Executing INSERT transaction for mutation {mutation_id} in '{table_name}'")
+        logger.info(
+            f"Executing INSERT transaction for mutation {mutation_id} in '{table_name}'"
+        )
         conn = psycopg2.connect(self.conn_str)
         conn.autocommit = False  # Ensure transaction block
         self._ensure_audit_table(conn)
@@ -59,11 +63,18 @@ class MutationExecutor:
                     INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                     VALUES (%s, %s, %s, %s)
                     """,
-                    (mutation_id, f"Bulk INSERT to {table_name}", sql, f"SUCCESS: inserted {rows_inserted} rows")
+                    (
+                        mutation_id,
+                        f"Bulk INSERT to {table_name}",
+                        sql,
+                        f"SUCCESS: inserted {rows_inserted} rows",
+                    ),
                 )
             conn.commit()
             conn.close()
-            logger.info(f"✓ INSERT transaction committed successfully. {rows_inserted} rows inserted.")
+            logger.info(
+                f"✓ INSERT transaction committed successfully. {rows_inserted} rows inserted."
+            )
             return rows_inserted
 
         except Exception as e:
@@ -76,7 +87,12 @@ class MutationExecutor:
                         INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                         VALUES (%s, %s, %s, %s)
                         """,
-                        (mutation_id, f"Bulk INSERT to {table_name}", sql, f"FAILED: {str(e)}")
+                        (
+                            mutation_id,
+                            f"Bulk INSERT to {table_name}",
+                            sql,
+                            f"FAILED: {str(e)}",
+                        ),
                     )
                 conn.commit()
             except Exception as log_err:
@@ -85,11 +101,18 @@ class MutationExecutor:
             raise ValueError(f"All-or-Nothing bulk INSERT failed: {str(e)}")
 
     @track(name="mutation_executor_update")
-    def execute_updates_transaction(self, mutation_id: str, table_name: str, updates: List[Tuple[str, Tuple[Any, ...]]]) -> int:
+    def execute_updates_transaction(
+        self,
+        mutation_id: str,
+        table_name: str,
+        updates: List[Tuple[str, Tuple[Any, ...]]],
+    ) -> int:
         """
         Execute updates inside a single safe transaction.
         """
-        logger.info(f"Executing UPDATE transaction for mutation {mutation_id} in '{table_name}'")
+        logger.info(
+            f"Executing UPDATE transaction for mutation {mutation_id} in '{table_name}'"
+        )
         conn = psycopg2.connect(self.conn_str)
         conn.autocommit = False
         self._ensure_audit_table(conn)
@@ -107,11 +130,18 @@ class MutationExecutor:
                     INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                     VALUES (%s, %s, %s, %s)
                     """,
-                    (mutation_id, f"Bulk UPDATE to {table_name}", f"Updated {len(updates)} rows", f"SUCCESS: updated {rows_updated} rows")
+                    (
+                        mutation_id,
+                        f"Bulk UPDATE to {table_name}",
+                        f"Updated {len(updates)} rows",
+                        f"SUCCESS: updated {rows_updated} rows",
+                    ),
                 )
             conn.commit()
             conn.close()
-            logger.info(f"✓ UPDATE transaction committed successfully. {rows_updated} rows updated.")
+            logger.info(
+                f"✓ UPDATE transaction committed successfully. {rows_updated} rows updated."
+            )
             return rows_updated
 
         except Exception as e:
@@ -124,7 +154,12 @@ class MutationExecutor:
                         INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                         VALUES (%s, %s, %s, %s)
                         """,
-                        (mutation_id, f"Bulk UPDATE to {table_name}", "Update batch", f"FAILED: {str(e)}")
+                        (
+                            mutation_id,
+                            f"Bulk UPDATE to {table_name}",
+                            "Update batch",
+                            f"FAILED: {str(e)}",
+                        ),
                     )
                 conn.commit()
             except Exception as log_err:
@@ -133,11 +168,15 @@ class MutationExecutor:
             raise ValueError(f"All-or-Nothing bulk UPDATE failed: {str(e)}")
 
     @track(name="mutation_executor_delete")
-    def execute_delete_transaction(self, mutation_id: str, table_name: str, sql: str, ids: List[Any]) -> int:
+    def execute_delete_transaction(
+        self, mutation_id: str, table_name: str, sql: str, ids: List[Any]
+    ) -> int:
         """
         Execute delete inside a single safe transaction.
         """
-        logger.info(f"Executing DELETE transaction for mutation {mutation_id} in '{table_name}'")
+        logger.info(
+            f"Executing DELETE transaction for mutation {mutation_id} in '{table_name}'"
+        )
         conn = psycopg2.connect(self.conn_str)
         conn.autocommit = False
         self._ensure_audit_table(conn)
@@ -154,11 +193,18 @@ class MutationExecutor:
                     INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                     VALUES (%s, %s, %s, %s)
                     """,
-                    (mutation_id, f"Bulk DELETE from {table_name}", sql, f"SUCCESS: deleted {rows_deleted} rows")
+                    (
+                        mutation_id,
+                        f"Bulk DELETE from {table_name}",
+                        sql,
+                        f"SUCCESS: deleted {rows_deleted} rows",
+                    ),
                 )
             conn.commit()
             conn.close()
-            logger.info(f"✓ DELETE transaction committed successfully. {rows_deleted} rows deleted.")
+            logger.info(
+                f"✓ DELETE transaction committed successfully. {rows_deleted} rows deleted."
+            )
             return rows_deleted
 
         except Exception as e:
@@ -171,7 +217,12 @@ class MutationExecutor:
                         INSERT INTO idop_audit_logs (query_id, question, sql_query, status)
                         VALUES (%s, %s, %s, %s)
                         """,
-                        (mutation_id, f"Bulk DELETE from {table_name}", sql, f"FAILED: {str(e)}")
+                        (
+                            mutation_id,
+                            f"Bulk DELETE from {table_name}",
+                            sql,
+                            f"FAILED: {str(e)}",
+                        ),
                     )
                 conn.commit()
             except Exception as log_err:

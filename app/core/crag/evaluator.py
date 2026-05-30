@@ -101,10 +101,7 @@ class CRAGEvaluator:
             )
         elif all(s < self._lower_th for s in scores):
             verdict = "INCORRECT"
-            reason = (
-                f"All chunks scored < {self._lower_th} "
-                f"(max={max(scores):.2f})"
-            )
+            reason = f"All chunks scored < {self._lower_th} " f"(max={max(scores):.2f})"
             good_docs = []
         else:
             verdict = "AMBIGUOUS"

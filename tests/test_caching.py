@@ -12,10 +12,10 @@ from app.services.cache_service import CacheService
 from app.services.local_storage import LocalStorageBackend
 from app.services.query_cache_service import QueryCacheService
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Tests for CacheService (Document-Level Cache)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestCacheService:
     """Tests for the document cache service wrapping storage backends."""
@@ -72,7 +72,9 @@ class TestCacheService:
         assert result["metadata"] == metadata
         assert len(result["embeddings"]) == 2
 
-    def test_save_mismatched_chunks_and_embeddings_raises(self, cache_service, sample_chunks):
+    def test_save_mismatched_chunks_and_embeddings_raises(
+        self, cache_service, sample_chunks
+    ):
         """Test that mismatched chunk/embedding counts raise ValueError."""
         doc_id = "cache_mismatch"
         file_ext = "pdf"
@@ -141,6 +143,7 @@ class TestCacheService:
 # ═══════════════════════════════════════════════════════════════════════
 # Tests for QueryCacheService (Redis / Local In-Memory Fallback)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestQueryCacheService:
     """Tests for the Redis-backed query cache with local fallback."""

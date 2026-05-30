@@ -91,13 +91,15 @@ class DocumentProcessor:
     def split_documents(self, documents: list[Document]) -> list[Document]:
         logger.info(f"Splitting {len(documents)} documents into chunks")
         chunks = self.text_splitter.split_documents(documents)
-        
+
         # Tag each chunk with a chronological index and source for Context Enrichment
         for idx, chunk in enumerate(chunks):
             chunk.metadata["index"] = idx
             # Ensure "source" is set in case it's missing
             if "source" not in chunk.metadata:
-                chunk.metadata["source"] = chunk.metadata.get("source_file", "unknown_source")
+                chunk.metadata["source"] = chunk.metadata.get(
+                    "source_file", "unknown_source"
+                )
 
         logger.info(f"Created {len(chunks)} chunks with index tracking metadata")
         return chunks
@@ -106,7 +108,7 @@ class DocumentProcessor:
     def _dict_to_document(chunk_dict: dict) -> Document:
         """
         Reconstruct a langchain Document from a cached chunk dictionary.
-        
+
         The dictionary is expected to have 'text' and 'metadata' keys,
         as stored by CacheService.save_chunks_and_embeddings.
         """

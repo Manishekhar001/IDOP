@@ -18,7 +18,9 @@ class MutationLLMJudge:
         self.model = settings.memory_llm_model
 
     @track(name="mutation_llm_judge_audit")
-    def audit_mutation(self, request_text: str, table_name: str, op_type: str) -> tuple[bool, str]:
+    def audit_mutation(
+        self, request_text: str, table_name: str, op_type: str
+    ) -> tuple[bool, str]:
         """
         Audit the planned mutation. Returns (is_approved, explanation).
         """
@@ -46,12 +48,16 @@ Respond strictly in the following JSON format:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             result = json.loads(response.choices[0].message.content)
             is_approved = result.get("is_approved", True)
-            explanation = result.get("explanation", "Matches business transaction alignment.")
-            logger.info(f"Mutation LLM Judge audit: is_approved={is_approved}, explanation={explanation}")
+            explanation = result.get(
+                "explanation", "Matches business transaction alignment."
+            )
+            logger.info(
+                f"Mutation LLM Judge audit: is_approved={is_approved}, explanation={explanation}"
+            )
             return is_approved, explanation
         except Exception as e:
             logger.error(f"Mutation LLM Judge audit failed: {e}")

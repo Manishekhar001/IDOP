@@ -46,17 +46,32 @@ class SQLValidator:
 
         # Simple security parsing — use word-boundary regex to avoid false positives
         for command in self.FORBIDDEN_COMMANDS:
-            if re.search(r'\b' + re.escape(command) + r'\b', cleaned_sql):
-                logger.warning(f"Validation failed: forbidden command '{command}' detected")
-                return False, f"Destructive or mutating SQL command '{command}' is strictly forbidden."
+            if re.search(r"\b" + re.escape(command) + r"\b", cleaned_sql):
+                logger.warning(
+                    f"Validation failed: forbidden command '{command}' detected"
+                )
+                return (
+                    False,
+                    f"Destructive or mutating SQL command '{command}' is strictly forbidden.",
+                )
 
         # Verify transaction safety — use word-boundary regex
-        if re.search(r'\bCOMMIT\b', cleaned_sql) or re.search(r'\bROLLBACK\b', cleaned_sql):
-            return False, "Explicit transaction control (COMMIT/ROLLBACK) is not permitted inside user queries."
+        if re.search(r"\bCOMMIT\b", cleaned_sql) or re.search(
+            r"\bROLLBACK\b", cleaned_sql
+        ):
+            return (
+                False,
+                "Explicit transaction control (COMMIT/ROLLBACK) is not permitted inside user queries.",
+            )
 
         # Enforce that all user SQL queries must start with SELECT
         if not cleaned_sql.startswith("SELECT"):
-            logger.warning("Validation failed: query does not begin with SELECT (read-only enforcement)")
-            return False, "Only read-only SELECT queries are permitted in Feature 1 NL-to-SQL."
+            logger.warning(
+                "Validation failed: query does not begin with SELECT (read-only enforcement)"
+            )
+            return (
+                False,
+                "Only read-only SELECT queries are permitted in Feature 1 NL-to-SQL.",
+            )
 
         return True, ""

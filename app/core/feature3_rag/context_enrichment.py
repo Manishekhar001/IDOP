@@ -17,14 +17,18 @@ class ContextEnrichmentService:
         self.vector_store = VectorStoreService()
 
     @track(name="context_enrichment_enrich")
-    def enrich_documents(self, documents: List[Document], num_neighbors: int = 1, chunk_overlap: int = 50) -> List[Document]:
+    def enrich_documents(
+        self, documents: List[Document], num_neighbors: int = 1, chunk_overlap: int = 50
+    ) -> List[Document]:
         """
         Enrich retrieved documents with their chronological neighbors.
         """
         if not documents:
             return []
 
-        logger.info(f"Enriching {len(documents)} retrieved documents (num_neighbors={num_neighbors})")
+        logger.info(
+            f"Enriching {len(documents)} retrieved documents (num_neighbors={num_neighbors})"
+        )
         enriched_documents = []
 
         for doc in documents:
@@ -71,10 +75,12 @@ class ContextEnrichmentService:
                 metadata={
                     **doc.metadata,
                     "enriched": True,
-                    "original_content": doc.page_content
-                }
+                    "original_content": doc.page_content,
+                },
             )
             enriched_documents.append(enriched_doc)
 
-        logger.info(f"✓ Context Enrichment complete. Enriched {len(enriched_documents)} documents.")
+        logger.info(
+            f"✓ Context Enrichment complete. Enriched {len(enriched_documents)} documents."
+        )
         return enriched_documents

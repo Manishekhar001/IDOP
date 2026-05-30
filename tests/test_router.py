@@ -11,18 +11,20 @@ from unittest.mock import patch, MagicMock
 
 from app.core.graph.router import QueryRouter, RouteDecision
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Helper — Mock OpenAI Response Factory
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def _mock_openai_response(query_type: str, reason: str = "Test classification"):
     """Build a mock OpenAI ChatCompletion response returning JSON."""
     mock_choice = MagicMock()
-    mock_choice.message.content = json.dumps({
-        "query_type": query_type,
-        "reason": reason,
-    })
+    mock_choice.message.content = json.dumps(
+        {
+            "query_type": query_type,
+            "reason": reason,
+        }
+    )
     mock_response = MagicMock()
     mock_response.choices = [mock_choice]
     return mock_response
@@ -31,6 +33,7 @@ def _mock_openai_response(query_type: str, reason: str = "Test classification"):
 # ═══════════════════════════════════════════════════════════════════════
 # Tests for QueryRouter
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestQueryRouter:
     """Tests for the 5-class LLM semantic router."""
@@ -82,7 +85,8 @@ class TestQueryRouter:
     def test_classify_hybrid_query(self, router):
         """Test that combined SQL + document queries are classified as HYBRID."""
         router.client.chat.completions.create.return_value = _mock_openai_response(
-            "HYBRID", "The user wants database data compared against document guidelines."
+            "HYBRID",
+            "The user wants database data compared against document guidelines.",
         )
         result = router.route_query(
             "Get sales data for customer X and compare it against the sales strategy in our PDF guidelines."
@@ -152,40 +156,48 @@ class TestQueryRouter:
 # Tests for Graph Routing Function (route_after_router)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestRouteAfterRouter:
     """Tests for the route_after_router conditional edge function."""
 
     def test_sql_routes_to_sql_gen(self):
         from app.core.graph.nodes import route_after_router
+
         state = {"query_type": "SQL"}
         assert route_after_router(state) == "sql_gen"
 
     def test_mutation_routes_to_mutation(self):
         from app.core.graph.nodes import route_after_router
+
         state = {"query_type": "MUTATION"}
         assert route_after_router(state) == "mutation"
 
     def test_rag_routes_to_ltm_remember(self):
         from app.core.graph.nodes import route_after_router
+
         state = {"query_type": "RAG"}
         assert route_after_router(state) == "ltm_remember"
 
     def test_chat_routes_to_chat(self):
         from app.core.graph.nodes import route_after_router
+
         state = {"query_type": "CHAT"}
         assert route_after_router(state) == "chat"
 
     def test_hybrid_routes_to_hybrid(self):
         from app.core.graph.nodes import route_after_router
+
         state = {"query_type": "HYBRID"}
         assert route_after_router(state) == "hybrid"
 
     def test_empty_type_routes_to_chat(self):
         from app.core.graph.nodes import route_after_router
+
         state = {"query_type": ""}
         assert route_after_router(state) == "chat"
 
     def test_missing_type_routes_to_chat(self):
         from app.core.graph.nodes import route_after_router
+
         state = {}
         assert route_after_router(state) == "chat"

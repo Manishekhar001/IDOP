@@ -27,7 +27,9 @@ class FileParser:
         elif filename.endswith(".xlsx") or filename.endswith(".xls"):
             df = pd.read_excel(BytesIO(file_content))
         else:
-            raise ValueError("Unsupported file format. Please upload an Excel (.xlsx/.xls) or CSV (.csv) file.")
+            raise ValueError(
+                "Unsupported file format. Please upload an Excel (.xlsx/.xls) or CSV (.csv) file."
+            )
 
         # Clean NaN/Null values to standard Python None
         df = df.where(pd.notnull(df), None)

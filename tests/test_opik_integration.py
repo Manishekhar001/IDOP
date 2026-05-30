@@ -18,12 +18,13 @@ import sys
 import pytest
 from unittest.mock import patch
 
-
 # ─── Test 1: Opik import and track decorator ─────────────────────────────
+
 
 def test_opik_package_importable():
     """Verify the opik package is installed and track can be imported."""
     from opik import track
+
     assert track is not None
     assert callable(track)
 
@@ -31,13 +32,15 @@ def test_opik_package_importable():
 def test_app_opik_module_imports():
     """Verify app.opik module loads cleanly with OPIK available when installed."""
     from app.opik import OPIK_AVAILABLE, track as app_track
-    assert OPIK_AVAILABLE is True, (
-        "OPIK_AVAILABLE should be True when opik package is installed"
-    )
+
+    assert (
+        OPIK_AVAILABLE is True
+    ), "OPIK_AVAILABLE should be True when opik package is installed"
     assert callable(app_track)
 
 
 # ─── Test 2: No-op fallback behavior ─────────────────────────────────
+
 
 def test_app_opik_noop_fallback():
     """Verify the no-op fallback works when opik package is unavailable.
@@ -84,6 +87,7 @@ def test_app_opik_noop_fallback():
         # the test started (original_module).  opik_module was re-bound
         # above to the freshly imported module, so save it first.
         import app.opik as original_module  # noqa: F811
+
         original_module.track = original_track
         original_module.OPIK_AVAILABLE = original_available
         # Restore env vars
@@ -95,10 +99,11 @@ def test_app_opik_noop_fallback():
         # Re-load modules in sys.modules so other tests aren't affected
         if "app.opik" in sys.modules:
             del sys.modules["app.opik"]
-        import app.opik  # noqa: F811 — re-import cleanly
+        import app.opik  # noqa: F401,F811 — re-import cleanly (side-effect: restores sys.modules)
 
 
 # ─── Test 3: Env var propagation ────────────────────────────────────
+
 
 @pytest.mark.usefixtures("monkeypatch")
 class TestEnvVarPropagation:
@@ -111,6 +116,7 @@ class TestEnvVarPropagation:
             if mod.startswith("app.opik"):
                 del sys.modules[mod]
         import app.opik  # noqa: F401
+
         importlib.reload(app.opik)
 
     def test_propagates_env_vars_when_configured(self, monkeypatch):
@@ -126,11 +132,15 @@ class TestEnvVarPropagation:
 
         monkeypatch.setattr(
             "app.config.get_settings",
-            lambda: type("Settings", (), {
-                "opik_api_key": "test-api-key-12345",
-                "opik_workspace": "test-workspace",
-                "opik_project_name": "test-project",
-            })(),
+            lambda: type(
+                "Settings",
+                (),
+                {
+                    "opik_api_key": "test-api-key-12345",
+                    "opik_workspace": "test-workspace",
+                    "opik_project_name": "test-project",
+                },
+            )(),
         )
 
         self._clean_reload_app_opik()
@@ -146,11 +156,15 @@ class TestEnvVarPropagation:
 
         monkeypatch.setattr(
             "app.config.get_settings",
-            lambda: type("Settings", (), {
-                "opik_api_key": None,
-                "opik_workspace": None,
-                "opik_project_name": None,
-            })(),
+            lambda: type(
+                "Settings",
+                (),
+                {
+                    "opik_api_key": None,
+                    "opik_workspace": None,
+                    "opik_project_name": None,
+                },
+            )(),
         )
 
         self._clean_reload_app_opik()
@@ -161,6 +175,7 @@ class TestEnvVarPropagation:
 
 
 # ─── Test 4: @track decorators on all route modules ──────────────────
+
 
 def _check_module_has_track_import(module_path: str) -> bool:
     """Check that a module file imports track from app.opik."""
@@ -183,9 +198,9 @@ ROUTE_FILES = [
 def test_all_route_modules_import_track():
     """Verify every API route module imports @track from app.opik."""
     for rfile in ROUTE_FILES:
-        assert _check_module_has_track_import(rfile), (
-            f"{rfile} is missing 'from app.opik import track'"
-        )
+        assert _check_module_has_track_import(
+            rfile
+        ), f"{rfile} is missing 'from app.opik import track'"
 
 
 def test_route_module_syntax_is_valid():
@@ -245,20 +260,21 @@ SERVICE_FILES_WITHOUT_TRACK = [
 def test_service_modules_with_track():
     """Verify core service modules import @track."""
     for sfile in SERVICE_FILES_WITH_TRACK:
-        assert _check_module_has_track_import(sfile), (
-            f"{sfile} is missing 'from app.opik import track'"
-        )
+        assert _check_module_has_track_import(
+            sfile
+        ), f"{sfile} is missing 'from app.opik import track'"
 
 
 def test_service_modules_without_track():
     """Verify storage/cache backends do NOT import @track (they don't need it)."""
     for sfile in SERVICE_FILES_WITHOUT_TRACK:
-        assert not _check_module_has_track_import(sfile), (
-            f"{sfile} should NOT import track — it's a low-level utility"
-        )
+        assert not _check_module_has_track_import(
+            sfile
+        ), f"{sfile} should NOT import track — it's a low-level utility"
 
 
 # ─── Test 6: @track decorators syntactically valid ───────────────────
+
 
 def _count_track_decorators(filepath: str) -> int:
     """Count @track(name=...) decorators in a file."""
@@ -276,7 +292,9 @@ def test_track_decorators_present_in_routes():
 
 # ─── Test 7: OPIK_AVAILABLE flag ─────────────────────────────────────
 
+
 def test_opik_available_flag():
     """Verify OPIK_AVAILABLE is accessible and boolean."""
     from app.opik import OPIK_AVAILABLE
+
     assert isinstance(OPIK_AVAILABLE, bool)

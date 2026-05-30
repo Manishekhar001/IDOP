@@ -42,7 +42,9 @@ class VannaAgentWrapper:
             from vanna.integrations.local.agent_memory import DemoAgentMemory
 
             settings = get_settings()
-            self.llm = OpenAILlmService(api_key=openai_api_key, model=settings.llm_model)
+            self.llm = OpenAILlmService(
+                api_key=openai_api_key, model=settings.llm_model
+            )
 
             logger.info(
                 f"Configuring SQL LLM with deterministic settings: "
@@ -69,7 +71,8 @@ class VannaAgentWrapper:
 
             self.tools = ToolRegistry()
             self.tools.register_local_tool(
-                RunSqlTool(sql_runner=self.postgres_runner), access_groups=["admin", "user"]
+                RunSqlTool(sql_runner=self.postgres_runner),
+                access_groups=["admin", "user"],
             )
 
             self.agent = VannaAgent(
@@ -80,9 +83,13 @@ class VannaAgentWrapper:
             self._available = True
             logger.info("Vanna Agent Wrapper initialized successfully")
         except ImportError as e:
-            logger.warning(f"Vanna 2.0 submodules not available ({e}) — will use direct LLM fallback")
+            logger.warning(
+                f"Vanna 2.0 submodules not available ({e}) — will use direct LLM fallback"
+            )
         except Exception as e:
-            logger.warning(f"Vanna Agent initialization failed ({e}) — will use direct LLM fallback")
+            logger.warning(
+                f"Vanna Agent initialization failed ({e}) — will use direct LLM fallback"
+            )
 
     @track(name="vanna_generate_sql")
     async def generate_sql_async(self, question: str, schema_context: str = "") -> str:
@@ -127,7 +134,9 @@ class VannaAgentWrapper:
     @track(name="vanna_execute_sql")
     async def execute_sql_async(self, sql: str) -> List[Dict[str, Any]]:
         if not self._available or self.postgres_runner is None:
-            raise RuntimeError("Vanna agent not available — cannot execute SQL through Vanna")
+            raise RuntimeError(
+                "Vanna agent not available — cannot execute SQL through Vanna"
+            )
 
         logger.info(f"Executing SQL directly: {sql[:100]}...")
         try:
@@ -147,7 +156,9 @@ class VannaAgentWrapper:
                 logger.info(f"Resolved {hostname} to IPv4: {ipv4_address}")
                 conn_str = conn_str.replace(hostname, ipv4_address)
             except Exception as e:
-                logger.warning(f"Failed to resolve hostname to IPv4: {e}, using original hostname")
+                logger.warning(
+                    f"Failed to resolve hostname to IPv4: {e}, using original hostname"
+                )
 
             conn = psycopg2.connect(conn_str)
             try:
@@ -231,17 +242,21 @@ class TextToSQLService:
             business_tables = [r["table_name"] for r in cur.fetchall()]
 
             if not business_tables:
-                logger.warning("No business tables found in database — using static schema fallback")
+                logger.warning(
+                    "No business tables found in database — using static schema fallback"
+                )
                 conn.close()
                 return self._static_schema_context()
 
             # Build table relationships description
-            schema_parts.append("\nThis is an e-commerce database with the following tables:")
+            schema_parts.append(
+                "\nThis is an e-commerce database with the following tables:"
+            )
             for tbl in business_tables:
                 cur.execute(
                     "SELECT COUNT(*) as cnt FROM information_schema.columns "
                     "WHERE table_schema = 'public' AND table_name = %s",
-                    (tbl,)
+                    (tbl,),
                 )
                 col_count = cur.fetchone()["cnt"]
                 schema_parts.append(f"- {tbl}: {col_count} columns")
@@ -275,7 +290,7 @@ class TextToSQLService:
                     WHERE table_schema = 'public' AND table_name = %s
                     ORDER BY ordinal_position
                     """,
-                    (tbl,)
+                    (tbl,),
                 )
                 columns = cur.fetchall()
 
@@ -283,8 +298,14 @@ class TextToSQLService:
                 schema_parts.append("Columns:")
                 for col in columns:
                     nullable = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
-                    default = f" DEFAULT {col['column_default']}" if col["column_default"] else ""
-                    schema_parts.append(f"  - {col['column_name']} ({col['data_type']}, {nullable}{default})")
+                    default = (
+                        f" DEFAULT {col['column_default']}"
+                        if col["column_default"]
+                        else ""
+                    )
+                    schema_parts.append(
+                        f"  - {col['column_name']} ({col['data_type']}, {nullable}{default})"
+                    )
 
                 # Link foreign keys for this table
                 for fk in foreign_keys:
@@ -321,13 +342,17 @@ class TextToSQLService:
                 }
                 for cc in check_constraints:
                     key = f"{cc['table_name']}.{cc['column_name']}"
-                    desc = enum_descriptions.get(key, f"See check constraint: {cc['constraint_def']}")
+                    desc = enum_descriptions.get(
+                        key, f"See check constraint: {cc['constraint_def']}"
+                    )
                     schema_parts.append(f"  - {key}: {desc}")
 
             conn.close()
 
         except Exception as e:
-            logger.warning(f"Dynamic schema introspection failed ({e}) — using static fallback")
+            logger.warning(
+                f"Dynamic schema introspection failed ({e}) — using static fallback"
+            )
             return self._static_schema_context()
 
         # Add example queries
@@ -493,12 +518,18 @@ class TextToSQLService:
         else:
             self.vanna.current_top_p = 0.1
 
-        if self.query_cache_service and (self.query_cache_service.enabled or self.query_cache_service.use_local):
+        if self.query_cache_service and (
+            self.query_cache_service.enabled or self.query_cache_service.use_local
+        ):
             cache_key = self.query_cache_service.get_sql_gen_key(question)
-            cached_result = self.query_cache_service.get(cache_key, cache_type="sql_gen")
+            cached_result = self.query_cache_service.get(
+                cache_key, cache_type="sql_gen"
+            )
 
             if cached_result and "sql" in cached_result:
-                logger.info(f"SQL generation cache HIT for question: '{question[:50]}...'")
+                logger.info(
+                    f"SQL generation cache HIT for question: '{question[:50]}...'"
+                )
                 query_id = str(uuid.uuid4())
                 self.pending_queries[query_id] = {
                     "question": question,
@@ -511,10 +542,14 @@ class TextToSQLService:
                     "query_id": query_id,
                     "question": question,
                     "sql": cached_result["sql"],
-                    "explanation": cached_result.get(
-                        "explanation",
-                        "This SQL will retrieve data from your database. Please review before approving.",
-                    ) if explain else "Explanation omitted by request.",
+                    "explanation": (
+                        cached_result.get(
+                            "explanation",
+                            "This SQL will retrieve data from your database. Please review before approving.",
+                        )
+                        if explain
+                        else "Explanation omitted by request."
+                    ),
                     "status": "pending_approval",
                     "generated_at": pd.Timestamp.now().isoformat(),
                     "cache_hit": True,
@@ -526,10 +561,17 @@ class TextToSQLService:
                 sql = await self.vanna.generate_sql_async(
                     question=question, schema_context=self.schema_context
                 )
-                explanation = "This SQL will retrieve data from your database. Please review before approving." if explain else "Explanation omitted by request."
+                explanation = (
+                    "This SQL will retrieve data from your database. Please review before approving."
+                    if explain
+                    else "Explanation omitted by request."
+                )
             except Exception as vanna_err:
-                logger.warning(f"Vanna SQL generation failed: {vanna_err}. Falling back to direct LLM SQL generation...")
+                logger.warning(
+                    f"Vanna SQL generation failed: {vanna_err}. Falling back to direct LLM SQL generation..."
+                )
                 from openai import OpenAI
+
                 client = OpenAI(api_key=self.openai_api_key)
                 prompt = f"""
 You are a senior database administrator.
@@ -546,7 +588,9 @@ Do not include any additional text outside the code block.
                 response = client.chat.completions.create(
                     model=settings.llm_model,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=vanna_temperature if vanna_temperature is not None else 0.0,
+                    temperature=(
+                        vanna_temperature if vanna_temperature is not None else 0.0
+                    ),
                     seed=vanna_seed if vanna_seed is not None else 42,
                     top_p=vanna_top_p if vanna_top_p is not None else 0.1,
                 )
@@ -560,11 +604,19 @@ Do not include any additional text outside the code block.
                             sql = part[3:].strip()
                 if not sql:
                     sql = content.strip()
-                
-                logger.info(f"Direct LLM SQL generation fallback succeeded! Generated SQL: {sql[:100]}...")
-                explanation = "⚠️ Direct LLM Fallback: Generated directly using OpenAI GPT-4o as the core Vanna agent was unavailable." if explain else "Explanation omitted by request."
 
-            if self.query_cache_service and (self.query_cache_service.enabled or self.query_cache_service.use_local):
+                logger.info(
+                    f"Direct LLM SQL generation fallback succeeded! Generated SQL: {sql[:100]}..."
+                )
+                explanation = (
+                    "⚠️ Direct LLM Fallback: Generated directly using OpenAI GPT-4o as the core Vanna agent was unavailable."
+                    if explain
+                    else "Explanation omitted by request."
+                )
+
+            if self.query_cache_service and (
+                self.query_cache_service.enabled or self.query_cache_service.use_local
+            ):
                 cache_key = self.query_cache_service.get_sql_gen_key(question)
                 cache_value = {
                     "sql": sql,
@@ -575,7 +627,9 @@ Do not include any additional text outside the code block.
                 self.query_cache_service.set(
                     cache_key, cache_value, ttl=ttl, cache_type="sql_gen"
                 )
-                logger.info(f"SQL generation cache MISS - cached for '{question[:50]}...' (TTL: {ttl}s)")
+                logger.info(
+                    f"SQL generation cache MISS - cached for '{question[:50]}...' (TTL: {ttl}s)"
+                )
 
             query_id = str(uuid.uuid4())
             self.pending_queries[query_id] = {
@@ -624,7 +678,9 @@ Do not include any additional text outside the code block.
             and (self.query_cache_service.enabled or self.query_cache_service.use_local)
         ):
             cache_key = self.query_cache_service.get_sql_result_key(sql)
-            cached_result = self.query_cache_service.get(cache_key, cache_type="sql_result")
+            cached_result = self.query_cache_service.get(
+                cache_key, cache_type="sql_result"
+            )
 
             if cached_result and "results" in cached_result:
                 logger.info(f"SQL result cache HIT for query: '{sql[:50]}...'")
@@ -646,7 +702,10 @@ Do not include any additional text outside the code block.
             if (
                 is_select_query
                 and self.query_cache_service
-                and (self.query_cache_service.enabled or self.query_cache_service.use_local)
+                and (
+                    self.query_cache_service.enabled
+                    or self.query_cache_service.use_local
+                )
             ):
                 cache_key = self.query_cache_service.get_sql_result_key(sql)
                 cache_value = {
@@ -659,7 +718,9 @@ Do not include any additional text outside the code block.
                 self.query_cache_service.set(
                     cache_key, cache_value, ttl=ttl, cache_type="sql_result"
                 )
-                logger.info(f"SQL result cache MISS - cached for '{sql[:50]}...' (TTL: {ttl}s)")
+                logger.info(
+                    f"SQL result cache MISS - cached for '{sql[:50]}...' (TTL: {ttl}s)"
+                )
 
             del self.pending_queries[query_id]
 

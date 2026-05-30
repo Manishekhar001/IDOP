@@ -27,6 +27,7 @@ logger = logging.getLogger("idop_app.ragas_evaluator")
 
 class RelevancyScore(BaseModel):
     """Answer relevancy score and analysis."""
+
     score: float = Field(
         ...,
         ge=0.0,
@@ -41,6 +42,7 @@ class RelevancyScore(BaseModel):
 
 class FaithfulnessScore(BaseModel):
     """Faithfulness score measuring factual consistency with context."""
+
     score: float = Field(
         ...,
         ge=0.0,
@@ -55,6 +57,7 @@ class FaithfulnessScore(BaseModel):
 
 class ContextPrecisionScore(BaseModel):
     """Context precision / relevance score."""
+
     score: float = Field(
         ...,
         ge=0.0,
@@ -73,6 +76,7 @@ class ContextPrecisionScore(BaseModel):
 
 class RagasScores(BaseModel):
     """Aggregated RAGAS evaluation results."""
+
     answer_relevancy: float = Field(
         ...,
         ge=0.0,
@@ -204,9 +208,15 @@ class RagasEvaluator:
             temperature=0.0,
             api_key=settings.openai_api_key,
         )
-        self._relevancy_chain = _RELEVANCY_PROMPT | llm.with_structured_output(RelevancyScore)
-        self._faithfulness_chain = _FAITHFULNESS_PROMPT | llm.with_structured_output(FaithfulnessScore)
-        self._precision_chain = _CONTEXT_PRECISION_PROMPT | llm.with_structured_output(ContextPrecisionScore)
+        self._relevancy_chain = _RELEVANCY_PROMPT | llm.with_structured_output(
+            RelevancyScore
+        )
+        self._faithfulness_chain = _FAITHFULNESS_PROMPT | llm.with_structured_output(
+            FaithfulnessScore
+        )
+        self._precision_chain = _CONTEXT_PRECISION_PROMPT | llm.with_structured_output(
+            ContextPrecisionScore
+        )
         logger.info("RAGASEvaluator initialized")
 
     @track(name="ragas_evaluator_evaluate")
@@ -229,10 +239,14 @@ class RagasEvaluator:
             relevancy: RelevancyScore = await self._relevancy_chain.ainvoke(
                 {"question": question, "answer": answer}
             )
-            logger.debug(f"RAGAS answer_relevancy: {relevancy.score:.3f} — {relevancy.reason}")
+            logger.debug(
+                f"RAGAS answer_relevancy: {relevancy.score:.3f} — {relevancy.reason}"
+            )
 
             # 2. Faithfulness
-            context_str = "\n\n---\n\n".join(contexts) if contexts else "(no context provided)"
+            context_str = (
+                "\n\n---\n\n".join(contexts) if contexts else "(no context provided)"
+            )
             faithfulness: FaithfulnessScore = await self._faithfulness_chain.ainvoke(
                 {"context": context_str, "answer": answer}
             )
@@ -242,10 +256,13 @@ class RagasEvaluator:
             )
 
             # 3. Context Precision
-            chunks_text = "\n\n---\n\n".join(
-                f"Chunk {i+1}: {c[:300]}"
-                for i, c in enumerate(contexts[:10])
-            ) if contexts else "(no chunks retrieved)"
+            chunks_text = (
+                "\n\n---\n\n".join(
+                    f"Chunk {i+1}: {c[:300]}" for i, c in enumerate(contexts[:10])
+                )
+                if contexts
+                else "(no chunks retrieved)"
+            )
             precision: ContextPrecisionScore = await self._precision_chain.ainvoke(
                 {"question": question, "chunks_text": chunks_text}
             )

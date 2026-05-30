@@ -20,7 +20,9 @@ class S3StorageBackend(StorageBackend):
             import boto3
             from botocore.config import Config
         except ImportError:
-            logger.warning("boto3 not installed. S3StorageBackend will not work properly.")
+            logger.warning(
+                "boto3 not installed. S3StorageBackend will not work properly."
+            )
             self.enabled = False
             return
 
@@ -43,7 +45,7 @@ class S3StorageBackend(StorageBackend):
                 "s3",
                 config=boto_config,
                 aws_access_key_id=settings.aws_access_key_id,
-                aws_secret_access_key=settings.aws_secret_access_key
+                aws_secret_access_key=settings.aws_secret_access_key,
             )
         else:
             self.s3_client = boto3.client("s3", config=boto_config)
@@ -51,7 +53,9 @@ class S3StorageBackend(StorageBackend):
         self.validation_error: Optional[str] = None
         try:
             self._validate_bucket()
-            logger.info(f"S3Storage initialized with bucket: {self.bucket_name} (region: {self.region})")
+            logger.info(
+                f"S3Storage initialized with bucket: {self.bucket_name} (region: {self.region})"
+            )
         except Exception as e:
             self.validation_error = str(e)
             logger.warning(f"S3 bucket validation failed, disabling S3 backend: {e}")
@@ -59,6 +63,7 @@ class S3StorageBackend(StorageBackend):
 
     def _validate_bucket(self) -> None:
         from botocore.exceptions import ClientError
+
         try:
             self.s3_client.head_bucket(Bucket=self.bucket_name)
             logger.info(f"S3 bucket '{self.bucket_name}' is accessible.")
@@ -67,7 +72,9 @@ class S3StorageBackend(StorageBackend):
             if error_code == "404":
                 raise ValueError(f"S3 bucket '{self.bucket_name}' does not exist.")
             elif error_code == "403":
-                raise PermissionError(f"Access denied to S3 bucket '{self.bucket_name}'")
+                raise PermissionError(
+                    f"Access denied to S3 bucket '{self.bucket_name}'"
+                )
             raise
 
     def _get_s3_key(self, document_id: str, file_extension: str, filename: str) -> str:
@@ -75,6 +82,7 @@ class S3StorageBackend(StorageBackend):
 
     def _object_exists(self, key: str) -> bool:
         from botocore.exceptions import ClientError
+
         try:
             self.s3_client.head_object(Bucket=self.bucket_name, Key=key)
             return True
@@ -194,6 +202,7 @@ class S3StorageBackend(StorageBackend):
     def load_chunks(self, document_id: str, file_extension: str) -> List[Dict]:
         key = self._get_s3_key(document_id, file_extension, "chunks.json")
         from botocore.exceptions import ClientError
+
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
             chunks = json.loads(response["Body"].read().decode("utf-8"))
@@ -207,6 +216,7 @@ class S3StorageBackend(StorageBackend):
     def load_embeddings(self, document_id: str, file_extension: str) -> np.ndarray:
         key = self._get_s3_key(document_id, file_extension, "embeddings.npy")
         from botocore.exceptions import ClientError
+
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
             buffer = io.BytesIO(response["Body"].read())
@@ -221,6 +231,7 @@ class S3StorageBackend(StorageBackend):
     def load_metadata(self, document_id: str, file_extension: str) -> Dict:
         key = self._get_s3_key(document_id, file_extension, "metadata.json")
         from botocore.exceptions import ClientError
+
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
             metadata = json.loads(response["Body"].read().decode("utf-8"))
@@ -235,7 +246,11 @@ class S3StorageBackend(StorageBackend):
         if not self.enabled:
             return
         keys_to_delete = [
-            {"Key": self._get_s3_key(document_id, file_extension, f"document.{file_extension}")},
+            {
+                "Key": self._get_s3_key(
+                    document_id, file_extension, f"document.{file_extension}"
+                )
+            },
             {"Key": self._get_s3_key(document_id, file_extension, "chunks.json")},
             {"Key": self._get_s3_key(document_id, file_extension, "embeddings.npy")},
             {"Key": self._get_s3_key(document_id, file_extension, "metadata.json")},
@@ -303,7 +318,9 @@ class S3StorageBackend(StorageBackend):
                 for obj in page["Contents"]:
                     total_size += obj["Size"]
                     total_objects += 1
-                    doc_type = obj["Key"].split("/")[0] if "/" in obj["Key"] else "unknown"
+                    doc_type = (
+                        obj["Key"].split("/")[0] if "/" in obj["Key"] else "unknown"
+                    )
                     doc_type_counts[doc_type] = doc_type_counts.get(doc_type, 0) + 1
             total_size_bytes_value = total_size
             if total_size_bytes_value < 1024:
@@ -311,7 +328,9 @@ class S3StorageBackend(StorageBackend):
             elif total_size_bytes_value < 1024 * 1024:
                 total_size_human_value = f"{total_size_bytes_value / 1024:.1f} KB"
             else:
-                total_size_human_value = f"{total_size_bytes_value / (1024 * 1024):.2f} MB"
+                total_size_human_value = (
+                    f"{total_size_bytes_value / (1024 * 1024):.2f} MB"
+                )
 
             stats = {
                 "backend": "s3",

@@ -8,12 +8,62 @@ class SparseVectorService:
     """Service for generating sparse vectors for BM25-style search."""
 
     STOP_WORDS = {
-        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
-        'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
-        'to', 'was', 'will', 'with', 'this', 'but', 'they', 'have', 'had',
-        'what', 'when', 'where', 'who', 'which', 'why', 'how', 'or', 'if',
-        'each', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
-        'same', 'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now'
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "has",
+        "he",
+        "in",
+        "is",
+        "it",
+        "its",
+        "of",
+        "on",
+        "that",
+        "the",
+        "to",
+        "was",
+        "will",
+        "with",
+        "this",
+        "but",
+        "they",
+        "have",
+        "had",
+        "what",
+        "when",
+        "where",
+        "who",
+        "which",
+        "why",
+        "how",
+        "or",
+        "if",
+        "each",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "can",
+        "just",
+        "should",
+        "now",
     }
 
     def __init__(self):
@@ -21,7 +71,7 @@ class SparseVectorService:
 
     def tokenize(self, text: str) -> List[str]:
         text = text.lower()
-        tokens = re.findall(r'\b[a-z0-9]+(?:-[a-z0-9]+)*\b', text)
+        tokens = re.findall(r"\b[a-z0-9]+(?:-[a-z0-9]+)*\b", text)
         tokens = [t for t in tokens if t not in self.STOP_WORDS]
         return tokens
 

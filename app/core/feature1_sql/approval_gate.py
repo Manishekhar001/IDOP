@@ -58,7 +58,7 @@ class ApprovalGate:
         Generate a secure, single-use approval token. Writes to Postgres and updates memory.
         """
         token = secrets.token_hex(32)
-        
+
         # Always update memory for tests/fallback
         self.active_sessions[query_id] = token
 
@@ -75,10 +75,12 @@ class ApprovalGate:
                             ON CONFLICT (query_id) 
                             DO UPDATE SET token = EXCLUDED.token
                             """,
-                            (query_id, token)
+                            (query_id, token),
                         )
                     conn.commit()
-                    logger.info(f"Persisted approval session token for ID {query_id} in PostgreSQL")
+                    logger.info(
+                        f"Persisted approval session token for ID {query_id} in PostgreSQL"
+                    )
             except Exception as e:
                 logger.error(f"Failed to persist approval token in PostgreSQL: {e}")
                 if conn:
@@ -102,12 +104,14 @@ class ApprovalGate:
                     with conn.cursor() as cur:
                         cur.execute(
                             "SELECT token FROM idop_approval_tokens WHERE query_id = %s",
-                            (query_id,)
+                            (query_id,),
                         )
                         row = cur.fetchone()
-                    
+
                     if not row:
-                        logger.warning(f"Verification failed: Query ID {query_id} not found in database")
+                        logger.warning(
+                            f"Verification failed: Query ID {query_id} not found in database"
+                        )
                         # Synchronize memory state if database is source of truth
                         if query_id in self.active_sessions:
                             del self.active_sessions[query_id]
@@ -120,23 +124,29 @@ class ApprovalGate:
                         with conn.cursor() as cur:
                             cur.execute(
                                 "DELETE FROM idop_approval_tokens WHERE query_id = %s",
-                                (query_id,)
+                                (query_id,),
                             )
                         conn.commit()
-                        
+
                         # Sync memory
                         if query_id in self.active_sessions:
                             del self.active_sessions[query_id]
-                            
-                        logger.info(f"✓ Verification success: Database session closed for query {query_id}")
+
+                        logger.info(
+                            f"✓ Verification success: Database session closed for query {query_id}"
+                        )
                         conn.close()
                         return True
 
-                    logger.warning(f"Verification failed: Incorrect token in DB for query {query_id}")
+                    logger.warning(
+                        f"Verification failed: Incorrect token in DB for query {query_id}"
+                    )
                     conn.close()
                     return False
             except Exception as e:
-                logger.error(f"Database token verification failed: {e}. Falling back to memory validation.")
+                logger.error(
+                    f"Database token verification failed: {e}. Falling back to memory validation."
+                )
                 if conn:
                     conn.rollback()
                     conn.close()
@@ -146,16 +156,22 @@ class ApprovalGate:
 
         # Ephemeral memory fallback (used in unit tests / database outages)
         if query_id not in self.active_sessions:
-            logger.warning(f"Verification failed (Memory Fallback): Query ID {query_id} not found")
+            logger.warning(
+                f"Verification failed (Memory Fallback): Query ID {query_id} not found"
+            )
             return False
 
         stored_token = self.active_sessions[query_id]
         if secrets.compare_digest(stored_token, token):
             del self.active_sessions[query_id]
-            logger.info(f"✓ Verification success (Memory Fallback): Session closed for query {query_id}")
+            logger.info(
+                f"✓ Verification success (Memory Fallback): Session closed for query {query_id}"
+            )
             return True
 
-        logger.warning(f"Verification failed (Memory Fallback): Incorrect token for query {query_id}")
+        logger.warning(
+            f"Verification failed (Memory Fallback): Incorrect token for query {query_id}"
+        )
         return False
 
 

@@ -9,7 +9,7 @@ logger = logging.getLogger("idop_app.router")
 class RouteDecision(BaseModel):
     query_type: str = Field(
         ...,
-        description="Classified query type. Must be SQL, MUTATION, RAG, CHAT, or HYBRID."
+        description="Classified query type. Must be SQL, MUTATION, RAG, CHAT, or HYBRID.",
     )
     reason: str = Field(..., description="Short explanation of the classification.")
 
@@ -53,14 +53,17 @@ Respond strictly in the following JSON format:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             import json
+
             result_dict = json.loads(response.choices[0].message.content)
             decision = RouteDecision.model_validate(result_dict)
             verdict = decision.query_type.upper()
             if verdict in ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"]:
-                logger.info(f"Router classified question as {verdict}. Reason: {decision.reason}")
+                logger.info(
+                    f"Router classified question as {verdict}. Reason: {decision.reason}"
+                )
                 return verdict
             return "CHAT"
         except Exception as e:
