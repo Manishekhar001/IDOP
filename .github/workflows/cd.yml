@@ -715,14 +715,57 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "📥 Step 11h: Pulling exact SHA-tagged image from ECR"
+            echo "🧹 Step 11h: Freeing disk space and cleaning old Docker images"
+            echo "=========================================="
+            echo "📊 Disk space BEFORE cleanup:"
+            df -h / | awk 'NR==1 || NR==2'
+            echo ""
+
+            # Prune ALL unused Docker resources EXCEPT named volumes
+            # (We must NOT prune volumes — the postgres checkpoint-db volume
+            #  contains LangGraph checkpoints and LTM data.)
+            echo "🐳 Pruning unused Docker images, containers, and build cache..."
+            $DOCKER_CMD system prune -af 2>&1 || true
+
+            echo "📊 Disk space AFTER cleanup:"
+            df -h / | awk 'NR==1 || NR==2'
+            echo ""
+
+            # If still critically low, warn but continue
+            AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
+            if [ "$AVAIL_KB" -lt 1048576 ]; then
+              echo "⚠️ WARNING: Less than 1GB available on root volume (${AVAIL_KB}KB free)"
+              echo "   The new image may fail to extract. Consider increasing EBS volume size."
+              echo "   Continuing anyway — pull may fail if space is insufficient."
+            else
+              echo "✅ Sufficient disk space available (${AVAIL_KB}KB free)"
+            fi
+            echo ""
+
+            echo "=========================================="
+            echo "📥 Step 11i: Pulling exact SHA-tagged image from ECR"
             echo "=========================================="
             echo "   🔑 Image: $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA"
-            $DOCKER_CMD pull $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA 2>&1
-            PULL_EXIT=$?
+            # Retry loop: docker pull can fail if ECR propagation is still in progress
+            MAX_PULL_RETRIES=3
+            PULL_RETRY_DELAY=15
+            PULL_EXIT=1
+            for PULL_ATTEMPT in $(seq 1 $MAX_PULL_RETRIES); do
+              echo "   🔄 Attempt $PULL_ATTEMPT/$MAX_PULL_RETRIES..."
+              $DOCKER_CMD pull $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA 2>&1
+              PULL_EXIT=$?
+              if [ $PULL_EXIT -eq 0 ]; then
+                echo "   ✅ Pull attempt $PULL_ATTEMPT succeeded!"
+                break
+              fi
+              if [ $PULL_ATTEMPT -lt $MAX_PULL_RETRIES ]; then
+                echo "   ⏳ Pull attempt $PULL_ATTEMPT failed. Waiting ${PULL_RETRY_DELAY}s before retry..."
+                sleep $PULL_RETRY_DELAY
+              fi
+            done
             if [ $PULL_EXIT -ne 0 ]; then
-              echo "❌ docker pull FAILED (exit $PULL_EXIT) — aborting deployment"
-              echo "   The image tag $GITHUB_SHA does not exist in ECR."
+              echo "❌ docker pull FAILED after $MAX_PULL_RETRIES attempts — aborting deployment"
+              echo "   The image tag $GITHUB_SHA may not exist in ECR, or disk space is insufficient."
               echo "   Check that Step 9 (docker build/push) completed successfully."
               exit 1
             fi
@@ -752,7 +795,7 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "🚀 Step 11i: Orchestrating containers"
+            echo "🚀 Step 11j: Orchestrating containers"
             echo "=========================================="
 
             # ── Forcefully remove any existing idop-app container ──
@@ -826,7 +869,7 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "🧪 Step 11j: Health check with retry logic"
+            echo "🧪 Step 11k: Health check with retry logic"
             echo "=========================================="
             echo ""
 
@@ -839,8 +882,8 @@ jobs:
             WAIT_SECONDS=5
 
             # Wait for initial cold start
-            echo "⏳ Waiting 10 seconds for cold start..."
-            sleep 10
+            echo "⏳ Waiting 15 seconds for cold start..."
+            sleep 15
 
             until curl -f -s "$API_URL/health" > /dev/null 2>&1 || [ $RETRY -eq $MAX_RETRIES ]; do
               RETRY=$((RETRY+1))
