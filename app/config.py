@@ -7,14 +7,37 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     @model_validator(mode="after")
     def normalize_database_url(self) -> "Settings":
+        import urllib.parse
+
         if not getattr(self, "supabase_db_url", None):
             self.supabase_db_url = self.database_url or ""
             
         for attr in ["database_url", "supabase_db_url"]:
             if hasattr(self, attr):
                 val = getattr(self, attr)
-                if val and val.startswith("postgresql+psycopg://"):
-                    setattr(self, attr, val.replace("postgresql+psycopg://", "postgresql://", 1))
+                if val:
+                    if val.startswith("postgresql+psycopg://"):
+                        val = val.replace("postgresql+psycopg://", "postgresql://", 1)
+                    
+                    try:
+                        parsed = urllib.parse.urlsplit(val)
+                        if parsed.password:
+                            encoded_pass = urllib.parse.quote(parsed.password, safe="")
+                            if parsed.port:
+                                netloc = f"{parsed.username}:{encoded_pass}@{parsed.hostname}:{parsed.port}"
+                            else:
+                                netloc = f"{parsed.username}:{encoded_pass}@{parsed.hostname}"
+                            
+                            val = urllib.parse.urlunsplit((
+                                parsed.scheme,
+                                netloc,
+                                parsed.path,
+                                parsed.query,
+                                parsed.fragment
+                            ))
+                        setattr(self, attr, val)
+                    except Exception:
+                        pass
         return self
 
 
