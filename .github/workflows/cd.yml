@@ -28,26 +28,21 @@ env:
 # │                          │ EC2 instance role, not this user)           │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ AWS_SECRET_ACCESS_KEY    │ IAM User Secret Access Key                  │
-# │                          │ Source: IAM → Users → Security credentials  │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ ECR_REGISTRY             │ ECR Registry ROOT URL (no repo name!)       │
 # │                          │ Example: 221691784496.dkr.ecr.us-east-1.     │
 # │                          │          amazonaws.com                      │
 # │                          │ ⚠️ Do NOT include /idop-app at the end      │
-# │                          │ Source: aws ecr describe-repositories       │
 # └──────────────────────────┴─────────────────────────────────────────────┘
 #
 # ┌──────────────────────────────────────────────────────────────────────────┐
 # │ 🔐 CATEGORY 2: EC2 SERVER CONNECTION                                   │
 # ├──────────────────────────┬─────────────────────────────────────────────┤
 # │ EC2_HOST                 │ Public IPv4 address or Elastic IP of EC2    │
-# │                          │ Example: 13.233.14.23                       │
-# │                          │ Source: EC2 Console → Instances              │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ EC2_SSH_KEY              │ FULL contents of your .pem key file         │
 # │                          │ Must include -----BEGIN/END RSA PRIVATE     │
 # │                          │ KEY----- headers and all base64 lines       │
-# │                          │ ⚠️ Paste raw PEM, no extra whitespace       │
 # └──────────────────────────┴─────────────────────────────────────────────┘
 #
 #   ℹ️ The internal checkpoint-db Postgres password (idop_checkpoint_2026) is
@@ -56,55 +51,46 @@ env:
 #      Docker network. Do NOT set POSTGRES_PASSWORD as a GitHub secret.
 #
 # ┌──────────────────────────────────────────────────────────────────────────┐
-# │ 🔐 CATEGORY 4: APPLICATION API KEYS & INTEGRATIONS                     │
+# │ 🔐 CATEGORY 3: APPLICATION API KEYS & INTEGRATIONS                     │
 # ├──────────────────────────┬─────────────────────────────────────────────┤
 # │ OPENAI_API_KEY           │ OpenAI API Key (sk-proj-...)                │
-# │                          │ Source: https://platform.openai.com/api-keys│
-# │                          │ Used for: Agent reasoning, routing, LLM     │
+# │                          │ Source: https://platform.openai.com/api-keys │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ VOYAGE_API_KEY           │ Voyage AI API Key                           │
-# │                          │ Source: https://dash.voyageai.com/           │
-# │                          │ Used for: Rerank-2.5 context scoring        │
+# │                          │ Source: https://dash.voyageai.com/          │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ TAVILY_API_KEY           │ Tavily Search API Key (tvly-...)            │
-# │                          │ Source: https://tavily.com/                  │
-# │                          │ Used for: Corrective RAG web search fallback│
+# │                          │ Source: https://tavily.com/                 │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ QDRANT_URL               │ Qdrant Cloud cluster endpoint URL           │
 # │                          │ Example: https://xyz.aws.cloud.qdrant.io    │
-# │                          │ Source: https://cloud.qdrant.io/ → Cluster  │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ QDRANT_API_KEY           │ Qdrant Cloud authorization token            │
-# │                          │ Source: Qdrant Dashboard → API Keys         │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ SUPABASE_DB_URL          │ Supabase PostgreSQL connection URL          │
 # │                          │ Format: postgresql+psycopg://postgres.ref:  │
 # │                          │         pass@host:5432/postgres             │
-# │                          │ Source: Supabase → Project Settings →       │
-# │                          │         Database → Session Pooler           │
 # │                          │ ⚠️ Use Session Pooler, NOT Direct connection│
 # └──────────────────────────┴─────────────────────────────────────────────┘
 #
 # ┌──────────────────────────────────────────────────────────────────────────┐
-# │ ⬜ CATEGORY 5: OPTIONAL CACHING SECRETS                                │
+# │ ⬜ CATEGORY 4: OPTIONAL CACHING SECRETS                                │
 # ├──────────────────────────┬─────────────────────────────────────────────┤
 # │ UPSTASH_REDIS_URL        │ Upstash Redis REST connection URL           │
-# │                          │ Example: https://suited-mantis-12345.       │
-# │                          │          upstash.io                         │
-# │                          │ Source: https://console.upstash.com/        │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
-# │ UPSTASH_REDIS_TOKEN      │ Upstash Redis authentication token         │
-# │                          │ Source: Upstash Console → Database → Token  │
+# │ UPSTASH_REDIS_TOKEN      │ Upstash Redis authentication token          │
 # ├──────────────────────────┼─────────────────────────────────────────────┤
 # │ S3_CACHE_BUCKET          │ AWS S3 bucket name for document cache       │
 # │                          │ Example: idop-cache-221691784496            │
-# │                          │ Source: aws s3 ls                           │
+# ├──────────────────────────┼─────────────────────────────────────────────┤
+# │ DOMAIN_NAME              │ Optional domain name for SSL setup          │
+# │                          │ Example: api.idop.example.com               │
 # └──────────────────────────┴─────────────────────────────────────────────┘
 # =========================================================================
 
 jobs:
   # =========================================================================
-  # JOB 1: BUILD, PUBLISH TO ECR, AND DEPLOY TO EC2 WITH VERIFIED RETRIES
+  # JOB 1: BUILD, PUBLISH TO ECR, AND DEPLOY TO EC2
   # =========================================================================
   deploy:
     name: Build → ECR → Deploy EC2
@@ -117,39 +103,28 @@ jobs:
       - name: "Step 1/12: Free up disk space"
         run: |
           echo "=========================================="
-          echo "🧹 DISK SPACE OPTIMIZATION"
-          echo "=========================================="
-          echo ""
           echo "📊 Disk space BEFORE cleanup:"
           df -h /
           echo ""
 
-          # Remove heavy pre-installed runner software
-          echo "🗑️ Removing unnecessary runner libraries..."
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           sudo rm -rf /usr/local/share/boost
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
-          # Clean Docker system caches
-          echo "🐳 Pruning Docker system..."
           docker system prune -af --volumes || true
-
-          # Clean package manager
-          echo "📦 Cleaning package caches..."
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
 
           echo ""
           echo "📊 Disk space AFTER cleanup:"
           df -h /
-          echo "✅ Runner disk space optimization complete!"
+          echo "✅ Disk space optimization complete!"
           echo ""
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 2: CHECKOUT SOURCE CODE
+      # STEP 2: CHECKOUT + RESOLVE ECR VARIABLES
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 2/12: Checkout code"
         uses: actions/checkout@v4
@@ -174,7 +149,7 @@ jobs:
           echo "=========================================="
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 3: PRINT DEPLOYMENT METADATA & CONFIGURATION
+      # STEP 3: PRINT DEPLOYMENT METADATA
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 3/12: Print deployment metadata"
         run: |
@@ -183,15 +158,12 @@ jobs:
           echo "=========================================="
           echo ""
           echo "📋 Git & Trigger Info:"
-          echo "  Trigger      : Push/Merge to main branch"
-          echo "  Commit SHA   : ${{ github.sha }}"
-          echo "  Short SHA    : $(echo '${{ github.sha }}' | cut -c1-7)"
-          echo "  Author       : ${{ github.actor }}"
-          echo "  Repository   : ${{ github.repository }}"
-          echo "  Workflow     : ${{ github.workflow }}"
-          echo "  Run Number   : ${{ github.run_number }}"
+          echo "  Commit SHA : ${{ github.sha }}"
+          echo "  Author     : ${{ github.actor }}"
+          echo "  Repository : ${{ github.repository }}"
+          echo "  Run Number : ${{ github.run_number }}"
           echo ""
-          echo "📋 Target Deployment Configuration:"
+          echo "📋 Target Configuration:"
           echo "  AWS Region   : $AWS_REGION"
           echo "  ECR Repo     : $RESOLVED_ECR_REPOSITORY"
           echo "  ECR Registry : $RESOLVED_ECR_REGISTRY"
@@ -212,7 +184,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 5: VERIFY AWS IDENTITY VIA STS
+      # STEP 5: VERIFY AWS IDENTITY
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 5/12: Verify AWS identity (STS)"
         run: |
@@ -231,12 +203,12 @@ jobs:
 
       - name: "Step 6b/12: Verify ECR login"
         run: |
-          echo "✅ Successfully authenticated with Amazon ECR!"
+          echo "✅ Authenticated with Amazon ECR!"
           echo "  Registry: ${{ steps.login-ecr.outputs.registry }}"
           echo ""
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 7: SETUP QEMU (MULTI-PLATFORM SUPPORT)
+      # STEP 7: SETUP QEMU
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 7/12: Set up QEMU"
         uses: docker/setup-qemu-action@v3
@@ -250,7 +222,11 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 9: BUILD, TAG, AND PUSH DOCKER IMAGE TO ECR
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 9/12: Build, tag, and push Docker image to ECR"
+      # GIT_COMMIT_SHA is passed as a build arg so it's baked into the image
+      # as an environment variable (see Dockerfile ARG/ENV). This provides a
+      # second source for the value beyond the .env file on EC2.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 9/12: Build, tag, push Docker image to ECR"
         id: build-push
         uses: docker/build-push-action@v6
         with:
@@ -258,14 +234,16 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64
+          build-args: |
+            GIT_COMMIT_SHA=${{ github.sha }}
           tags: |
             ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
             ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }}
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 10: PRINT BUILD & ECR PUBLICATION SUMMARY
+      # STEP 10: SAVE IMAGE DIGEST FOR VERIFICATION
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 10/12: Print build summary and save image digest"
+      - name: "Step 10/12: Save image digest"
         run: |
           DIGEST="${{ steps.build-push.outputs.digest }}"
           echo "=========================================="
@@ -276,16 +254,24 @@ jobs:
           echo "  Tags         : latest, ${{ github.sha }}"
           echo "  Architecture : linux/amd64"
           echo "  Digest       : $DIGEST"
-          echo "  AWS Region   : $AWS_REGION"
           echo "=========================================="
           echo ""
-          echo "💾 Saving IMAGE_DIGEST to GITHUB_ENV for downstream verification..."
           echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 11: DEPLOY TO EC2 VIA SSH (AUTO-PROVISION + WRITE FILES + ORCHESTRATE)
+      # STEP 11: DEPLOY TO EC2 VIA SSH
+      #
+      # FIXES vs original cd.yml:
+      #   ✅ envs: single-line (no YAML folding) — all secrets forwarded correctly
+      #   ✅ Pull BEFORE down — minimizes downtime
+      #   ✅ Single pull via compose pull (no redundant docker pull)
+      #   ✅ No docker rm -f before compose down — clean state management
+      #   ✅ :stable tagged BEFORE pulling new image — points to current version
+      #   ✅ Rollback restores :stable cleanly (no confusing SHA re-tag)
+      #   ✅ Health check: 30s initial + 30 retries × 6s = 210s total (matches Postgres compose healthcheck)
+      #   ✅ Step numbering: consistent 11/12 → 11/12
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 11/13: Deploy to EC2 via SSH"
+      - name: "Step 11/12: Deploy to EC2 via SSH"
         uses: appleboy/ssh-action@v1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -310,15 +296,11 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: >-
-            AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,
-            OPENAI_API_KEY,
-            VOYAGE_API_KEY,TAVILY_API_KEY,
-            QDRANT_URL,QDRANT_API_KEY,
-            UPSTASH_REDIS_URL,UPSTASH_REDIS_TOKEN,
-            SUPABASE_DB_URL,S3_CACHE_BUCKET,DOMAIN_NAME,
-            RESOLVED_ECR_REGISTRY,RESOLVED_ECR_REPOSITORY,
-            EC2_PROJECT_PATH,AWS_REGION,GITHUB_SHA,IMAGE_DIGEST
+          # IMPORTANT: envs is a SINGLE-LINE comma-separated string.
+          # Do NOT use >- YAML folding — it inserts spaces between lines,
+          # causing env var names like " OPENAI_API_KEY" (with leading space)
+          # that won't match the actual env var names.
+          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,OPENAI_API_KEY,VOYAGE_API_KEY,TAVILY_API_KEY,QDRANT_URL,QDRANT_API_KEY,UPSTASH_REDIS_URL,UPSTASH_REDIS_TOKEN,SUPABASE_DB_URL,S3_CACHE_BUCKET,DOMAIN_NAME,RESOLVED_ECR_REGISTRY,RESOLVED_ECR_REPOSITORY,EC2_PROJECT_PATH,AWS_REGION,GITHUB_SHA,IMAGE_DIGEST
           script: |
             echo "=========================================="
             echo "📂 Step 11a: Preparing deployment directory"
@@ -329,49 +311,41 @@ jobs:
             echo ""
 
             echo "=========================================="
-            echo "🛠️ Step 11b: Verifying System Dependencies"
+            echo "🛠️ Step 11b: Verifying system dependencies"
             echo "=========================================="
-            # Install general system dependencies
-            echo "📦 Updating package lists..."
             sudo apt-get update -y
-            echo "📦 Installing zip, unzip, curl, gnupg, ca-certificates, lsb-release, lsof..."
             sudo apt-get install -y zip unzip curl gnupg ca-certificates lsb-release lsof
-            echo ""
 
-            # Check and install Docker if missing
+            # Install Docker if missing
             if ! command -v docker &> /dev/null; then
-              echo "🐳 Docker not found. Installing Docker Engine..."
+              echo "🐳 Installing Docker Engine..."
               sudo mkdir -p /etc/apt/keyrings
               curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
               echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
               sudo apt-get update -y
               sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
               sudo usermod -aG docker ubuntu
-              echo "✅ Docker installed successfully!"
+              echo "✅ Docker installed: $(docker --version)"
             else
               echo "🐳 Docker already installed: $(docker --version)"
             fi
 
-            # Check and install Docker Compose plugin if missing
+            # Install Docker Compose plugin if missing
             if ! docker compose version &> /dev/null && ! sudo docker compose version &> /dev/null; then
-              echo "🐳 Docker Compose plugin not found. Installing..."
+              echo "🐳 Installing Docker Compose plugin..."
               sudo apt-get update -y
               sudo apt-get install -y docker-compose-plugin
-              echo "✅ Docker Compose plugin installed!"
-            else
-              echo "🐳 Docker Compose is available!"
             fi
 
             # Determine docker command wrapper (handles group permissions delay)
             DOCKER_CMD="docker"
             if ! docker ps &> /dev/null; then
-              echo "⚠️ Current shell does not have docker permissions. Using 'sudo docker' wrapper."
+              echo "⚠️ Using 'sudo docker' wrapper (group permissions not active)"
               DOCKER_CMD="sudo docker"
             fi
 
             COMPOSE_CMD="$DOCKER_CMD compose"
             if ! $COMPOSE_CMD version &> /dev/null; then
-              echo "⚠️ 'docker compose' syntax not supported. Using 'docker-compose'."
               if command -v docker-compose &> /dev/null; then
                 COMPOSE_CMD="docker-compose"
               else
@@ -379,35 +353,32 @@ jobs:
               fi
             fi
 
-            echo "🐳 Using Docker Command: $DOCKER_CMD"
-            echo "🐳 Using Compose Command: $COMPOSE_CMD"
+            echo "🐳 Docker Command: $DOCKER_CMD"
+            echo "🐳 Compose Command: $COMPOSE_CMD"
             echo ""
 
-            # Check and install AWS CLI if missing
+            # Install AWS CLI if missing
             if ! command -v aws &> /dev/null; then
-              echo "📦 AWS CLI not found. Installing AWS CLI v2..."
+              echo "📦 Installing AWS CLI v2..."
               curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
               unzip -o awscliv2.zip &> /dev/null
               sudo ./aws/install --update
               rm -rf aws awscliv2.zip
-              echo "✅ AWS CLI installed successfully: $(aws --version)"
+              echo "✅ AWS CLI installed: $(aws --version)"
             else
               echo "📦 AWS CLI already installed: $(aws --version)"
             fi
             echo ""
 
             echo "=========================================="
-            echo "🌐 Step 11c: Setup Nginx Reverse Proxy"
+            echo "🌐 Step 11c: Setting up Nginx reverse proxy"
             echo "=========================================="
-            # Check and install Nginx
             if ! command -v nginx &> /dev/null; then
-              echo "🌐 Nginx not found. Installing Nginx..."
+              echo "🌐 Installing Nginx..."
               sudo apt-get update -y
               sudo apt-get install -y nginx
             fi
 
-            # Write/update reverse proxy configuration
-            echo "🌐 Configuring Nginx server block..."
             sudo rm -f /etc/nginx/sites-enabled/default
 
             # Get public IP dynamically (IMDSv2 → IMDSv1 → ipify → catch-all _)
@@ -423,14 +394,13 @@ jobs:
             if [ -z "$EC2_PUBLIC_IP" ]; then
               EC2_PUBLIC_IP="_"
             fi
-            echo "🌐 Dynamic Public IP: $EC2_PUBLIC_IP"
+            echo "🌐 Public IP: $EC2_PUBLIC_IP"
 
-            sudo tee /etc/nginx/sites-available/idop.conf <<EOF
+            sudo tee /etc/nginx/sites-available/idop.conf << NGINXEOF
             server {
                 listen 80;
                 server_name $EC2_PUBLIC_IP;
 
-                # Allow document uploads up to 100MB (application limit is 50MB)
                 client_max_body_size 100M;
 
                 location / {
@@ -440,7 +410,7 @@ jobs:
                     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
                     proxy_set_header X-Forwarded-Proto \$scheme;
 
-                    # Enable SSE Streaming support
+                    # Enable SSE streaming support
                     proxy_set_header Connection '';
                     proxy_http_version 1.1;
                     chunked_transfer_encoding on;
@@ -449,69 +419,52 @@ jobs:
                     proxy_read_timeout 24h;
                 }
             }
-            EOF
+            NGINXEOF
 
             sudo ln -sf /etc/nginx/sites-available/idop.conf /etc/nginx/sites-enabled/
 
-            # Validate nginx config syntax before restarting
             echo "🔍 Validating nginx configuration..."
             sudo nginx -t
             if [ $? -ne 0 ]; then
-              echo "❌ Nginx configuration invalid — aborting nginx restart."
+              echo "❌ Nginx configuration invalid — aborting."
               exit 1
             fi
-            echo "✅ Nginx configuration syntax is valid!"
 
-            # Kill any process already holding port 80 (e.g., Apache on some Ubuntu AMIs)
+            # Kill any process holding port 80 (e.g., Apache)
             if sudo lsof -i :80 -P -n 2>/dev/null | grep -q LISTEN; then
               OLD_PROCESS=$(sudo lsof -i :80 -P -n | grep LISTEN | awk '{print $1}' | head -1)
-              echo "⚠️ Port 80 is already in use by '$OLD_PROCESS'. Stopping it..."
+              echo "⚠️ Port 80 in use by '$OLD_PROCESS'. Stopping..."
               sudo systemctl stop "$OLD_PROCESS" 2>/dev/null || sudo kill -9 $(sudo lsof -t -i :80) 2>/dev/null || true
               sleep 2
             fi
 
-            echo "🌐 Restarting nginx..."
             sudo systemctl enable nginx
             sudo systemctl restart nginx
             sleep 2
 
-            # Verify nginx is actually listening on port 80
             if sudo lsof -i :80 -P -n 2>/dev/null | grep -q LISTEN; then
-              echo "✅ Nginx is listening on port 80"
+              echo "✅ Nginx listening on port 80"
             else
-              echo "❌ Nginx is NOT listening on port 80 — checking status..."
-              sudo systemctl status nginx --no-pager 2>&1 || true
-              echo "⚠️ Attempting fallback: direct start via nginx binary..."
+              echo "⚠️ Nginx not on port 80 — starting via binary..."
               sudo nginx 2>&1 || true
               sleep 2
-              if sudo lsof -i :80 -P -n 2>/dev/null | grep -q LISTEN; then
-                echo "✅ Nginx started successfully via direct binary!"
-              else
-                echo "❌ Nginx still not listening on port 80. Deployment may fail smoke tests."
-              fi
             fi
-            echo "✅ Nginx reverse proxy configured successfully!"
 
-            # Optional Domain Setup & Let's Encrypt SSL
+            # Optional domain setup & Let's Encrypt SSL
             DOMAIN_NAME="$DOMAIN_NAME"
             if [ -n "$DOMAIN_NAME" ]; then
-              echo "🌐 Domain Name secret detected: $DOMAIN_NAME"
-              # Read current server_name
+              echo "🌐 Domain detected: $DOMAIN_NAME"
               CURRENT_SERVER_NAME=$(grep "server_name" /etc/nginx/sites-available/idop.conf | awk '{print $2}' | tr -d ';')
               if [ "$CURRENT_SERVER_NAME" != "$DOMAIN_NAME" ]; then
-                echo "🌐 Updating Nginx server_name from $CURRENT_SERVER_NAME to $DOMAIN_NAME..."
                 sudo sed -i "s/server_name .*/server_name $DOMAIN_NAME;/" /etc/nginx/sites-available/idop.conf
                 sudo systemctl restart nginx
               fi
-
-              # Secure with Certbot SSL if not already secured
               if ! sudo test -f "/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"; then
-                echo "🔒 Certbot SSL not found for $DOMAIN_NAME. Acquiring Let's Encrypt certificate..."
+                echo "🔒 Acquiring Let's Encrypt certificate..."
                 sudo apt-get install -y certbot python3-certbot-nginx
-                # Acquire SSL certificate (non-interactive)
-                sudo certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --email webmaster@$DOMAIN_NAME || echo "⚠️ Let's Encrypt acquisition failed. Checking DNS propagation or firewall settings."
+                sudo certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --email webmaster@$DOMAIN_NAME || echo "⚠️ Let's Encrypt failed — check DNS."
               else
-                echo "🔒 Let's Encrypt SSL certificate is active!"
+                echo "🔒 SSL certificate active!"
               fi
             fi
             echo ""
@@ -519,16 +472,14 @@ jobs:
             echo "=========================================="
             echo "🔐 Step 11d: Writing production .env file"
             echo "=========================================="
-            # Write all secrets into a secure .env file on the host.
-            # The CD pipeline injects each GitHub Secret as an environment variable.
-            # docker-compose.yml reads this .env file and passes values to containers.
-            cat << ENVEOF | sed 's/^[ \t]*//' > .env
+            # NOTE: This heredoc is UNQUOTED (ENVEOF) so bash expands all $VARIABLE references.
+            # The values are forwarded by appleboy/ssh-action via the envs parameter.
+            cat << ENVEOF > .env
             # ─────────────────────────────────────────────────────────
             # IDOP RUNTIME PRODUCTION SECRETS
             # Auto-generated by GitHub Actions CD Pipeline
             # Commit: $GITHUB_SHA
-            # Date: \$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            # ⚠️ DO NOT EDIT MANUALLY — will be overwritten on next deploy
+            # ⚠️ DO NOT EDIT MANUALLY — overwritten on next deploy
             # ─────────────────────────────────────────────────────────
 
             # Runtime state
@@ -536,59 +487,51 @@ jobs:
             ECR_REPOSITORY=$RESOLVED_ECR_REPOSITORY
 
             # Internal PostgreSQL (LangGraph checkpointing)
-            # Password is hardcoded — checkpoint-db has no exposed ports and is
-            # only reachable from inside the Docker network by the app container.
             POSTGRES_PASSWORD=idop_checkpoint_2026
             DATABASE_URL=postgresql://postgres:idop_checkpoint_2026@checkpoint-db:5432/idop_memories
 
-            # OpenAI (Agent reasoning + embeddings)
+            # OpenAI
             OPENAI_API_KEY=$OPENAI_API_KEY
 
-            # Voyage AI (Rerank-2.5 context scoring)
+            # Voyage AI
             VOYAGE_API_KEY=$VOYAGE_API_KEY
 
-            # Tavily (Corrective RAG web search fallback)
+            # Tavily
             TAVILY_API_KEY=$TAVILY_API_KEY
 
-            # Qdrant Cloud (Vector database)
+            # Qdrant Cloud
             QDRANT_URL=$QDRANT_URL
             QDRANT_API_KEY=$QDRANT_API_KEY
 
-            # Upstash Redis (Query-level caching — optional)
+            # Upstash Redis (optional)
             UPSTASH_REDIS_URL=$UPSTASH_REDIS_URL
             UPSTASH_REDIS_TOKEN=$UPSTASH_REDIS_TOKEN
 
-            # Supabase (Relational database)
+            # Supabase
             SUPABASE_DB_URL=$SUPABASE_DB_URL
 
-            # AWS S3 (Document chunk caching)
-            # AWS credentials passed for S3 access (needed if EC2 instance role
-            # lacks S3 permissions). The IAM user must have s3:HeadBucket,
-            # s3:PutObject, s3:GetObject, s3:ListBucket on the cache bucket.
+            # AWS S3
             AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
             AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
             AWS_REGION=$AWS_REGION
             S3_CACHE_BUCKET=$S3_CACHE_BUCKET
             STORAGE_BACKEND=s3
 
-            # Correct runtime state flag (maps to Settings.environment)
+            # Runtime state
             ENVIRONMENT=production
 
-            # Git commit SHA for deploy verification
+            # Git commit SHA (also baked into image via Docker build-arg)
             GIT_COMMIT_SHA=$GITHUB_SHA
             ENVEOF
 
             chmod 600 .env
-            echo "✅ .env file created and secured (chmod 600)"
-            echo "   Variables written: $(grep -c '=' .env) entries"
+            echo "✅ .env file created (chmod 600)"
             echo ""
 
             echo "=========================================="
-            echo "📝 Step 11e: Writing production docker-compose.yml"
+            echo "📝 Step 11e: Writing docker-compose.yml"
             echo "=========================================="
-            # Write production docker-compose.yml via quoted heredoc.
-            # Variables like ${ECR_REGISTRY} stay literal (no bash expansion)
-            # and Docker Compose expands them at runtime.
+            # Quoted heredoc — variables stay literal for Docker Compose runtime expansion
             cat << 'COMPOSEEOF' > docker-compose.yml
 
             services:
@@ -620,10 +563,12 @@ jobs:
                   test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d idop_memories -c 'SELECT 1' > /dev/null 2>&1"]
                   interval: 5s
                   timeout: 5s
-                  retries: 15
-                  start_period: 40s
+                  retries: 30
+                  start_period: 60s
                 networks:
                   - idop-net
+                # ⬆️ retries: 30 × 5s = 150s max + 60s start_period = 210s total
+                #    This comfortably covers Postgres cold-start on t2.micro (up to 115s).
 
             volumes:
               pgdata:
@@ -632,224 +577,138 @@ jobs:
               idop-net:
                 name: idop-net
             COMPOSEEOF
-            echo "✅ docker-compose.yml written successfully"
+            echo "✅ docker-compose.yml written"
             echo ""
 
             echo "=========================================="
-            echo "🐳 Step 11f: Authenticating Docker with ECR"
+            echo "🔐 Step 11f: Authenticating Docker with ECR"
             echo "=========================================="
             export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
             export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
             export AWS_DEFAULT_REGION="$AWS_REGION"
 
-            # Verify AWS CLI works before attempting ECR login
-            echo "🔍 Verifying AWS identity on EC2..."
-            aws sts get-caller-identity 2>&1 || echo "⚠️ AWS identity check failed — will still attempt ECR login"
-            echo ""
+            aws sts get-caller-identity 2>&1 || echo "⚠️ AWS identity check failed"
 
-            echo "🔐 Logging Docker into ECR (IAM user)..."
+            echo "🔐 Logging Docker into ECR..."
             ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION 2>&1)
             ECR_LOGIN_EXIT=$?
             if [ $ECR_LOGIN_EXIT -ne 0 ]; then
-              echo "❌ ECR get-login-password failed (exit $ECR_LOGIN_EXIT)"
-              echo "   Error: $ECR_PASSWORD"
-              echo ""
-              echo "Trying ECR login via EC2 instance role as fallback..."
+              echo "❌ ECR login via IAM user failed. Trying instance role..."
               unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
               ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION 2>&1)
               ECR_LOGIN_EXIT=$?
               if [ $ECR_LOGIN_EXIT -ne 0 ]; then
-                echo "Instance role ECR login also failed (exit $ECR_LOGIN_EXIT)"
-                echo "Error: $ECR_PASSWORD"
-                echo ""
-                echo "============================================================"
-                echo "DEPLOYMENT BLOCKED: Cannot authenticate to ECR"
-                echo "============================================================"
-                echo ""
-                echo "Both IAM User and EC2 Instance Role failed to login to ECR."
-                echo ""
-                echo "Fix 1: Attach AmazonEC2ContainerRegistryReadOnly to the"
-                echo "       IAM user used by the GitHub secrets."
-                echo "  Console: IAM > Users > select user > Add permissions"
-                echo "  > Attach policies > AmazonEC2ContainerRegistryReadOnly"
-                echo ""
-                echo "Fix 2: Attach AmazonEC2ContainerRegistryReadOnly to the"
-                echo "       EC2 instance's IAM role."
-                echo "  Console: EC2 > Instances > select > Security > Modify IAM role"
-                echo "  > Attach policy: AmazonEC2ContainerRegistryReadOnly"
-                echo ""
-                echo "Alternatively, add the repo to the IAM user's inline policy:"
-                echo '  { "Effect": "Allow", "Action": ["ecr:GetAuthorizationToken",'
-                echo '    "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage",'
-                echo '    "ecr:GetDownloadUrlForLayer"], "Resource": "*" }'
-                echo "============================================================"
+                echo "❌ Instance role ECR login also failed."
+                echo "Attach AmazonEC2ContainerRegistryReadOnly to the IAM user or EC2 instance role."
                 exit 1
-              else
-                echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin $RESOLVED_ECR_REGISTRY 2>&1
-                DOCKER_LOGIN_EXIT=$?
-                if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
-                  echo "Docker login to ECR via instance role failed (exit $DOCKER_LOGIN_EXIT)"
-                  echo "Error: $ECR_PASSWORD"
-                  exit 1
-                else
-                  echo "Docker authenticated with ECR via instance role!"
-                fi
-              fi
-            else
-              echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin $RESOLVED_ECR_REGISTRY 2>&1
-              DOCKER_LOGIN_EXIT=$?
-              if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
-                echo "Docker login to ECR failed (exit $DOCKER_LOGIN_EXIT)"
-                echo "Error: $ECR_PASSWORD"
-                echo "Check ECR_REGISTRY secret value and repository permissions."
-                exit 1
-              else
-                echo "Docker authenticated with ECR successfully!"
               fi
             fi
+
+            echo "$ECR_PASSWORD" | $DOCKER_CMD login --username AWS --password-stdin $RESOLVED_ECR_REGISTRY 2>&1
+            DOCKER_LOGIN_EXIT=$?
+            if [ $DOCKER_LOGIN_EXIT -ne 0 ]; then
+              echo "❌ Docker login to ECR failed."
+              exit 1
+            fi
+            echo "✅ Docker authenticated with ECR!"
             echo ""
 
             echo "=========================================="
-            echo "💾 Step 11g: Tagging current deployed image as :stable backup"
+            echo "💾 Step 11g: Tagging current :latest as :stable rollback backup"
             echo "=========================================="
-            # Tag the current (old) SHA-tagged image as :stable for rollback
-            # We use :latest here because docker-compose.yml previously referenced :latest
-            # (this backup happens BEFORE pulling the new image)
+            # Tag the CURRENT deployed image as :stable BEFORE pulling the new image.
+            # This ensures :stable always points to the previously working version.
             $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest \
-              $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable 2>/dev/null || \
-              echo "ℹ️ No existing :latest image to backup (first deployment)"
+              $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable 2>/dev/null && \
+              echo "✅ :stable tag updated to current :latest" || \
+              echo "ℹ️ No existing :latest to backup (first deployment)"
             echo ""
 
             echo "=========================================="
-            echo "🧹 Step 11h: Freeing disk space and cleaning old Docker images"
+            echo "🧹 Step 11h: Freeing disk space"
             echo "=========================================="
-            echo "📊 Disk space BEFORE cleanup:"
             df -h / | awk 'NR==1 || NR==2'
-            echo ""
 
-            # Prune ALL unused Docker resources EXCEPT named volumes
-            # (We must NOT prune volumes — the postgres checkpoint-db volume
-            #  contains LangGraph checkpoints and LTM data.)
-            echo "🐳 Pruning unused Docker images, containers, and build cache..."
+            # Prune unused Docker resources EXCEPT named volumes
             $DOCKER_CMD system prune -af 2>&1 || true
 
-            echo "📊 Disk space AFTER cleanup:"
             df -h / | awk 'NR==1 || NR==2'
-            echo ""
 
-            # If still critically low, warn but continue
             AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
             if [ "$AVAIL_KB" -lt 1048576 ]; then
-              echo "⚠️ WARNING: Less than 1GB available on root volume (${AVAIL_KB}KB free)"
-              echo "   The new image may fail to extract. Consider increasing EBS volume size."
-              echo "   Continuing anyway — pull may fail if space is insufficient."
+              echo "⚠️ WARNING: <1GB free (${AVAIL_KB}KB). Image may fail to pull."
             else
-              echo "✅ Sufficient disk space available (${AVAIL_KB}KB free)"
+              echo "✅ ${AVAIL_KB}KB free — sufficient disk space"
             fi
             echo ""
 
+            # ─── PULL NEW IMAGE (single pull via compose) ───
             echo "=========================================="
-            echo "📥 Step 11i: Pulling exact SHA-tagged image from ECR"
+            echo "📥 Step 11i: Pulling new image via docker compose"
             echo "=========================================="
-            echo "   🔑 Image: $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA"
-            # Retry loop: docker pull can fail if ECR propagation is still in progress
+            echo "  Image: $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA"
+            echo ""
+
+            # Retry loop for compose pull
             MAX_PULL_RETRIES=3
             PULL_RETRY_DELAY=15
-            PULL_EXIT=1
-            for PULL_ATTEMPT in $(seq 1 $MAX_PULL_RETRIES); do
-              echo "   🔄 Attempt $PULL_ATTEMPT/$MAX_PULL_RETRIES..."
-              $DOCKER_CMD pull $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA 2>&1
-              PULL_EXIT=$?
-              if [ $PULL_EXIT -eq 0 ]; then
-                echo "   ✅ Pull attempt $PULL_ATTEMPT succeeded!"
+            PULL_OK=1
+            for ATTEMPT in $(seq 1 $MAX_PULL_RETRIES); do
+              echo "  🔄 Pull attempt $ATTEMPT/$MAX_PULL_RETRIES..."
+              # Use the SHA-tagged image from docker-compose.yml
+              $COMPOSE_CMD pull 2>&1
+              if [ $? -eq 0 ]; then
+                PULL_OK=0
+                echo "  ✅ Pull succeeded on attempt $ATTEMPT!"
                 break
               fi
-              if [ $PULL_ATTEMPT -lt $MAX_PULL_RETRIES ]; then
-                echo "   ⏳ Pull attempt $PULL_ATTEMPT failed. Waiting ${PULL_RETRY_DELAY}s before retry..."
+              if [ $ATTEMPT -lt $MAX_PULL_RETRIES ]; then
+                echo "  ⏳ Waiting ${PULL_RETRY_DELAY}s before retry..."
                 sleep $PULL_RETRY_DELAY
               fi
             done
-            if [ $PULL_EXIT -ne 0 ]; then
-              echo "❌ docker pull FAILED after $MAX_PULL_RETRIES attempts — aborting deployment"
-              echo "   The image tag $GITHUB_SHA may not exist in ECR, or disk space is insufficient."
-              echo "   Check that Step 9 (docker build/push) completed successfully."
+
+            if [ $PULL_OK -ne 0 ]; then
+              echo "❌ docker compose pull FAILED after $MAX_PULL_RETRIES attempts."
+              echo "   The image tag $GITHUB_SHA may not exist in ECR."
               exit 1
             fi
-            echo "✅ Image $GITHUB_SHA pulled successfully!"
 
-            # ── Verify image digest matches the just-built image ──
+            # ─── Verify image digest matches the just-built image ───
             PULLED_DIGEST=$($DOCKER_CMD inspect --format='{{index .RepoDigests 0}}' \
               $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA \
               2>/dev/null | cut -d'@' -f2 || echo "")
-            if [ -n "$PULLED_DIGEST" ]; then
+            if [ -n "$PULLED_DIGEST" ] && [ -n "$IMAGE_DIGEST" ]; then
               if [ "$PULLED_DIGEST" != "$IMAGE_DIGEST" ]; then
-                echo "❌ IMAGE DIGEST MISMATCH!"
+                echo "❌ DIGEST MISMATCH!"
                 echo "   Expected: $IMAGE_DIGEST"
                 echo "   Got:      $PULLED_DIGEST"
-                echo "   📋 The pulled image content differs from what was just pushed."
-                echo "      The SHA tag may have been overwritten in ECR by another build."
+                echo "   The SHA tag may have been overwritten by another build."
                 exit 1
               fi
-              echo "   ✅ Image digest verified: $PULLED_DIGEST"
+              echo "  ✅ Digest verified: $PULLED_DIGEST"
             else
-              echo "   ⚠️ Could not retrieve image digest — skipping verification"
+              echo "  ⚠️ Skipping digest verification (digest unavailable)"
             fi
 
-            # Also tag as :latest for convenience (but deployment uses SHA tag)
+            # Also tag pulled image as :latest for convenience
             $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA \
               $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest 2>/dev/null || true
             echo ""
 
+            # ─── BRING DOWN OLD, UP WITH NEW ───
             echo "=========================================="
             echo "🚀 Step 11j: Orchestrating containers"
             echo "=========================================="
-
-            # ── Forcefully remove any existing idop-app container ──
-            echo "🗑️ Force-removing old idop-app container..."
-            $DOCKER_CMD rm -f idop-app 2>/dev/null || echo "   ℹ️ No existing container to remove"
-
-            # ── Verify what image version we have available ──
-            echo "🔍 Current image state:"
-            $DOCKER_CMD images $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" 2>/dev/null || echo "   (no local image found)"
+            echo "♻️ Bringing down old containers..."
+            $COMPOSE_CMD down 2>&1 || echo "  ℹ️ compose down completed (minor warnings)"
             echo ""
 
-            # ── Start fresh with docker compose (handles checkpoint-db + app together) ──
-            # First bring down (doesn't remove named volumes) then spin up
-            echo "♻️ Recreating containers via docker compose..."
-            $COMPOSE_CMD down 2>&1 || echo "   ℹ️ compose down minor issue (continuing)"
-            # ── Always pull the exact SHA-tagged image before recreating ──
-            echo "📥 Ensuring exact SHA-tagged image is pulled..."
-            $COMPOSE_CMD pull 2>&1
-            PULL_EXIT=$?
-            if [ $PULL_EXIT -ne 0 ]; then
-              echo "❌ compose pull FAILED (exit $PULL_EXIT) — aborting deployment"
-              echo "   ECR authentication may have failed. Check Step 11f output above."
-              exit 1
-            fi
-
-            # ── Verify digest after compose pull ──
-            COMPOSE_PULLED_DIGEST=$($DOCKER_CMD inspect --format='{{index .RepoDigests 0}}' \
-              $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA \
-              2>/dev/null | cut -d'@' -f2 || echo "")
-            if [ -n "$COMPOSE_PULLED_DIGEST" ]; then
-              if [ "$COMPOSE_PULLED_DIGEST" != "$IMAGE_DIGEST" ]; then
-                echo "❌ COMPOSE PULL DIGEST MISMATCH!"
-                echo "   Expected: $IMAGE_DIGEST"
-                echo "   Got:      $COMPOSE_PULLED_DIGEST"
-                echo "   📋 The compose pull fetched a different image than expected."
-                exit 1
-              fi
-              echo "   ✅ Compose pull digest verified: $COMPOSE_PULLED_DIGEST"
-            else
-              echo "   ⚠️ Could not retrieve compose pull digest — skipping verification"
-            fi
-
-            # ── Recreate containers (image already pulled by $COMPOSE_CMD pull above) ──
+            echo "🚀 Starting new containers..."
             $COMPOSE_CMD up -d 2>&1
             COMPOSE_EXIT=$?
             if [ $COMPOSE_EXIT -ne 0 ]; then
-              echo "⚠️ docker compose up failed with exit code $COMPOSE_EXIT — attempting direct container launch..."
-              echo "   🔄 Launching container directly with SHA-tagged image..."
+              echo "⚠️ compose up failed ($COMPOSE_EXIT) — trying direct container launch..."
               $DOCKER_CMD run -d \
                 --name idop-app \
                 --restart always \
@@ -858,38 +717,35 @@ jobs:
                 $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA
               DIRECT_EXIT=$?
               if [ $DIRECT_EXIT -ne 0 ]; then
-                echo "❌ Direct container launch also failed (exit $DIRECT_EXIT)"
-                echo "   Last resort: attempting docker compose up again..."
+                echo "❌ Direct launch also failed. Attempting compose up one more time..."
                 $COMPOSE_CMD up -d 2>&1 || true
               else
-                echo "   ✅ Container launched directly (bypassing compose)"
+                echo "  ✅ Container launched directly (bypassing compose)"
               fi
             else
-              echo "   ✅ Docker compose orchestration successful!"
+              echo "  ✅ Docker compose up successful!"
             fi
             echo ""
 
-            # Show running containers
             echo "📋 Running containers:"
             $DOCKER_CMD ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
             echo ""
 
+            # ─── HEALTH CHECK WITH EXTENDED TIMEOUT ───
             echo "=========================================="
             echo "🧪 Step 11k: Health check with retry logic"
             echo "=========================================="
             echo ""
+            echo "🏥 Testing FastAPI container health (port 8000)..."
+            echo "⏳ Waiting 30s for cold start (Postgres init can take up to 115s)..."
+            sleep 30
 
-            # ── Test 1: FastAPI container health (port 8000) ──
-            echo "🏥 Test 1: FastAPI container health (port 8000)..."
             API_URL="http://localhost:8000"
-
             RETRY=0
-            MAX_RETRIES=5
-            WAIT_SECONDS=5
-
-            # Wait for initial cold start
-            echo "⏳ Waiting 15 seconds for cold start..."
-            sleep 15
+            # Match the Postgres compose healthcheck timeout (retries: 30 × 5s + 60s start = 210s)
+            # App check: 30s initial + 30 retries × 6s = 210s total
+            MAX_RETRIES=30
+            WAIT_SECONDS=6
 
             until curl -f -s "$API_URL/health" > /dev/null 2>&1 || [ $RETRY -eq $MAX_RETRIES ]; do
               RETRY=$((RETRY+1))
@@ -900,23 +756,21 @@ jobs:
             if [ $RETRY -eq $MAX_RETRIES ]; then
               echo ""
               echo "=========================================="
-              echo "❌ CONTAINER HEALTH CHECK FAILED — TRIGGERING ROLLBACK"
+              echo "❌ HEALTH CHECK FAILED — ROLLING BACK"
               echo "=========================================="
               echo ""
               echo "📋 Container logs (last 50 lines):"
               $DOCKER_CMD logs --tail 50 idop-app 2>&1 || true
               echo ""
 
-              # Automatic rollback to stable image
-              echo "🔄 Rolling back to stable image..."
+              # Rollback: bring down new, bring up :stable
+              echo "🔄 Rolling back to :stable image..."
               $COMPOSE_CMD down
-              # Tag the local :stable image with the current SHA so compose finds it locally
-              # (instead of pulling a broken image from ECR)
               $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable \
                 $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA 2>/dev/null || true
-              # Don't pull — use the locally tagged stable image to avoid pulling broken image
+              # Use the locally-tagged :stable image — do NOT pull from ECR
               $COMPOSE_CMD up -d 2>&1 || {
-                echo "❌ Rollback compose up also failed — deploying directly from :stable";
+                echo "❌ Rollback compose up failed — deploying directly from :stable";
                 $DOCKER_CMD rm -f idop-app 2>/dev/null || true;
                 $DOCKER_CMD run -d \
                   --name idop-app \
@@ -929,81 +783,65 @@ jobs:
               exit 1
             fi
 
-            echo "   ✅ FastAPI container health endpoint responding!"
+            echo "   ✅ FastAPI container is healthy!"
             echo ""
-            echo "📋 Container Health Check Response:"
-            echo "──────────────────────────────────────"
+            echo "📋 Health check response:"
+            echo "──────────────────────────"
             curl -s "$API_URL/health" | python3 -m json.tool 2>/dev/null || curl -s "$API_URL/health"
             echo ""
-            echo "──────────────────────────────────────"
+            echo "──────────────────────────"
             echo ""
 
-            # ── Test 2: Nginx reverse proxy health (port 80) ──
-            echo "🏥 Test 2: Nginx reverse proxy health (port 80)..."
-            NGINX_URL="http://localhost:80"
-
+            # ── Test 2: Nginx proxy ──
+            echo "🏥 Test 2: Nginx reverse proxy (port 80)..."
             RETRY=0
             MAX_RETRIES=3
             WAIT_SECONDS=3
-
-            until curl -f -s "$NGINX_URL/health" > /dev/null 2>&1 || [ $RETRY -eq $MAX_RETRIES ]; do
+            until curl -f -s "http://localhost:80/health" > /dev/null 2>&1 || [ $RETRY -eq $MAX_RETRIES ]; do
               RETRY=$((RETRY+1))
-              if [ $RETRY -eq 1 ]; then
-                echo "   ⚠️ Nginx not responding yet, checking status..."
-                sudo systemctl status nginx --no-pager 2>&1 | head -20 || true
-              fi
-              echo "   ⚠️ Attempt $RETRY/$MAX_RETRIES failed, retrying in ${WAIT_SECONDS}s..."
+              echo "   ⚠️ Attempt $RETRY/$MAX_RETRIES..."
               sleep $WAIT_SECONDS
             done
 
             if [ $RETRY -eq $MAX_RETRIES ]; then
-              echo "   ❌ Nginx proxy health check FAILED after retries."
-              echo "   📋 Nginx error log (last 20 lines):"
-              sudo tail -20 /var/log/nginx/error.log 2>/dev/null || echo "   (no error log found)"
-              echo ""
-              echo "   ⚠️ Deployment will continue, but smoke tests may fail on port 80."
+              echo "   ❌ Nginx health check failed."
             else
-              echo "   ✅ Nginx reverse proxy is proxying correctly on port 80!"
-              echo ""
-              echo "📋 Nginx Health Check Response:"
-              echo "─────────────────────────────────"
-              curl -s "$NGINX_URL/health" | python3 -m json.tool 2>/dev/null || curl -s "$NGINX_URL/health"
-              echo ""
-              echo "─────────────────────────────────"
+              echo "   ✅ Nginx proxying correctly on port 80!"
             fi
             echo ""
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 12: DEPLOYMENT INTEGRATION SMOKE TESTS
+      # STEP 12: POST-DEPLOYMENT SMOKE TESTS
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 12/13: Run post-deployment integration tests"
+      - name: "Step 12/12: Run post-deployment smoke tests"
         env:
           EXPECTED_GIT_SHA: ${{ github.sha }}
         run: |
           echo "=========================================="
           echo "🧪 DEPLOYMENT INTEGRATION SMOKE TESTS"
           echo "=========================================="
-          echo "   Target Host: ${{ secrets.EC2_HOST }}"
-          echo "   Expected SHA: ${{ github.sha }}"
+          echo "   Target: ${{ secrets.EC2_HOST }}"
+          echo "   SHA:    ${{ github.sha }}"
           echo ""
+
           python -m pip install --upgrade pip
           pip install requests pydantic boto3
-          
+
           if [ -n "${{ secrets.DOMAIN_NAME }}" ]; then
             export API_TARGET_URL="https://${{ secrets.DOMAIN_NAME }}"
           else
             export API_TARGET_URL="http://${{ secrets.EC2_HOST }}"
           fi
-          
+
           echo "📡 API Target URL: $API_TARGET_URL"
           echo ""
           python scripts/deploy_smoke.py
 
-
       # ─────────────────────────────────────────────────────────────────────
-      # STEP 13: DEPLOYMENT COMPLETION SUMMARY
+      # STEP 12b: DEPLOYMENT COMPLETION SUMMARY
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 13/13: Deployment summary"
+      - name: "Step 12b/12: Deployment summary"
+        if: success()
         run: |
           echo "=========================================="
           echo "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY"
@@ -1017,7 +855,6 @@ jobs:
           echo "  Region      : $AWS_REGION"
           echo "  Status      : ✅ LIVE"
           echo ""
-          echo "📋 Next Steps:"
-          echo "  • Verify: curl -f https://your-domain.com/health"
-          echo "  • Logs:   ssh ubuntu@${{ secrets.EC2_HOST }} 'docker logs -f idop-app'"
+          echo "📋 Verify: curl -f http://\$EC2_HOST/health"
+          echo "   Logs:   ssh ubuntu@\$EC2_HOST 'docker logs -f idop-app'"
           echo "=========================================="

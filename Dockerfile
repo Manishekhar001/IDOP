@@ -21,6 +21,12 @@ FROM python:3.13-slim AS production
 
 WORKDIR /app
 
+# GIT_COMMIT_SHA is baked into the image for deployment verification.
+# Pass via --build-arg GIT_COMMIT_SHA=$(git rev-parse HEAD).
+# The .env file on EC2 also sets this as a runtime fallback.
+ARG GIT_COMMIT_SHA=unknown
+ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     git \
