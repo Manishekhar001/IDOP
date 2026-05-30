@@ -77,6 +77,38 @@ TEST_SET = [
 ]
 
 
+async def _pg_connect_and_setup(cls, database_url: str, name: str, max_retries: int = 3, delay: float = 1.0):
+    """
+    Create a Postgres async pool, enter context, run migrations, with retry.
+
+    Freshly-restarted Postgres containers sometimes close the first few
+    connections during background recovery. Retrying resolves this.
+    """
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        resource = None
+        try:
+            resource = await cls.from_conn_string(database_url).__aenter__()
+            await resource.setup()
+            if attempt > 1:
+                print(f"  [OK] {name} connected on retry attempt {attempt}")
+            return resource
+        except Exception as e:
+            last_exc = e
+            print(f"  [WARN] {name} attempt {attempt}/{max_retries} failed: {type(e).__name__}: {e}")
+            # Prevent connection leaks if __aenter__ succeeded but setup() failed
+            if resource is not None:
+                try:
+                    await resource.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            if attempt < max_retries:
+                print(f"  [INFO] Retrying {name} in {delay * attempt}s...")
+                await asyncio.sleep(delay * attempt)
+    print(f"  [ERROR] All {max_retries} attempts for {name} failed.")
+    raise last_exc  # type: ignore[misc]
+
+
 async def run_pipeline(question: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Mock/Direct runner executing RAG queries through CSRAGEngine based on configuration.
@@ -88,15 +120,13 @@ async def run_pipeline(question: str, config: Dict[str, Any]) -> Dict[str, Any]:
     from app.config import get_settings
 
     settings = get_settings()
-    
-    # Initialize services
+
+    # Initialize services (with retry for Postgres startup race)
     vector_store = VectorStoreService()
-    store = await AsyncPostgresStore.from_conn_string(settings.database_url).__aenter__()
-    checkpointer = await AsyncPostgresSaver.from_conn_string(settings.database_url).__aenter__()
-    
+    store = await _pg_connect_and_setup(AsyncPostgresStore, settings.database_url, "AsyncPostgresStore")
+    checkpointer = await _pg_connect_and_setup(AsyncPostgresSaver, settings.database_url, "AsyncPostgresSaver")
+
     try:
-        await store.setup()
-        await checkpointer.setup()
         engine = CSRAGEngine(vector_store, store, checkpointer)
         
         # Override RAG config keys for ablation study
