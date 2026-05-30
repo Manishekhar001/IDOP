@@ -1,5 +1,6 @@
 import sys
 import asyncio
+from typing import Any
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -24,6 +25,18 @@ from app.utils.logger import get_logger, setup_logging  # noqa: E402
 settings = get_settings()
 __version__ = "0.1.0"
 
+# Stores async context managers (from from_conn_string) indexed by resource id.
+# We MUST keep these alive until shutdown — otherwise Python's async generator GC
+# closes the Postgres connection mid-query (between two awaits in setup()).
+_resource_cms: dict[int, Any] = {}
+
+
+async def _close_resource(resource: Any) -> None:
+    """Close a Postgres resource's connection/pool via its stored context manager."""
+    cm = _resource_cms.pop(id(resource), None)
+    if cm:
+        await cm.__aexit__(None, None, None)
+
 
 async def _retry_init(
     factory, name: str, max_retries: int = 3, initial_delay: float = 1.0
@@ -35,13 +48,11 @@ async def _retry_init(
     connections during background recovery. Retrying the full connection
     + migration cycle resolves this transient psycopg.OperationalError.
 
-    IMPORTANT: The factory must call __aenter__() itself so that on
-    failure we can properly __aexit__() to avoid connection leaks.
+    The factory is responsible for its own cleanup on failure.
     """
     logger = get_logger(__name__)
     last_exc = None
     for attempt in range(1, max_retries + 1):
-        resource = None
         try:
             resource = await factory()
             logger.info(f"{name} ready on attempt {attempt}")
@@ -52,12 +63,6 @@ async def _retry_init(
                 f"{name} init attempt {attempt}/{max_retries} failed: "
                 f"{type(e).__name__}: {e}"
             )
-            # Prevent connection leaks: close the pool if __aenter__ succeeded
-            if resource is not None:
-                try:
-                    await resource.__aexit__(None, None, None)
-                except Exception:
-                    pass
             if attempt < max_retries:
                 delay = initial_delay * (2 ** (attempt - 1))
                 logger.info(f"Retrying {name} init in {delay}s...")
@@ -70,10 +75,29 @@ async def _retry_init(
 
 
 async def _connect_pg_resource(cls):
-    """Create pool via __aenter__, run migrations, return the resource."""
-    resource = await cls.from_conn_string(settings.database_url).__aenter__()
-    await resource.setup()
-    return resource
+    """
+    Create a Postgres resource and run migrations.
+
+    CRITICAL: cls.from_conn_string() is an @asynccontextmanager generator.
+    We MUST keep a reference to the context manager (cm) alive through
+    setup(), otherwise Python's GC will schedule aclose() on the event
+    loop, closing the connection mid-query (between two awaits in setup).
+
+    On failure we call cm.__aexit__() to properly close the pool/connection.
+    On success we stash cm in _resource_cms (module-level dict) so lifespan
+    shutdown can close it properly. We avoid stashing on the resource object
+    because AsyncPostgresStore uses __slots__, which would prevent attribute
+    assignment.
+    """
+    cm = cls.from_conn_string(settings.database_url)
+    resource = await cm.__aenter__()
+    try:
+        await resource.setup()
+        _resource_cms[id(resource)] = cm
+        return resource
+    except BaseException:
+        await cm.__aexit__(None, None, None)
+        raise
 
 
 @asynccontextmanager
@@ -117,9 +141,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down services...")
     if hasattr(app.state, "checkpointer") and app.state.checkpointer:
-        await app.state.checkpointer.__aexit__(None, None, None)
+        await _close_resource(app.state.checkpointer)
     if hasattr(app.state, "store") and app.state.store:
-        await app.state.store.__aexit__(None, None, None)
+        await _close_resource(app.state.store)
     logger.info("Shutdown complete")
 
 
