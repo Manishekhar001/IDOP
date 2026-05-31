@@ -285,15 +285,15 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 11: DEPLOY TO EC2 VIA SSH
       #
-      # FIXES vs original cd.yml:
+      # FIXES:
       #   ✅ envs: single-line (no YAML folding) — all secrets forwarded correctly
-      #   ✅ Pull BEFORE down — minimizes downtime
-      #   ✅ Single pull via compose pull (no redundant docker pull)
-      #   ✅ No docker rm -f before compose down — clean state management
-      #   ✅ :stable tagged BEFORE pulling new image — points to current version
-      #   ✅ Rollback restores :stable cleanly (no confusing SHA re-tag)
-      #   ✅ Health check: 30s initial + 30 retries × 6s = 210s total (matches Postgres compose healthcheck)
-      #   ✅ Step numbering: consistent 11/12 → 11/12
+      #   ✅ compose down BEFORE prune — frees old image layers (~1.66GB)
+      #   ✅ EBS auto-resize before pull — resists disk space exhaustion
+      #   ✅ :stable tagged BEFORE stopping containers — points to current deploy
+      #   ✅ :stable pushed to ECR for true remote rollback
+      #   ✅ Rollback pulls :stable from ECR (not local tag which may be pruned)
+      #   ✅ Health check: 30s initial + 30 retries × 6s = 210s total
+      #   ✅ compose down -v on stale pgdata password mismatch
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 11/13: Deploy to EC2 via SSH"
         uses: appleboy/ssh-action@v1
@@ -728,9 +728,76 @@ jobs:
             fi
             echo ""
 
+            # ─── AUTO-RESIZE EBS VOLUME IF SPACE IS LOW ───
+            echo "=========================================="
+            echo "💽 Step 11j: Auto-resize EBS volume if disk is low"
+            echo "=========================================="
+            df -h /
+            AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
+            if [ "$AVAIL_KB" -lt 2097152 ]; then
+              echo "⚠️ Less than 2GB free (${AVAIL_KB}KB). Attempting EBS volume resize..."
+              INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || \
+                            curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
+                              http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
+              if [ -n "$INSTANCE_ID" ]; then
+                echo "  🔍 Instance ID: $INSTANCE_ID"
+                # Find the root EBS volume
+                # Get root device name from instance metadata (most reliable)
+                ROOT_DEVICE=$(curl -s http://169.254.169.254/latest/meta-data/block-device-mapping/root 2>/dev/null || echo "xvda")
+                ROOT_VOLUME_ID=$(aws ec2 describe-volumes \
+                  --filters "Name=attachment.instance-id,Values=$INSTANCE_ID" \
+                  --query "Volumes[?contains(['/dev/$ROOT_DEVICE','/dev/sda1','/dev/xvda'], Attachment[0].Device)].[VolumeId,Size]" \
+                  --region $AWS_REGION --output text 2>/dev/null)
+                if [ -n "$ROOT_VOLUME_ID" ]; then
+                  VOL_ID=$(echo "$ROOT_VOLUME_ID" | awk '{print $1}')
+                  CURRENT_SIZE=$(echo "$ROOT_VOLUME_ID" | awk '{print $2}')
+                  echo "  📀 Root volume: $VOL_ID (${CURRENT_SIZE}GB)"
+                  if [ "$CURRENT_SIZE" -lt 20 ]; then
+                    echo "  🔧 Resizing $VOL_ID from ${CURRENT_SIZE}GB → 20GB..."
+                    MODIFY_RESULT=$(aws ec2 modify-volume \
+                      --volume-id "$VOL_ID" --size 20 \
+                      --region $AWS_REGION 2>&1)
+                    if [ $? -eq 0 ]; then
+                      echo "  ✅ Resize initiated! Waiting for completion..."
+                      # Wait for resize to complete (usually 30-60s for small increases)
+                      for W in 1 2 3 4 5 6; do
+                        STATE=$(aws ec2 describe-volumes-modifications \
+                          --volume-id "$VOL_ID" \
+                          --query "VolumesModifications[0].ModificationState" \
+                          --region $AWS_REGION --output text 2>/dev/null)
+                        if [ "$STATE" = "completed" ]; then break; fi
+                        echo "  ⏳ Waiting for resize... (attempt $W/6)"
+                        sleep 10
+                      done
+                      # Extend filesystem to use new space
+                      echo "  🔧 Extending filesystem..."
+                      sudo resize2fs $(df / --output=source | tail -1) 2>/dev/null || \
+                        sudo xfs_growfs / 2>/dev/null || \
+                        echo "  ⚠️ Filesystem extension skipped (manual: sudo resize2fs <device>)"
+                      echo ""
+                      echo "📊 Disk space AFTER resize:"
+                      df -h /
+                    else
+                      echo "  ⚠️ Volume resize failed: $MODIFY_RESULT"
+                      echo "  ℹ️ The IAM role needs ec2:ModifyVolume permission."
+                    fi
+                  else
+                    echo "  ✅ Volume is already ${CURRENT_SIZE}GB — sufficient."
+                  fi
+                else
+                  echo "  ⚠️ Could not determine root volume ID."
+                fi
+              else
+                echo "  ⚠️ Could not retrieve instance ID from metadata."
+              fi
+            else
+              echo "✅ ${AVAIL_KB}KB free — sufficient disk space, no resize needed."
+            fi
+            echo ""
+
             # ─── PULL NEW IMAGE ───
             echo "=========================================="
-            echo "📥 Step 11j: Pulling new image via docker compose"
+            echo "📥 Step 11k: Pulling new image via docker compose"
             echo "=========================================="
             echo "  Image: $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA"
             echo ""
@@ -793,7 +860,7 @@ jobs:
 
             # ─── COMPOSE UP ───
             echo "=========================================="
-            echo "🚀 Step 11k: Starting new containers"
+            echo "🚀 Step 11l: Starting new containers"
             echo "=========================================="
             # (pgdata password was tested in Step 11g before compose down.
             #  If password mismatch was detected, down -v already deleted the stale volume.)
@@ -827,7 +894,7 @@ jobs:
 
             # ─── HEALTH CHECK WITH EXTENDED TIMEOUT ───
             echo "=========================================="
-            echo "🧪 Step 11l: Health check with retry logic"
+            echo "🧪 Step 11m: Health check with retry logic"
             echo "=========================================="
             echo ""
             echo "🏥 Testing FastAPI container health (port 8000)..."
