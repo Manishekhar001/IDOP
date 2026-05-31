@@ -173,6 +173,18 @@ The graph shifts execution flows based on five dynamic routing functions:
 - **Dual Memory**: Long-Term Memory (LTM Postgres Store for user facts) and Short-Term Memory (STM checkpointers with automated conversation summaries).
 - **Redis Cache & Fallback**: Four namespaces (`embedding`, `rag`, `sql_gen`, `sql_result`) hosted on Upstash Redis with a seamless thread-safe **LRU Local Memory Fallback** when Redis is offline.
 
+### 5. Highly Customizable API Schemas ("Asking All the Options")
+- Exposes complete parameter controls across all operational endpoints rather than forcing hardcoded values:
+  - **Dynamic Ingestion Tuning**: Customize `chunk_size` and `chunk_overlap` on document upload to dynamically control chunking granularity.
+  - **Granular SQL Generation Control**: The `/sql/generate` endpoint supports custom temperature, random seed overrides (`vanna_seed`), nucleus sampling thresholds (`vanna_top_p`), and semantic judge audits.
+  - **Spreadsheet Operations**: Configure bulk row size thresholds (`max_bulk_rows`), primary key names, semantic LLM column auto-mapping (`auto_map`), and selective rule validation bypasses (`skip_validation`).
+  - **Chat Reasoning Overrides**: Forward customizable RAG retrieval variables, HyDE switches, and reranking parameters directly in unified conversational requests.
+
+### 6. Enterprise Security & Connection Resilience
+- **Auto-Encoding Connection Safety**: Automatically parses, normalizes, and URL-encodes special characters (such as `@`, `:`, or `/`) in raw connection strings (`DATABASE_URL` and `SUPABASE_DB_URL`) at config load time. This prevents parsing splits and eliminates transient `psycopg.OperationalError` failures in production.
+- **Robust CORS Handling**: Bypasses browser restriction ceilings securely when transmitting authorization credentials (`credentials: 'include'`) by utilizing custom regex-matched origin gateways (`allow_origin_regex`) rather than flat wildcards.
+- **Transactional Rollback Safeguards**: Enforces strict database transaction isolations, ensuring bulk relational operations run in all-or-nothing transactions that auto-rollback on single-row failures.
+
 ---
 
 ## 📁 Repository Structure
@@ -289,7 +301,7 @@ The application will launch on `http://localhost:8000`. You can inspect the Swag
 
 ## 🧪 Running Automated Tests
 
-IDOP includes an isolated automated unit test suite with **147 test cases** verifying all cached nodes, routing classifiers, features, and database transactions offline without requiring real API keys or vector databases:
+IDOP includes an isolated automated unit test suite with **177 test cases** verifying all cached nodes, routing classifiers, features, and database transactions offline without requiring real API keys or vector databases:
 
 Run the entire test suite:
 ```bash
