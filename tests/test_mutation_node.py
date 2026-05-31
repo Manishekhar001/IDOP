@@ -14,7 +14,6 @@ from unittest.mock import patch
 
 from app.core.graph.nodes import mutation_node, route_after_router
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # mutation_node Tests
 # ═══════════════════════════════════════════════════════════════════════

@@ -51,7 +51,6 @@ import argparse
 import asyncio
 import csv
 import json
-import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -541,8 +540,10 @@ async def run_configuration(
     print(f"\n{'=' * 70}")
     print(f"  Run {cfg_id}/5: {cfg_name}")
     print(f"  {config['description']}")
-    print(f"  search_mode={config['search_mode']}, hyde={config['enable_hyde']}, "
-          f"rerank={config['enable_reranking']}, top_k={config['top_k']}")
+    print(
+        f"  search_mode={config['search_mode']}, hyde={config['enable_hyde']}, "
+        f"rerank={config['enable_reranking']}, top_k={config['top_k']}"
+    )
     print(f"{'=' * 70}")
 
     # ── 1. Execute all queries ──────────────────────────────────────────
@@ -563,18 +564,20 @@ async def run_configuration(
             print(f"  OK ({out['pipeline_time_s']:.1f}s)")
         except Exception as exc:
             print(f"  FAIL ERROR: {type(exc).__name__}: {exc}")
-            pipeline_outputs.append({
-                "question": item["question"],
-                "ground_truth": item["ground_truth"],
-                "category": item.get("category", ""),
-                "config_id": cfg_id,
-                "answer": f"[ERROR] {type(exc).__name__}: {exc}",
-                "contexts": [],
-                "pipeline_time_s": 0.0,
-                "crag_verdict": "",
-                "issup": "",
-                "isuse": "",
-            })
+            pipeline_outputs.append(
+                {
+                    "question": item["question"],
+                    "ground_truth": item["ground_truth"],
+                    "category": item.get("category", ""),
+                    "config_id": cfg_id,
+                    "answer": f"[ERROR] {type(exc).__name__}: {exc}",
+                    "contexts": [],
+                    "pipeline_time_s": 0.0,
+                    "crag_verdict": "",
+                    "issup": "",
+                    "isuse": "",
+                }
+            )
 
     total_time = time.monotonic() - start_time
     avg_time = round(total_time / n_questions, 3)
@@ -611,21 +614,33 @@ async def run_configuration(
                     context_recall,
                 ],
             )
+            # RAGAS 0.4.x EvaluationResult has .scores dict but not .get()
+            scores_dict = score_res.scores
             metrics = {
-                "faithfulness": round(float(score_res.get("faithfulness", 0.0)), 4),
-                "answer_relevancy": round(float(score_res.get("answer_relevancy", 0.0)), 4),
-                "context_precision": round(float(score_res.get("context_precision", 0.0)), 4),
-                "context_recall": round(float(score_res.get("context_recall", 0.0)), 4),
+                "faithfulness": round(float(scores_dict.get("faithfulness", 0.0)), 4),
+                "answer_relevancy": round(
+                    float(scores_dict.get("answer_relevancy", 0.0)), 4
+                ),
+                "context_precision": round(
+                    float(scores_dict.get("context_precision", 0.0)), 4
+                ),
+                "context_recall": round(
+                    float(scores_dict.get("context_recall", 0.0)), 4
+                ),
             }
             ragas_used = True
-            print(f"\n  [RAGAS] Evaluation complete — "
-                  f"faith={metrics['faithfulness']:.3f}, "
-                  f"relev={metrics['answer_relevancy']:.3f}, "
-                  f"prec={metrics['context_precision']:.3f}, "
-                  f"recall={metrics['context_recall']:.3f}")
+            print(
+                f"\n  [RAGAS] Evaluation complete — "
+                f"faith={metrics['faithfulness']:.3f}, "
+                f"relev={metrics['answer_relevancy']:.3f}, "
+                f"prec={metrics['context_precision']:.3f}, "
+                f"recall={metrics['context_recall']:.3f}"
+            )
 
         except ImportError:
-            print(f"\n  [SKIP] RAGAS package not installed — will use in-house evaluator")
+            print(
+                "\n  [SKIP] RAGAS package not installed — will use in-house evaluator"
+            )
         except Exception as exc:
             print(f"\n  [RAGAS ERROR] {type(exc).__name__}: {exc} — falling back")
 
@@ -660,7 +675,10 @@ async def run_configuration(
     }
 
     # ── 5. Save per-configuration results ───────────────────────────────
-    cfg_file = config_dir / f"config_{cfg_id:02d}_{config['name'].replace(' ', '_').lower()}.json"
+    cfg_file = (
+        config_dir
+        / f"config_{cfg_id:02d}_{config['name'].replace(' ', '_').lower()}.json"
+    )
     with open(cfg_file, "w", encoding="utf-8") as f:
         # Strip bulky per-question data from the main file to keep it lightweight
         summary = {k: v for k, v in result.items() if k != "questions"}
@@ -716,11 +734,13 @@ async def _evaluate_in_house(
         "context_precision": round(sum(prec_scores) / n, 4) if prec_scores else 0.0,
         "context_recall": round(sum(recall_numer) / n, 4) if recall_numer else 0.0,
     }
-    print(f"  [EVAL] In-house complete — "
-          f"faith={metrics['faithfulness']:.3f}, "
-          f"relev={metrics['answer_relevancy']:.3f}, "
-          f"prec={metrics['context_precision']:.3f}, "
-          f"recall={metrics['context_recall']:.3f}")
+    print(
+        f"  [EVAL] In-house complete — "
+        f"faith={metrics['faithfulness']:.3f}, "
+        f"relev={metrics['answer_relevancy']:.3f}, "
+        f"prec={metrics['context_precision']:.3f}, "
+        f"recall={metrics['context_recall']:.3f}"
+    )
     return metrics
 
 
@@ -733,7 +753,11 @@ def _compute_category_metrics(
         cat = o.get("category", "Unknown")
         answer = o.get("answer", "")
         has_error = answer.startswith("[ERROR]")
-        has_answer = bool(answer) and not has_error and answer != "I don't have enough information."
+        has_answer = (
+            bool(answer)
+            and not has_error
+            and answer != "I don't have enough information."
+        )
         categories[cat].append(has_answer)
 
     cat_metrics = {}
@@ -800,10 +824,17 @@ def _build_report(
         last = all_results[-1]["metrics"]
         lines.append("")
         lines.append("  Cumulative Improvements (Full CSRAG vs Dense Only):")
-        for key in ("faithfulness", "answer_relevancy", "context_precision", "context_recall"):
+        for key in (
+            "faithfulness",
+            "answer_relevancy",
+            "context_precision",
+            "context_recall",
+        ):
             delta = last[key] - first[key]
             pct = (delta / first[key] * 100) if first[key] > 0 else 0
-            lines.append(f"    {key:<25} {first[key]:.4f} -> {last[key]:.4f}  ({pct:+.1f}%)")
+            lines.append(
+                f"    {key:<25} {first[key]:.4f} -> {last[key]:.4f}  ({pct:+.1f}%)"
+            )
     lines.append("")
 
     # ── Per-Configuration Details ────────────────────────────────────────
@@ -814,18 +845,20 @@ def _build_report(
         lines.append(f"  Parameters: {json.dumps(r['parameters'])}")
         lines.append(f"  RAGAS used: {r.get('ragas_used', False)}")
         lines.append(f"  Avg query time: {r['timing']['avg_seconds_per_query']:.3f}s")
-        lines.append(f"")
+        lines.append("")
         m = r["metrics"]
         lines.append(f"    faithfulness       = {m['faithfulness']:.4f}")
         lines.append(f"    answer_relevancy    = {m['answer_relevancy']:.4f}")
         lines.append(f"    context_precision   = {m['context_precision']:.4f}")
         lines.append(f"    context_recall      = {m['context_recall']:.4f}")
         if r.get("category_metrics"):
-            lines.append(f"")
-            lines.append(f"    Per-Category Success Rates:")
+            lines.append("")
+            lines.append("    Per-Category Success Rates:")
             for cat, cm in sorted(r["category_metrics"].items()):
-                lines.append(f"      {cat:<25} {cm['successful']:>3}/{cm['total']:<3} "
-                             f"({cm['success_rate']:.1%})")
+                lines.append(
+                    f"      {cat:<25} {cm['successful']:>3}/{cm['total']:<3} "
+                    f"({cm['success_rate']:.1%})"
+                )
 
     lines.append("")
     lines.append("=" * 72)
@@ -839,51 +872,73 @@ def _save_csv(results_dir: Path, all_results: List[Dict[str, Any]]) -> Path:
     csv_path = results_dir / "ablation_summary.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "config_id", "name", "faithfulness", "answer_relevancy",
-            "context_precision", "context_recall", "avg_query_time_s",
-            "total_time_s",
-        ])
+        writer.writerow(
+            [
+                "config_id",
+                "name",
+                "faithfulness",
+                "answer_relevancy",
+                "context_precision",
+                "context_recall",
+                "avg_query_time_s",
+                "total_time_s",
+            ]
+        )
         for r in all_results:
             m = r["metrics"]
-            writer.writerow([
-                r["config_id"],
-                r["name"],
-                m["faithfulness"],
-                m["answer_relevancy"],
-                m["context_precision"],
-                m["context_recall"],
-                r["timing"]["avg_seconds_per_query"],
-                r["timing"]["total_seconds"],
-            ])
+            writer.writerow(
+                [
+                    r["config_id"],
+                    r["name"],
+                    m["faithfulness"],
+                    m["answer_relevancy"],
+                    m["context_precision"],
+                    m["context_recall"],
+                    r["timing"]["avg_seconds_per_query"],
+                    r["timing"]["total_seconds"],
+                ]
+            )
     return csv_path
 
 
-def _save_per_question_csv(results_dir: Path, all_results: List[Dict[str, Any]]) -> Path:
+def _save_per_question_csv(
+    results_dir: Path, all_results: List[Dict[str, Any]]
+) -> Path:
     """Save a detailed per-question × per-configuration CSV."""
     csv_path = results_dir / "per_question_results.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "config_id", "config_name", "question", "category",
-            "has_answer", "has_error", "pipeline_time_s",
-            "crag_verdict", "issup", "isuse",
-        ])
+        writer.writerow(
+            [
+                "config_id",
+                "config_name",
+                "question",
+                "category",
+                "has_answer",
+                "has_error",
+                "pipeline_time_s",
+                "crag_verdict",
+                "issup",
+                "isuse",
+            ]
+        )
         for r in all_results:
             for q in r.get("questions", []):
                 answer = q.get("answer", "")
-                writer.writerow([
-                    r["config_id"],
-                    r["name"],
-                    q["question"],
-                    q.get("category", ""),
-                    1 if bool(answer) and not answer.startswith("[ERROR]") else 0,
-                    1 if answer.startswith("[ERROR]") else 0,
-                    q.get("pipeline_time_s", 0.0),
-                    q.get("crag_verdict", ""),
-                    q.get("issup", ""),
-                    q.get("isuse", ""),
-                ])
+                writer.writerow(
+                    [
+                        r["config_id"],
+                        r["name"],
+                        q["question"],
+                        q.get("category", ""),
+                        1 if bool(answer) and not answer.startswith("[ERROR]") else 0,
+                        1 if answer.startswith("[ERROR]") else 0,
+                        q.get("pipeline_time_s", 0.0),
+                        q.get("crag_verdict", ""),
+                        q.get("issup", ""),
+                        q.get("isuse", ""),
+                    ]
+                )
     return csv_path
 
 
@@ -899,13 +954,15 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         epilog=__doc__,
     )
     parser.add_argument(
-        "--subset", "-n",
+        "--subset",
+        "-n",
         type=int,
         default=None,
         help="Run on a random subset of N questions (default: all 50)",
     )
     parser.add_argument(
-        "--output-dir", "-o",
+        "--output-dir",
+        "-o",
         type=str,
         default="data/ablation_results",
         help="Output directory for results (default: data/ablation_results)",
@@ -931,6 +988,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 async def main_async() -> None:
     """Async entry point."""
+    import asyncio
+
+    # Windows compatibility: psycopg async requires SelectorEventLoop
+    # rather than the default ProactorEventLoop
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     args = parse_args()
     use_ragas = not args.no_ragas
     benchmark = list(BENCHMARK)
@@ -938,10 +1002,13 @@ async def main_async() -> None:
     # ── Subset logic ────────────────────────────────────────────────────
     if args.subset and 0 < args.subset < len(benchmark):
         import random
+
         rng = random.Random(args.seed)
         rng.shuffle(benchmark)
         benchmark = benchmark[: args.subset]
-        print(f"  [SUBSET] Using {len(benchmark)} questions (--subset={args.subset}, seed={args.seed})")
+        print(
+            f"  [SUBSET] Using {len(benchmark)} questions (--subset={args.subset}, seed={args.seed})"
+        )
     else:
         print(f"  [FULL] Using all {len(benchmark)} benchmark questions")
 
@@ -965,7 +1032,10 @@ async def main_async() -> None:
         print(f"  [REUSE] Loading from {prev.name}")
         all_results = []
         for cfg in ABLATION_CONFIGS:
-            cfg_file = prev / f"config_{cfg['id']:02d}_{cfg['name'].replace(' ', '_').lower()}.json"
+            cfg_file = (
+                prev
+                / f"config_{cfg['id']:02d}_{cfg['name'].replace(' ', '_').lower()}.json"
+            )
             if cfg_file.exists():
                 with open(cfg_file) as f:
                     all_results.append(json.load(f))
@@ -983,19 +1053,23 @@ async def main_async() -> None:
         all_results = []
         t_start = time.monotonic()
         for cfg in ABLATION_CONFIGS:
-            result = await run_configuration(cfg, benchmark, config_dir, base_dir, use_ragas)
+            result = await run_configuration(
+                cfg, benchmark, config_dir, base_dir, use_ragas
+            )
             all_results.append(result)
         total_elapsed = time.monotonic() - t_start
 
     # ── Generate report ─────────────────────────────────────────────────
-    report = _build_report(all_results, f"IDOP Benchmark ({len(benchmark)} questions)", total_elapsed)
+    report = _build_report(
+        all_results, f"IDOP Benchmark ({len(benchmark)} questions)", total_elapsed
+    )
     report_path = config_dir / "ablation_report.txt"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
 
     # ── Save CSVs ────────────────────────────────────────────────────────
-    csv_path = _save_csv(config_dir, all_results)
-    detail_csv = _save_per_question_csv(config_dir, all_results)
+    _save_csv(config_dir, all_results)
+    _save_per_question_csv(config_dir, all_results)
 
     # ── Save full JSON ──────────────────────────────────────────────────
     full_json = {
@@ -1007,8 +1081,7 @@ async def main_async() -> None:
             "ragas_used": use_ragas,
         },
         "configurations": [
-            {k: v for k, v in r.items() if k != "questions"}
-            for r in all_results
+            {k: v for k, v in r.items() if k != "questions"} for r in all_results
         ],
     }
     json_path = config_dir / "ablation_full.json"
@@ -1020,14 +1093,16 @@ async def main_async() -> None:
 
     # ── Final summary ───────────────────────────────────────────────────
     print(f"\n{'=' * 50}")
-    print(f"  Ablation study complete!")
+    print("  Ablation study complete!")
     print(f"  Results saved to: {config_dir}")
-    print(f"    Report:   ablation_report.txt")
-    print(f"    Summary:  ablation_summary.csv")
-    print(f"    Details:  per_question_results.csv")
-    print(f"    Full:     ablation_full.json")
+    print("    Report:   ablation_report.txt")
+    print("    Summary:  ablation_summary.csv")
+    print("    Details:  per_question_results.csv")
+    print("    Full:     ablation_full.json")
     print(f"  Total time: {total_elapsed:.1f}s")
     print(f"{'=' * 50}")
+
+
 def main() -> None:
     """Synchronous entry point."""
     asyncio.run(main_async())

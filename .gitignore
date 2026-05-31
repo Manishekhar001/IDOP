@@ -155,6 +155,9 @@ cython_debug/
 cache_dir/
 data_cache/
 
+# Generated data artifacts (ablation results, cached chunks)
+data/
+
 # OS-specific files
 Thumbs.db
 Desktop.ini
