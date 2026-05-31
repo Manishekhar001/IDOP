@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # General App Config
     app_name: str = "Intelligent Data Operations Platform (IDOP)"
-    app_version: str = "0.1.0"
+    app_version: str = "0.1.1"
     environment: str = "development"
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"

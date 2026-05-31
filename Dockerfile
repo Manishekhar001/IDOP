@@ -29,7 +29,7 @@ ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
-    git \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser

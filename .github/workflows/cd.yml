@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["IDOP Continuous Integration (CI)"]
     types: [completed]
+    branches: [main]
 
 # =========================================================================
 # GLOBAL ENVIRONMENT VARIABLES
@@ -98,6 +99,7 @@ jobs:
   deploy:
     name: Build → ECR → Deploy EC2
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       # ─────────────────────────────────────────────────────────────────────
@@ -633,12 +635,13 @@ jobs:
             aws sts get-caller-identity 2>&1 || echo "⚠️ AWS identity check failed"
 
             echo "🔐 Logging Docker into ECR..."
-            ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION 2>&1)
+            ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION)
             ECR_LOGIN_EXIT=$?
             if [ $ECR_LOGIN_EXIT -ne 0 ]; then
               echo "❌ ECR login via IAM user failed. Trying instance role..."
               unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-              ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION 2>&1)
+              rm -f ~/.aws/credentials
+              ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION)
               ECR_LOGIN_EXIT=$?
               if [ $ECR_LOGIN_EXIT -ne 0 ]; then
                 echo "❌ Instance role ECR login also failed."
@@ -895,8 +898,8 @@ jobs:
           echo "   SHA:    ${{ github.sha }}"
           echo ""
 
-          python -m pip install --upgrade pip
-          pip install requests pydantic boto3
+          python -m pip install --upgrade pip --break-system-packages
+          pip install requests pydantic boto3 --break-system-packages
 
           if [ -n "${{ secrets.DOMAIN_NAME }}" ]; then
             export API_TARGET_URL="https://${{ secrets.DOMAIN_NAME }}"

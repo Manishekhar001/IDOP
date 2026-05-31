@@ -235,12 +235,15 @@ def run_health_check():
         else:
             print(f"   ✅ Query cache is connected ({query_cache_mode})")
 
-        if status == "healthy":
-            print(f"   ✅ Health endpoint verified! [Version: {version}]")
+        if status in ("healthy", "degraded"):
+            print(f"   ✅ API is live (status={status}) [Version: {version}]")
             print("")
             return True
+        if status == "unhealthy":
+            print(f"   ❌ Health endpoint reported unhealthy: {status}")
+            return False
         else:
-            print(f"   ❌ Health endpoint reported degraded status: {status}")
+            print(f"   ❌ Health endpoint reported unknown status: {status}")
             return False
 
     except Exception as e:

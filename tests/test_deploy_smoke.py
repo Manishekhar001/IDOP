@@ -387,8 +387,8 @@ class TestHealthStatus:
             result = deploy_smoke.run_health_check()
             assert result is True
 
-    def test_degraded_status_fails(self, mock_response):
-        """status == 'degraded' → returns False."""
+    def test_degraded_status_passes(self, mock_response):
+        """status == 'degraded' → returns True (non-fatal, API still serving traffic)."""
         health_data = {
             "status": "degraded",
             "version": "0.1.0",
@@ -401,7 +401,7 @@ class TestHealthStatus:
         resp = mock_response(200, health_data)
         with patch.object(deploy_smoke.requests, "get", return_value=resp):
             result = deploy_smoke.run_health_check()
-            assert result is False
+            assert result is True
 
     def test_unhealthy_status_fails(self, mock_response):
         """status == 'unhealthy' → returns False."""

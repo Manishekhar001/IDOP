@@ -219,7 +219,6 @@ The graph shifts execution flows based on five dynamic routing functions:
 │   │   ├── query_cache_service.py # Redis client & In-Memory LRU
 │   │   └── s3_storage.py        # AWS S3 Storage Buckets
 │   ├── config.py                # Pydantic Settings Validations
-│   └── logging_config.py        # Intercept Logger Layouts
 ├── business_rules/
 │   └── rules.json               # Declarative Mutation Rules
 ├── tests/

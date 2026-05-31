@@ -31,10 +31,7 @@ from app.core.vector_store import VectorStoreService  # noqa: E402
 from app.utils.logger import get_logger, setup_logging  # noqa: E402
 
 settings = get_settings()
-__version__ = "0.1.0"
-
-# ── OPIK Monitoring (optional — graceful fallback if not configured) ──────
-from app.opik import OPIK_AVAILABLE  # noqa: E402, F401
+__version__ = "0.1.1"
 
 # Stores async context managers (from from_conn_string) indexed by resource id.
 # We MUST keep these alive until shutdown — otherwise Python's async generator GC
