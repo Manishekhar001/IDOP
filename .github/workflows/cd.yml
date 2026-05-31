@@ -710,13 +710,22 @@ jobs:
             # pinned by running containers
             $DOCKER_CMD system prune -af --volumes 2>&1 || true
 
-            # Also purge Docker buildx cache (separate from image layers)
+            # Explicitly remove ALL Docker images (none are running anymore)
+            $DOCKER_CMD image prune -af 2>&1 || true
+
+            # Remove any dangling/stopped containers explicitly
+            $DOCKER_CMD container prune -f 2>&1 || true
+
+            # Purge Docker buildx cache (separate from image layers)
             $DOCKER_CMD builder prune -af 2>&1 || true
 
             # Aggressive OS-level cleanup
             sudo apt-get clean 2>/dev/null || true
+            sudo apt-get autoremove --purge -y 2>/dev/null || true
             sudo rm -rf /tmp/* 2>/dev/null || true
             sudo journalctl --vacuum-time=1d 2>/dev/null || true
+            # Remove any remaining temp Docker files
+            sudo rm -rf /var/lib/docker/tmp/* 2>/dev/null || true
 
             df -h / | awk 'NR==1 || NR==2'
 
@@ -741,25 +750,25 @@ jobs:
                               http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
               if [ -n "$INSTANCE_ID" ]; then
                 echo "  🔍 Instance ID: $INSTANCE_ID"
-                # Find the root EBS volume
-                # Get root device name from instance metadata (most reliable)
-                ROOT_DEVICE=$(curl -s http://169.254.169.254/latest/meta-data/block-device-mapping/root 2>/dev/null || echo "xvda")
-                ROOT_VOLUME_ID=$(aws ec2 describe-volumes \
+                # Find root EBS volume by filtering on DeleteOnTermination=true.
+                # This is more reliable than Volumes[0] (order not guaranteed)
+                # and avoids brittle device-name matching (/dev/xvda vs /dev/sda1).
+                VOL_DATA=$(aws ec2 describe-volumes \
                   --filters "Name=attachment.instance-id,Values=$INSTANCE_ID" \
-                  --query "Volumes[?contains(['/dev/$ROOT_DEVICE','/dev/sda1','/dev/xvda'], Attachment[0].Device)].[VolumeId,Size]" \
-                  --region $AWS_REGION --output text 2>/dev/null)
-                if [ -n "$ROOT_VOLUME_ID" ]; then
-                  VOL_ID=$(echo "$ROOT_VOLUME_ID" | awk '{print $1}')
-                  CURRENT_SIZE=$(echo "$ROOT_VOLUME_ID" | awk '{print $2}')
+                             "Name=attachment.delete-on-termination,Values=true" \
+                  --query "Volumes[0].[VolumeId,Size]" \
+                  --region $AWS_REGION --output text 2>/dev/null || echo "")
+                if [ -n "$VOL_DATA" ] && [ "$(echo "$VOL_DATA" | wc -w)" -ge 2 ]; then
+                  VOL_ID=$(echo "$VOL_DATA" | awk '{print $1}')
+                  CURRENT_SIZE=$(echo "$VOL_DATA" | awk '{print $2}')
                   echo "  📀 Root volume: $VOL_ID (${CURRENT_SIZE}GB)"
-                  if [ "$CURRENT_SIZE" -lt 20 ]; then
-                    echo "  🔧 Resizing $VOL_ID from ${CURRENT_SIZE}GB → 20GB..."
+                  if [ "$CURRENT_SIZE" -lt 20 ] 2>/dev/null; then
+                    echo "  🔧 Resizing $VOL_ID from ${CURRENT_SIZE}GB to 20GB..."
                     MODIFY_RESULT=$(aws ec2 modify-volume \
                       --volume-id "$VOL_ID" --size 20 \
                       --region $AWS_REGION 2>&1)
                     if [ $? -eq 0 ]; then
                       echo "  ✅ Resize initiated! Waiting for completion..."
-                      # Wait for resize to complete (usually 30-60s for small increases)
                       for W in 1 2 3 4 5 6; do
                         STATE=$(aws ec2 describe-volumes-modifications \
                           --volume-id "$VOL_ID" \
@@ -769,23 +778,25 @@ jobs:
                         echo "  ⏳ Waiting for resize... (attempt $W/6)"
                         sleep 10
                       done
-                      # Extend filesystem to use new space
                       echo "  🔧 Extending filesystem..."
-                      sudo resize2fs $(df / --output=source | tail -1) 2>/dev/null || \
+                      ROOT_DEV=$(df / --output=source | tail -1)
+                      sudo resize2fs "$ROOT_DEV" 2>/dev/null || \
                         sudo xfs_growfs / 2>/dev/null || \
-                        echo "  ⚠️ Filesystem extension skipped (manual: sudo resize2fs <device>)"
+                        echo "  ⚠️ Filesystem extension skipped (manual resize may be needed)"
                       echo ""
                       echo "📊 Disk space AFTER resize:"
                       df -h /
                     else
                       echo "  ⚠️ Volume resize failed: $MODIFY_RESULT"
-                      echo "  ℹ️ The IAM role needs ec2:ModifyVolume permission."
+                      echo "  ℹ️ To fix: attach AmazonEC2FullAccess policy or add ec2:ModifyVolume permission to the IAM user/instance role."
+                      echo "  ⚠️ Continuing without resize — will try pull anyway."
                     fi
                   else
                     echo "  ✅ Volume is already ${CURRENT_SIZE}GB — sufficient."
                   fi
                 else
-                  echo "  ⚠️ Could not determine root volume ID."
+                  echo "  ⚠️ Could not determine root volume ID (describe-volumes may lack ec2:DescribeVolumes permission)."
+                  echo "  ⚠️ Continuing without resize — will try pull anyway."
                 fi
               else
                 echo "  ⚠️ Could not retrieve instance ID from metadata."
@@ -801,6 +812,13 @@ jobs:
             echo "=========================================="
             echo "  Image: $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA"
             echo ""
+
+            # Check if any version of our image already exists locally
+            LOCAL_IMAGE_EXISTS=false
+            if $DOCKER_CMD images --format '{{.Repository}}:{{.Tag}}' | grep -q "$RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY"; then
+              LOCAL_IMAGE_EXISTS=true
+              echo "  ℹ️ Local image exists — will use as fallback if pull fails."
+            fi
 
             # Retry loop for compose pull
             MAX_PULL_RETRIES=3
@@ -822,18 +840,37 @@ jobs:
 
             if [ $PULL_OK -ne 0 ]; then
               echo "❌ docker compose pull FAILED after $MAX_PULL_RETRIES attempts."
-              echo "   Trying to pull :stable (previous successful deploy)..."
+              
+              # Fallback 1: Try to pull :stable from ECR (may be smaller/fewer layers)
+              echo "   Trying to pull :stable (previous successful deploy) from ECR..."
               $DOCKER_CMD pull $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable 2>&1
-              if [ $? -ne 0 ]; then
-                echo "❌ :stable pull also failed. No fallback image available."
+              if [ $? -eq 0 ]; then
+                # Re-tag :stable as :latest and this SHA so compose picks it up
+                $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable \
+                  $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA
+                $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable \
+                  $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest
+                echo "⚠️ Deploying :stable as fallback instead of new image"
+              elif [ "$LOCAL_IMAGE_EXISTS" = "true" ]; then
+                # Fallback 2: Use whatever local image exists (even if outdated)
+                # This is better than leaving the service down
+                echo "   Pull failed. Using existing local image as fallback..."
+                LATEST_LOCAL_TAG=$($DOCKER_CMD images --format '{{.Repository}}:{{.Tag}}' | \
+                  grep "$RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY" | head -1)
+                if [ -n "$LATEST_LOCAL_TAG" ]; then
+                  $DOCKER_CMD tag "$LATEST_LOCAL_TAG" \
+                    $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA
+                  $DOCKER_CMD tag "$LATEST_LOCAL_TAG" \
+                    $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest
+                  echo "⚠️ Deploying existing local image: $LATEST_LOCAL_TAG"
+                else
+                  echo "❌ No local image available. Deploy failed."
+                  exit 1
+                fi
+              else
+                echo "❌ No fallback image available (local or remote). Deploy failed."
                 exit 1
               fi
-              # Re-tag :stable as :latest and this SHA so compose picks it up
-              $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable \
-                $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:$GITHUB_SHA
-              $DOCKER_CMD tag $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:stable \
-                $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest
-              echo "⚠️ Deploying :stable as fallback instead of new image"
             fi
 
             # ─── Verify image digest matches the just-built image ───

@@ -15,6 +15,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Install CPU-only PyTorch (avoids ~600MB of unnecessary CUDA libraries)
+# EC2 t2.micro has no GPU, so CUDA torch is pure waste
+# docling uses torch at runtime for PDF parsing
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
 
 # Production stage
 FROM python:3.13-slim AS production
