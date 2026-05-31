@@ -31,6 +31,11 @@ from app.services.cache_init import get_query_cache
 from app.opik import track
 from app.utils.logger import get_logger
 
+# Shared service instances — avoid creating per-call TextToSQLService instances
+# so that schema training state and query cache are consistently shared with
+# the module-level sql_service in app.api.routes.sql.
+from app.core.feature1_sql.shared import sql_service as shared_sql_service
+
 logger = get_logger(__name__)
 
 
@@ -97,8 +102,9 @@ async def sql_generation_node(state: CSRAGState) -> dict:
     judge = LLMJudge()
 
     try:
-        # Generate raw SQL (uses direct OpenAI fallback when Vanna imports fail)
-        sql_service = TextToSQLService(query_cache_service=get_query_cache())
+        # Generate raw SQL using the shared module-level service
+        # (shared with /sql/generate route so schema training and cache are consistent)
+        sql_service = shared_sql_service
         gen_res = await sql_service.generate_sql_for_approval(
             question=question,
             explain=state.get("explain", True),
@@ -163,23 +169,112 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 @track(name="graph_mutation")
 async def mutation_node(state: CSRAGState) -> dict:
     """
-    (Legacy — no longer wired in the graph.)
+    Processes mutation requests through the Feature 2 pipeline.
 
-    Bulk mutations require a file upload.  The LangGraph now routes MUTATION
-    queries directly to the chat node, which instructs users to use the
-    /mutation/upload API endpoint.
+    When mutation context (table, rows) is available in state from a prior
+    upload or direct input, this node runs the full pipeline: classify op →
+    validate rules → generate SQL → LLM audit → store pending → return token.
+
+    When no file/row context is available, the node classifies the intent from
+    the question and provides structured instructions for the upload API.
     """
-    logger.info("Feature 2 Mutation Node triggered")
+    question = state.get("question", "")
+    logger.info(f"Feature 2 Mutation Node triggered: '{question}'")
 
-    return {
-        "mutation_status": "requires_file_upload",
-        "mutation_error": (
-            "Bulk mutations require a CSV or Excel file upload.\n"
-            "1. POST /mutation/upload with your file\n"
-            "2. Review the preview (GET /mutation/pending)\n"
-            "3. Approve via POST /mutation/approve"
-        ),
-    }
+    from app.core.feature2_mutation.op_classifier import OpClassifier
+    from app.core.feature2_mutation.rule_validator import RuleValidator
+    from app.core.feature2_mutation.mutation_generator import MutationGenerator
+    from app.core.feature2_mutation.llm_judge import MutationLLMJudge
+    from app.core.feature2_mutation.approval_gate import MutationApprovalGate
+    from app.services.pending_store import pending_mutations as shared_pending_mutations
+
+    import uuid
+
+    try:
+        # Determine mutation context from state
+        table_name = state.get("mutation_table", "")
+        op_type = state.get("mutation_op", "")
+        rows = state.get("mutation_rows", [])
+
+        # Classify operation if not pre-set
+        if not op_type and question:
+            classifier = OpClassifier()
+            op_type = classifier.classify_operation(question)
+
+        # Guide user for bulk operations that need file upload
+        if not table_name or not rows:
+            return {
+                "mutation_status": "requires_file_upload",
+                "mutation_op": op_type or "",
+                "mutation_error": (
+                    f"To perform a {op_type.lower() or 'database'} mutation, "
+                    "you need to provide a file with the data.\n"
+                    "Use the mutation upload API:\n"
+                    "1. POST /mutation/upload with your CSV/Excel file\n"
+                    "2. Review the preview (GET /mutation/pending)\n"
+                    "3. Approve via POST /mutation/approve"
+                ),
+            }
+
+        # Process mutation with available data (from prior upload or direct input)
+        validator = RuleValidator()
+        generator = MutationGenerator()
+        judge = MutationLLMJudge()
+        gate = MutationApprovalGate()
+
+        # Validate business rules
+        is_valid, validation_errors = validator.validate_rows(table_name, rows)
+
+        # Generate SQL based on operation type
+        pk = "id"
+        sql = ""
+        params = []
+        updates = []
+        ids = []
+
+        if op_type == "INSERT":
+            sql, params = generator.generate_insert(table_name, rows)
+        elif op_type == "UPDATE":
+            updates = generator.generate_update(table_name, rows, primary_key=pk)
+        elif op_type == "DELETE":
+            sql, ids = generator.generate_delete(table_name, rows, primary_key=pk)
+
+        # LLM Judge audit
+        is_approved, explanation = judge.audit_mutation(question, table_name, op_type)
+        if not is_approved:
+            validation_errors.append(f"Audit Warning: {explanation}")
+
+        # Create approval session
+        mutation_id = str(uuid.uuid4())
+        token = gate.generate_session(mutation_id)
+
+        shared_pending_mutations[mutation_id] = {
+            "table_name": table_name,
+            "op_type": op_type,
+            "mapped_rows": rows,
+            "sql": sql,
+            "params": params,
+            "updates": updates,
+            "ids": ids,
+            "token": token,
+        }
+
+        return {
+            "mutation_id": mutation_id,
+            "mutation_table": table_name,
+            "mutation_op": op_type,
+            "mutation_status": "pending_approval" if not validation_errors else "failed_validation",
+            "mutation_error": "; ".join(validation_errors) if validation_errors else "",
+            "mutation_result_count": len(rows),
+            "approval_token": token,
+        }
+
+    except Exception as e:
+        logger.error(f"Mutation processing failed: {e}")
+        return {
+            "mutation_status": "error",
+            "mutation_error": f"Mutation processing failed: {str(e)}",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -617,7 +712,8 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
     question = state["question"]
     logger.info(f"Hybrid SQL + RAG node triggered for question: '{question}'")
 
-    sql_service = TextToSQLService(query_cache_service=get_query_cache())
+    # Use shared service so schema training and cache are consistent with /sql/generate route
+    sql_service = shared_sql_service
     validator = SQLValidator()
     executor = SQLExecutor()
 
@@ -848,8 +944,8 @@ def route_after_router(
     if q_type == "SQL":
         return "sql_gen"
     elif q_type == "MUTATION":
-        # Mutations require file uploads — route to chat so the LLM explains the workflow
-        return "chat"
+        # Route to the dedicated mutation node which processes through Feature 2 pipeline
+        return "mutation"
     elif q_type == "RAG":
         return "ltm_remember"
     elif q_type == "HYBRID":

@@ -7,6 +7,7 @@ from langgraph.store.postgres.aio import AsyncPostgresStore
 from app.core.graph.nodes import (
     router_node,
     sql_generation_node,
+    mutation_node,
     ltm_remember_node,
     decide_retrieval_node,
     generate_direct_node,
@@ -46,9 +47,10 @@ def build_graph(
         retrieve_docs_node, vector_store=vector_store
     )
 
-    # 4-Path Routing Nodes
+    # 5-Path Routing Nodes
     builder.add_node("router", router_node)
     builder.add_node("sql_gen", sql_generation_node)
+    builder.add_node("mutation", mutation_node)
     builder.add_node("hybrid_gen", hybrid_generation_node)
 
     # CSRAG Nodes
@@ -70,12 +72,13 @@ def build_graph(
     # Start Edge -> Route
     builder.add_edge(START, "router")
 
-    # Dynamic classification route
+    # Dynamic classification route — routes MUTATION to the mutation node
     builder.add_conditional_edges(
         "router",
         route_after_router,
         {
             "sql_gen": "sql_gen",
+            "mutation": "mutation",
             "ltm_remember": "ltm_remember",
             "chat": "generate_direct",
             "hybrid": "hybrid_gen",
@@ -84,6 +87,7 @@ def build_graph(
 
     # Terminate direct branch endpoints
     builder.add_edge("sql_gen", END)
+    builder.add_edge("mutation", END)
     builder.add_edge(
         "generate_direct", "stm_summarize"
     )  # LOGIC-01: summarize conversation even for direct responses

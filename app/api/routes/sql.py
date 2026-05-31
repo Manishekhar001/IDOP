@@ -6,10 +6,9 @@ from app.api.schemas import (
     ErrorResponse,
     SQLGenerationRequest,
 )
-from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
-from app.services.cache_init import get_query_cache
+from app.core.feature1_sql.shared import sql_service
 from app.services.pending_store import pending_queries as shared_pending_queries
 from app.opik import track
 from app.utils.logger import get_logger
@@ -17,9 +16,7 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 router = APIRouter(prefix="/sql", tags=["SQL Operations"])
 
-# Use centralized singleton for shared cache stats
-query_cache = get_query_cache()
-sql_service = TextToSQLService(query_cache_service=query_cache)
+# Use centralized singleton for shared service, cache stats
 executor = SQLExecutor()
 
 

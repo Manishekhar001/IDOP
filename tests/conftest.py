@@ -3,6 +3,16 @@ Shared pytest fixtures and configuration for the IDOP test suite.
 
 Provides mocked settings, temporary directories, and sample data
 fixtures used across all test modules.
+
+IMPORTANT — Settings Strategy:
+    Instead of patching app.config.get_settings (which fails because most
+    modules bind a local reference via `from app.config import get_settings`),
+    we set environment variables BEFORE any production code imports happen.
+    The real Settings() class reads from os.environ, so get_settings() returns
+    the correct test values regardless of when it is first called.
+
+    Additionally, the get_settings LRU cache is cleared after setting env vars
+    to ensure a fresh Settings() object is constructed on first access.
 """
 
 import os
@@ -10,99 +20,101 @@ import sys
 import pytest
 import numpy as np
 from pathlib import Path
-from unittest.mock import patch
 
 # Ensure the IDOP project root is on sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Set dummy environment variables to prevent Pydantic ValidationError on Settings instantiation
-os.environ.setdefault("OPENAI_API_KEY", "sk-test-fake-key-for-unit-tests")
-os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
-os.environ.setdefault("QDRANT_API_KEY", "test-qdrant-key")
-os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/idop_test")
-os.environ.setdefault("TAVILY_API_KEY", "tvly-test-fake-key")
-
-
 # ---------------------------------------------------------------------------
-# Mock Settings — avoids needing a real .env file during tests
+# Environment variable setup — runs at import time, before any test module
 # ---------------------------------------------------------------------------
+# Assign (not setdefault) to override any real .env values and guarantee
+# deterministic settings for all tests.
 
+_TEST_ENV = {
+    # General App Config
+    "APP_NAME": "IDOP Test Suite",
+    "APP_VERSION": "0.1.0-test",
+    "ENVIRONMENT": "test",
+    "LOG_LEVEL": "WARNING",
+    "API_HOST": "127.0.0.1",
+    "API_PORT": "8000",
+    "ALLOWED_ORIGINS": "*",
+    # OpenAI
+    "OPENAI_API_KEY": "sk-test-fake-key-for-unit-tests",
+    "LLM_MODEL": "gpt-4o",
+    "LLM_TEMPERATURE": "0.0",
+    "MEMORY_LLM_MODEL": "gpt-4o-mini",
+    "MEMORY_LLM_TEMPERATURE": "0.0",
+    # Qdrant
+    "QDRANT_URL": "http://localhost:6333",
+    "QDRANT_API_KEY": "test-qdrant-key",
+    "COLLECTION_NAME": "idop_test_documents",
+    "EMBEDDING_DIMENSION": "1536",
+    # Database
+    "DATABASE_URL": "postgresql://test:test@localhost:5432/idop_test",
+    "SUPABASE_DB_URL": "",
+    # Storage
+    "STORAGE_BACKEND": "local",
+    "S3_CACHE_BUCKET": "idop-test-bucket",
+    "CACHE_DIR": "data/cached_chunks",
+    "AWS_REGION": "us-east-1",
+    "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+    "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    # Cache TTLs
+    "CACHE_TTL_EMBEDDINGS": "604800",
+    "CACHE_TTL_RAG": "3600",
+    "CACHE_TTL_SQL_GEN": "86400",
+    "CACHE_TTL_SQL_RESULT": "900",
+    # Search
+    "TAVILY_API_KEY": "tvly-test-fake-key",
+    "TAVILY_MAX_RESULTS": "5",
+    "VOYAGE_API_KEY": "va-test-fake-key",
+    # LangGraph
+    "STM_MESSAGE_THRESHOLD": "6",
+    "CRAG_UPPER_THRESHOLD": "0.7",
+    "CRAG_LOWER_THRESHOLD": "0.3",
+    "SRAG_MAX_RETRIES": "2",
+    "MAX_REWRITE_TRIES": "2",
+    "RETRIEVAL_K": "5",
+    # Chunking
+    "CHUNK_SIZE": "512",
+    "CHUNK_OVERLAP": "50",
+}
 
-class MockSettings:
-    """Minimal mock of app.config.Settings for offline testing."""
+for _key, _val in _TEST_ENV.items():
+    os.environ[_key] = _val
 
-    app_name = "IDOP Test Suite"
-    app_version = "0.1.0-test"
-    environment = "test"
-    log_level = "WARNING"
-    api_host = "127.0.0.1"
-    api_port = 8000
-    allowed_origins = "*"
+# Clear the get_settings LRU cache so it picks up the test env vars on first call
+from app.config import get_settings as _get_settings
 
-    openai_api_key = "sk-test-fake-key-for-unit-tests"
-    llm_model = "gpt-4o"
-    llm_temperature = 0.0
-    memory_llm_model = "gpt-4o-mini"
-    memory_llm_temperature = 0.0
-
-    qdrant_url = "http://localhost:6333"
-    qdrant_api_key = "test-qdrant-key"
-    collection_name = "idop_test_documents"
-    embedding_dimension = 1536
-
-    database_url = "postgresql://test:test@localhost:5432/idop_test"
-
-    storage_backend = "local"
-    s3_cache_bucket = "idop-test-bucket"
-    cache_dir = "data/cached_chunks"
-    aws_region = "us-east-1"
-    aws_access_key_id = "AKIAIOSFODNN7EXAMPLE"
-    aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-
-    upstash_redis_url = None
-    upstash_redis_token = None
-
-    cache_ttl_embeddings = 604800
-    cache_ttl_rag = 3600
-    cache_ttl_sql_gen = 86400
-    cache_ttl_sql_result = 900
-
-    tavily_api_key = "tvly-test-fake-key"
-    tavily_max_results = 5
-    voyage_api_key = "va-test-fake-key"
-
-    stm_message_threshold = 6
-    crag_upper_threshold = 0.7
-    crag_lower_threshold = 0.3
-    srag_max_retries = 2
-    max_rewrite_tries = 2
-    retrieval_k = 5
-
-    chunk_size = 512
-    chunk_overlap = 50
+_get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)
 def mock_settings():
     """
-    Auto-applied fixture that patches get_settings() globally,
-    so no test ever needs a real .env or external credentials.
-    Also patches database connections for SQL and Mutation approval gates
-    to return None, preventing TCP handshake socket timeout delays.
-    Resets cache singletons to prevent cross-test contamination.
+    Auto-applied fixture that:
+    1. Clears the get_settings LRU cache so every test gets a fresh Settings object
+    2. Patches database connections for SQL and Mutation approval gates to return None,
+       preventing TCP handshake socket timeout delays.
+    3. Resets cache singletons to prevent cross-test contamination.
+
+    Returns the active Settings instance (built from the env vars set above).
     """
+    from unittest.mock import patch
     from app.services.cache_init import reset_caches
 
     reset_caches()
-    mock = MockSettings()
-    with patch("app.config.get_settings", return_value=mock), patch(
+    _get_settings.cache_clear()
+
+    with patch(
         "app.core.feature1_sql.approval_gate.ApprovalGate._get_connection",
         return_value=None,
     ), patch(
         "app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection",
         return_value=None,
     ):
-        yield mock
+        yield _get_settings()
     reset_caches()
 
 
