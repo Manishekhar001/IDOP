@@ -125,14 +125,14 @@ jobs:
       - name: "Step 5/7: Lint with Ruff"
         run: |
           echo "🔍 Running Ruff code quality audit..."
-          ruff check app/ --exit-zero
+          ruff check app/
           echo "✅ Ruff audit complete."
           echo ""
 
       - name: "Step 5b/7: Format check with Black"
         run: |
           echo "🔍 Checking code formatting with Black..."
-          black --check app/ || echo "⚠️ Minor formatting inconsistencies found (non-blocking)."
+          black --check app/
           echo "✅ Black format check complete."
           echo ""
 

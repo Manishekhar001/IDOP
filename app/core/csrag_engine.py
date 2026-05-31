@@ -9,9 +9,7 @@ from app.core.vector_store import VectorStoreService
 from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
 from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
-from app.opik import track
-from opik import start_as_current_trace, start_as_current_span
-from opik import opik_context
+from app.opik import track, start_as_current_trace, start_as_current_span, opik_context
 
 logger = get_logger(__name__)
 settings = get_settings()

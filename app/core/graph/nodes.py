@@ -162,15 +162,23 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
 @track(name="graph_mutation")
 async def mutation_node(state: CSRAGState) -> dict:
-    """Validates mutation rules, column mappings, and formats approval token."""
+    """
+    (Legacy — no longer wired in the graph.)
+
+    Bulk mutations require a file upload.  The LangGraph now routes MUTATION
+    queries directly to the chat node, which instructs users to use the
+    /mutation/upload API endpoint.
+    """
     logger.info("Feature 2 Mutation Node triggered")
 
-    # This node is triggered if a user asks for updates.
-    # Normally file uploads are handled at FastAPI route level.
-    # Here we default to setting up state for pending mutations.
     return {
-        "mutation_status": "pending_approval",
-        "mutation_error": " Spreadsheet upload required to generate column mapping and parameterized SQL.",
+        "mutation_status": "requires_file_upload",
+        "mutation_error": (
+            "Bulk mutations require a CSV or Excel file upload.\n"
+            "1. POST /mutation/upload with your file\n"
+            "2. Review the preview (GET /mutation/pending)\n"
+            "3. Approve via POST /mutation/approve"
+        ),
     }
 
 
@@ -835,12 +843,13 @@ Provide your answer in professional markdown with clear headings, bullet points,
 
 def route_after_router(
     state: CSRAGState,
-) -> Literal["sql_gen", "mutation", "ltm_remember", "chat", "hybrid"]:
+) -> Literal["sql_gen", "ltm_remember", "chat", "hybrid"]:
     q_type = state.get("query_type", "CHAT")
     if q_type == "SQL":
         return "sql_gen"
     elif q_type == "MUTATION":
-        return "mutation"
+        # Mutations require file uploads — route to chat so the LLM explains the workflow
+        return "chat"
     elif q_type == "RAG":
         return "ltm_remember"
     elif q_type == "HYBRID":

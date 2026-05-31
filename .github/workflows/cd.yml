@@ -1,8 +1,9 @@
 name: IDOP Continuous Deployment (CD)
 
 on:
-  push:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["IDOP Continuous Integration (CI)"]
+    types: [completed]
 
 # =========================================================================
 # GLOBAL ENVIRONMENT VARIABLES
@@ -100,9 +101,27 @@ jobs:
 
     steps:
       # ─────────────────────────────────────────────────────────────────────
+      # STEP 0: VERIFY CI WORKFLOW PASSED
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 0/13: Verify CI workflow passed"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowRun = context.payload.workflow_run;
+            if (!workflowRun) {
+              core.warning('No workflow_run payload — possibly triggered manually');
+              return;
+            }
+            if (workflowRun.conclusion !== 'success') {
+              core.setFailed(`CI workflow failed (${workflowRun.conclusion}). Aborting deployment.`);
+            } else {
+              console.log(`CI workflow passed! (SHA: ${workflowRun.head_sha})`);
+            }
+
+      # ─────────────────────────────────────────────────────────────────────
       # STEP 1: DISK SPACE OPTIMIZATION
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 1/12: Free up disk space"
+      - name: "Step 1/13: Free up disk space"
         run: |
           echo "=========================================="
           echo "📊 Disk space BEFORE cleanup:"
@@ -128,10 +147,10 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 2: CHECKOUT + RESOLVE ECR VARIABLES
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 2/12: Checkout code"
+      - name: "Step 2/13: Checkout code"
         uses: actions/checkout@v4
 
-      - name: "Step 2b/12: Resolve ECR Registry Variables"
+      - name: "Step 2b/13: Resolve ECR Registry Variables"
         run: |
           echo "=========================================="
           echo "🔍 RESOLVING ECR REGISTRY AND REPOSITORY"
@@ -153,7 +172,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 3: PRINT DEPLOYMENT METADATA
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 3/12: Print deployment metadata"
+      - name: "Step 3/13: Print deployment metadata"
         run: |
           echo "=========================================="
           echo "🚀 IDOP CD PIPELINE — DEPLOYMENT INITIATED"
@@ -178,7 +197,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 4: CONFIGURE AWS CREDENTIALS
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 4/12: Configure AWS credentials"
+      - name: "Step 4/13: Configure AWS credentials"
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -188,7 +207,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 5: VERIFY AWS IDENTITY
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 5/12: Verify AWS identity (STS)"
+      - name: "Step 5/13: Verify AWS identity (STS)"
         run: |
           echo "🔍 Verifying AWS IAM connection identity..."
           aws sts get-caller-identity
@@ -199,11 +218,11 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 6: LOGIN TO AMAZON ECR
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 6/12: Login to Amazon ECR"
+      - name: "Step 6/13: Login to Amazon ECR"
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: "Step 6b/12: Verify ECR login"
+      - name: "Step 6b/13: Verify ECR login"
         run: |
           echo "✅ Authenticated with Amazon ECR!"
           echo "  Registry: ${{ steps.login-ecr.outputs.registry }}"
@@ -212,13 +231,13 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 7: SETUP QEMU
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 7/12: Set up QEMU"
+      - name: "Step 7/13: Set up QEMU"
         uses: docker/setup-qemu-action@v3
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 8: SETUP DOCKER BUILDX
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 8/12: Set up Docker Buildx"
+      - name: "Step 8/13: Set up Docker Buildx"
         uses: docker/setup-buildx-action@v3
 
       # ─────────────────────────────────────────────────────────────────────
@@ -228,7 +247,7 @@ jobs:
       # as an environment variable (see Dockerfile ARG/ENV). This provides a
       # second source for the value beyond the .env file on EC2.
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 9/12: Build, tag, push Docker image to ECR"
+      - name: "Step 9/13: Build, tag, push Docker image to ECR"
         id: build-push
         uses: docker/build-push-action@v6
         with:
@@ -245,7 +264,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 10: SAVE IMAGE DIGEST FOR VERIFICATION
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 10/12: Save image digest"
+      - name: "Step 10/13: Save image digest"
         run: |
           DIGEST="${{ steps.build-push.outputs.digest }}"
           echo "=========================================="
@@ -273,7 +292,7 @@ jobs:
       #   ✅ Health check: 30s initial + 30 retries × 6s = 210s total (matches Postgres compose healthcheck)
       #   ✅ Step numbering: consistent 11/12 → 11/12
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 11/12: Deploy to EC2 via SSH"
+      - name: "Step 11/13: Deploy to EC2 via SSH"
         uses: appleboy/ssh-action@v1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -605,9 +624,11 @@ jobs:
             echo "=========================================="
             echo "🔐 Step 11f: Authenticating Docker with ECR"
             echo "=========================================="
-            export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-            export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
-            export AWS_DEFAULT_REGION="$AWS_REGION"
+            # Write AWS credentials to config file instead of exporting shell variables
+            # (avoids exposing secrets in /proc/ environment on the EC2 instance)
+            aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+            aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+            aws configure set default.region "$AWS_REGION"
 
             aws sts get-caller-identity 2>&1 || echo "⚠️ AWS identity check failed"
 
@@ -863,7 +884,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 12: POST-DEPLOYMENT SMOKE TESTS
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 12/12: Run post-deployment smoke tests"
+      - name: "Step 12/13: Run post-deployment smoke tests"
         env:
           EXPECTED_GIT_SHA: ${{ github.sha }}
         run: |
@@ -890,7 +911,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 12b: DEPLOYMENT COMPLETION SUMMARY
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 12b/12: Deployment summary"
+      - name: "Step 12b/13: Deployment summary"
         if: success()
         run: |
           echo "=========================================="

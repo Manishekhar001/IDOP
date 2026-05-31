@@ -166,11 +166,11 @@ class TestRouteAfterRouter:
         state = {"query_type": "SQL"}
         assert route_after_router(state) == "sql_gen"
 
-    def test_mutation_routes_to_mutation(self):
+    def test_mutation_routes_to_chat(self):
         from app.core.graph.nodes import route_after_router
 
         state = {"query_type": "MUTATION"}
-        assert route_after_router(state) == "mutation"
+        assert route_after_router(state) == "chat"
 
     def test_rag_routes_to_ltm_remember(self):
         from app.core.graph.nodes import route_after_router

@@ -118,9 +118,11 @@ doc_id = sha256.hexdigest()
 
 | File Type | Parser | Output |
 |---|---|---|
-| `.pdf` | `PyPDFLoader` | One `Document` per page |
+| `.pdf` | **Docling** `DocumentConverter` | One `Document` with structured markdown output |
 | `.txt` | `TextLoader` (UTF-8) | Single `Document` per file |
 | `.csv` | `CSVLoader` (UTF-8) | One `Document` per row |
+
+> **Note:** PDFs are parsed using IBM's [Docling](https://github.com/docling-project/docling) AI document understanding library (`DocumentConverter`), which preserves document structure (headings, tables, lists) and exports to markdown. This replaces the older `PyPDFLoader` for superior layout handling and OCR support on scanned documents.
 
 - Files are written to a temporary path before parsing
 - Temporary files are cleaned up (`unlink`) in a `finally` block
@@ -245,7 +247,7 @@ Check cache: S3/local for doc_id
     │   Return response (fast path)
     │
     └── CACHE MISS:
-        Parse with PyPDFLoader → raw Document[] (1 per page)
+        Parse with Docling DocumentConverter → Document (structured markdown)
         │
         ▼
         Split with RecursiveCharacterTextSplitter
@@ -276,7 +278,7 @@ Check cache: S3/local for doc_id
 |---|---|---|
 | **SHA-256 hash** (10 MB file) | ~20 ms | Streamed in 8 KB blocks |
 | **Cache hit** (load + upsert) | ~200–500 ms | Skips parsing + embedding entirely |
-| **PDF parsing** (50 pages) | ~1–3 s | PyPDFLoader page extraction |
+| **PDF parsing** (50 pages) | ~3–10 s | Docling DocumentConverter with layout analysis |
 | **Chunking** (500 chunks) | ~50 ms | In-memory text splitting |
 | **Dense embedding** (500 chunks) | ~3–8 s | OpenAI API batch call (rate-limited) |
 | **Sparse vectors** (500 chunks) | ~100 ms | In-process tokenization + hashing |

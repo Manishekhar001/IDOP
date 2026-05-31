@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 from typing import BinaryIO
 
-from langchain_community.document_loaders import CSVLoader, PyPDFLoader, TextLoader
+from langchain_community.document_loaders import CSVLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -37,10 +37,23 @@ class DocumentProcessor:
         )
 
     def _load_pdf(self, file_path: Path) -> list[Document]:
-        logger.info(f"Loading PDF: {file_path.name}")
-        docs = PyPDFLoader(str(file_path)).load()
-        logger.info(f"Loaded {len(docs)} pages from {file_path.name}")
-        return docs
+        logger.info(f"Loading PDF with Docling: {file_path.name}")
+        from docling.document_converter import DocumentConverter
+
+        converter = DocumentConverter()
+        result = converter.convert(str(file_path))
+
+        # Export to markdown to preserve document structure (headings, tables, lists)
+        text = result.document.export_to_markdown()
+
+        doc = Document(
+            page_content=text,
+            metadata={"source": file_path.name},
+        )
+        logger.info(
+            f"Loaded {len(text)} characters from {file_path.name} using Docling"
+        )
+        return [doc]
 
     def _load_text(self, file_path: Path) -> list[Document]:
         logger.info(f"Loading text: {file_path.name}")
