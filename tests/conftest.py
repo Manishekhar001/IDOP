@@ -76,6 +76,9 @@ _TEST_ENV = {
     "SRAG_MAX_RETRIES": "2",
     "MAX_REWRITE_TRIES": "2",
     "RETRIEVAL_K": "5",
+    # Opik — disable tracking entirely to prevent real HTTP calls in tests
+    "OPIK_TRACK_DISABLE": "true",
+
     # Chunking
     "CHUNK_SIZE": "512",
     "CHUNK_OVERLAP": "50",

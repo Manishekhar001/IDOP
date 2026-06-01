@@ -261,7 +261,9 @@ async def mutation_node(state: CSRAGState) -> dict:
             "mutation_id": mutation_id,
             "mutation_table": table_name,
             "mutation_op": op_type,
-            "mutation_status": "pending_approval" if not validation_errors else "failed_validation",
+            "mutation_status": (
+                "pending_approval" if not validation_errors else "failed_validation"
+            ),
             "mutation_error": "; ".join(validation_errors) if validation_errors else "",
             "mutation_result_count": len(rows),
             "approval_token": token,

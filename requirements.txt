@@ -1,4 +1,4 @@
-fastapi>=0.100.0
+fastapi>=0.115.0  # TestClient requires httpx<0.28 or fastapi>=0.115 with starlette>=0.40
 uvicorn[standard]>=0.22.0
 pydantic-settings>=2.0.0
 langgraph>=0.1.0
@@ -23,6 +23,7 @@ voyageai>=0.2.0
 tavily-python>=0.3.0
 docling>=2.0.0
 opik>=1.0.0
+moto[s3]>=5.0.0  # S3 storage backend mocking for tests
 python-multipart>=0.0.12
 langgraph-checkpoint-postgres>=0.1.0
 watchtower>=3.0.0

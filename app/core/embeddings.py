@@ -11,6 +11,7 @@ logger = get_logger(__name__)
 
 class OpenAIQuotaError(Exception):
     """Raised when OpenAI returns HTTP 429 (insufficient quota / rate limit)."""
+
     pass
 
 
@@ -26,6 +27,7 @@ def _retry_on_quota(
     After exhausting all retries, raises OpenAIQuotaError with a clear
     message pointing the user to the OpenAI billing dashboard.
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -65,7 +67,9 @@ def _retry_on_quota(
                 "2. Or set a new OPENAI_API_KEY with available quota in the deployment secrets\n"
                 f"Original error: {last_exc}"
             ) from last_exc
+
         return wrapper
+
     return decorator
 
 
