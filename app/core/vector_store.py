@@ -18,7 +18,7 @@ from qdrant_client.models import (
 
 from app.opik import track
 from app.config import get_settings
-from app.core.embeddings import get_embeddings
+from app.core.embeddings import EmbeddingsService
 from app.core.sparse_vector_service import SparseVectorService
 from app.utils.logger import get_logger
 
@@ -42,7 +42,7 @@ class VectorStoreService:
         settings = get_settings()
         self.client = get_qdrant_client()
         self.collection_name = collection_name or settings.collection_name
-        self.embeddings = get_embeddings()
+        self.embeddings = EmbeddingsService()
         self.sparse_service = SparseVectorService()
         self.embedding_dimension = settings.embedding_dimension
         self._ensure_collection()

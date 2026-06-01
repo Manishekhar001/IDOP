@@ -274,6 +274,19 @@ async def upload_document(
                 status_code=429,
                 detail=str(e),
             )
+        # Catch raw openai.RateLimitError as a safety net for any non-embedding routes
+        err_str = str(e).lower()
+        if "429" in err_str or "insufficient_quota" in err_str:
+            logger.error(f"OpenAI quota error during document upload: {e}")
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "OpenAI API quota exhausted. The API key needs more credits.\n"
+                    "To resolve this:\n"
+                    "1. Visit https://platform.openai.com/account/billing to add credits\n"
+                    "2. Or set a new OPENAI_API_KEY with available quota in the deployment secrets"
+                ),
+            )
         logger.error(f"Upload error: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to process document: {str(e)}"

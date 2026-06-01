@@ -21,12 +21,10 @@ from app.core.srag.verifier import get_srag_verifier
 from app.core.vector_store import VectorStoreService
 
 # Feature 1 & 2 Imports
-from app.core.feature1_sql.vanna_service import TextToSQLService
 from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature1_sql.llm_judge import LLMJudge
 from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
-from app.services.cache_init import get_query_cache
 
 from app.opik import track
 from app.utils.logger import get_logger
@@ -709,7 +707,7 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
     Executes simultaneous Text-to-SQL database operations and RAG document search,
     then synthesizes both into a unified, source-cited comprehensive answer.
     """
-    question = state["question"]
+    question = state.get("question", "")
     logger.info(f"Hybrid SQL + RAG node triggered for question: '{question}'")
 
     # Use shared service so schema training and cache are consistent with /sql/generate route
@@ -775,6 +773,7 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
 
     hyde_used = False
     hyde_hypotheses = []
+    reranking_used = False
     retrieval_query = question
 
     try:
@@ -808,7 +807,6 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
         )
 
         # Reranking if enabled!
-        reranking_used = False
         if enable_reranking and docs:
             try:
                 from app.core.feature3_rag.reranking import RerankingService
