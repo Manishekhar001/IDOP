@@ -94,7 +94,7 @@ The primary SQL generation engine, backed by Vanna's ChromaDB-based vectorstore 
 
 ### SQLValidator
 
-A static rule-based validator that blocks dangerous SQL commands:
+A static rule-based validator that enforces **read-only SELECT-only** policy. Every user query is checked against a forbidden command list and must begin with `SELECT`:
 
 | Forbidden Command | Risk |
 |---|---|
@@ -105,13 +105,20 @@ A static rule-based validator that blocks dangerous SQL commands:
 | `REVOKE` | Privilege removal |
 | `CREATE` | Schema creation |
 | `REPLACE` | Data overwrite |
+| `INSERT` | Data insertion |
+| `UPDATE` | Data modification |
+| `DELETE` | Data deletion |
+| `EXECUTE` / `EXEC` | Arbitrary code execution |
 | `COMMIT` | Transaction forcing |
 | `ROLLBACK` | Transaction cancellation |
 
 **Validation process:**
 1. Normalize SQL to uppercase
-2. Regex check against forbidden command list
-3. Returns `(is_safe: bool, error_message: str)`
+2. Word-boundary regex check against forbidden command list (blocks all DDL, DCL, DML except SELECT)
+3. Enforce that query must start with `SELECT`
+4. Returns `(is_safe: bool, error_message: str)`
+
+> ⚠️ **Only read-only `SELECT` queries are permitted.** All DML commands (`INSERT`, `UPDATE`, `DELETE`) are blocked — mutations go through the separate Feature 2 mutation pipeline with its own approval gate.
 
 Source: [sql_validator.py](../app/core/feature1_sql/sql_validator.py)
 
@@ -330,7 +337,7 @@ The SQL pipeline uses **two Redis cache tiers**:
 
 | Layer | Protection |
 |---|---|
-| **SQLValidator** | Blocks DDL/DCL commands — only DML (SELECT, INSERT, UPDATE, DELETE) passes |
+| **SQLValidator** | Blocks ALL non-SELECT commands — only read-only SELECT queries pass. DML (INSERT, UPDATE, DELETE), DDL, DCL, and EXEC are all forbidden. Mutations use the separate Feature 2 pipeline |
 | **LLMJudge** | Detects logical errors in query semantics |
 | **ApprovalGate** | Cryptographic token prevents unauthorized execution |
 | **Single-use tokens** | Prevents replay attacks |

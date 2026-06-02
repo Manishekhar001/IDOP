@@ -77,7 +77,7 @@ graph TB
     API --> CORS --> Routes
     Routes --> Schemas
     Routes -->|"/chat"| CSRAG
-    Routes -->|"/upload"| Nodes
+    Routes -->|"/documents/upload"| Nodes
     Routes -->|"/sql/*"| Nodes
     Routes -->|"/mutation/*"| Nodes
 
@@ -187,9 +187,9 @@ graph TB
 | **Chat** | `/chat` | POST | Primary query endpoint — routes through LangGraph |
 | **Chat** | `/chat/stream` | POST | SSE streaming variant of `/chat` |
 | **Chat** | `/chat/history/{thread_id}` | GET | Retrieve conversation history |
-| **Documents** | `/upload` | POST | Upload PDF/DOCX/CSV/JSON/TXT for RAG indexing |
-| **Documents** | `/documents` | GET | List all indexed documents in Qdrant |
-| **Documents** | `/documents/reset` | DELETE | Wipe and recreate the Qdrant collection |
+| **Documents** | `/documents/upload` | POST | Upload PDF/DOCX/CSV/TXT for RAG indexing |
+| **Documents** | `/documents/info` | GET | Get Qdrant collection info (name, point count, status) |
+| **Documents** | `/documents/collection` | DELETE | Delete and recreate the Qdrant collection |
 | **SQL** | `/sql/generate` | POST | Generate SQL from natural language (Feature 1) |
 | **SQL** | `/sql/approve` | POST | Approve and execute a pending SQL query |
 | **Mutation** | `/mutation/upload` | POST | Upload Excel/CSV for mutation processing (Feature 2) |
@@ -276,4 +276,4 @@ Formatted Response → Client
 - [04 — NL-to-SQL Execution](./04-feature1-sql-execution.md) — Feature 1 deep dive
 - [05 — Mutation Pipeline](./05-feature2-mutation-pipeline.md) — Feature 2 deep dive
 - [06 — RAG Pipeline](./06-feature3-rag-pipeline.md) — Feature 3 deep dive
-- [07 — LangGraph State Machine](./07-langgraph-state-machine.md) — Complete graph definition
+- [07 — LangGraph State Machine](./07-langgraph-state-machine.md) — Complete graph definition, all 18 nodes, conditional edges, and CSRAGState shape (definitive reference — this doc provides the high-level component map only)

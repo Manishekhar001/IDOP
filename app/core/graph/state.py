@@ -41,7 +41,7 @@ class CSRAGState(TypedDict):
     reranking_used: bool
 
     # Existing state continues...
-    isuse: Literal["useful", "not_useful", "skipped", ""]
+    isuse: Literal["useful", "not_useful", ""]
     use_reason: str
 
     # IDOP 5-path Routing State

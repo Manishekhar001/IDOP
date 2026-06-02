@@ -137,7 +137,7 @@ async def upload_document(
             f"Computed doc_id={doc_id[:12]}... for {filename} ({len(file_bytes) / 1024:.1f} KB)"
         )
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         # --- Cache Check ---
         doc_cache = get_doc_cache()
@@ -246,8 +246,6 @@ async def upload_document(
                     metadata,
                 )
                 logger.info(f"Cached {len(chunks)} chunks for {filename}")
-            except Exception as cache_err:
-                logger.warning(f"Failed to cache document {filename}: {cache_err}")
 
         logger.info(
             f"Indexed {filename}: {len(chunks)} chunks, {len(document_ids)} IDs"
@@ -328,7 +326,7 @@ async def delete_collection(
 ) -> dict:
     logger.warning("Collection deletion requested")
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, vector_store.delete_collection)
         return {"message": "Collection deleted successfully"}
     except Exception as e:

@@ -704,10 +704,16 @@ async def stm_summarize_node(state: CSRAGState) -> dict:
 
 
 @track(name="graph_hybrid_generation")
-async def hybrid_generation_node(state: CSRAGState) -> dict:
+async def hybrid_generation_node(
+    state: CSRAGState, *, vector_store: VectorStoreService | None = None
+) -> dict:
     """
     Executes simultaneous Text-to-SQL database operations and RAG document search,
     then synthesizes both into a unified, source-cited comprehensive answer.
+
+    Args:
+        vector_store: Shared VectorStoreService instance from app lifespan.
+                      If None, creates a new one (fallback for direct calls).
     """
     question = state.get("question", "")
     logger.info(f"Hybrid SQL + RAG node triggered for question: '{question}'")
@@ -801,7 +807,8 @@ async def hybrid_generation_node(state: CSRAGState) -> dict:
             f"Hybrid: Querying Qdrant vector store (top_k={top_k}, search_mode={search_mode})..."
         )
         settings = get_settings()
-        vector_store = VectorStoreService()
+        if vector_store is None:
+            vector_store = VectorStoreService()
 
         # Call vector store hybrid search (runs synchronously under asyncio.to_thread)
         docs = await asyncio.to_thread(

@@ -108,9 +108,9 @@ The entire engine is dynamically configurable per-request via the `ChatRequest` 
 | Param Name | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | **search_mode** | `Literal['dense', 'sparse', 'hybrid']` | `'hybrid'` | Specifies which vector search method to use in Qdrant |
-| **top_k** | `int` | `5` | Number of document chunks to retrieve |
-| **enable_hyde** | `bool` | `True` | Toggles Hypothetical Document Embeddings generation |
-| **enable_reranking** | `bool` | `True` | Toggles Voyage AI Rerank-2.5 step |
+| **top_k** | `int` | `4` | Number of document chunks to retrieve (range: 1–20) |
+| **enable_hyde** | `bool` | `False` | Toggles Hypothetical Document Embeddings generation |
+| **enable_reranking** | `bool` | `False` | Toggles Voyage AI Rerank-2.5 step |
 
 ---
 

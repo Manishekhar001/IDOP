@@ -68,7 +68,7 @@ class WebSearchService:
     async def search(self, query: str) -> list[Document]:
         logger.info(f"Tavily web search: '{query}'")
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             results = await loop.run_in_executor(
                 None, lambda: self._tavily.invoke({"query": query})
             )

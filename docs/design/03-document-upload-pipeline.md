@@ -18,7 +18,7 @@ Every document passes through: **SHA-256 dedup check** → **parsing** → **chu
 
 ```mermaid
 graph TB
-    subgraph Upload["FastAPI /upload Endpoint"]
+    subgraph Upload["FastAPI /documents/upload Endpoint"]
         style Upload fill:#e8f4fd,stroke:#2196F3,stroke-width:2px
         Client["Client uploads file<br/>(PDF / TXT / CSV)"]
         Validate["Validate file extension<br/>.pdf / .txt / .csv"]
@@ -39,7 +39,7 @@ graph TB
 
     subgraph Parse["Document Parsing"]
         style Parse fill:#f3e5f5,stroke:#9C27B0,stroke-width:2px
-        PDFLoader["PyPDFLoader<br/>(PDF files)"]
+        PDFLoader["Docling DocumentConverter<br/>(PDF files)"]
         TextLoader["TextLoader<br/>(TXT files)"]
         CSVLoader["CSVLoader<br/>(CSV files)"]
     end
@@ -91,7 +91,7 @@ graph TB
 
 ### File Upload Endpoint
 
-- **Route:** `POST /upload`
+- **Route:** `POST /documents/upload`
 - **Accepts:** Multipart file upload
 - **Supported extensions:** `.pdf`, `.txt`, `.csv`
 - Unsupported extensions return `400 Bad Request` with supported format list

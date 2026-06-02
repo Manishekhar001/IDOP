@@ -46,12 +46,15 @@ def build_graph(
     retrieve_with_store = functools.partial(
         retrieve_docs_node, vector_store=vector_store
     )
+    hybrid_with_store = functools.partial(
+        hybrid_generation_node, vector_store=vector_store
+    )
 
     # 5-Path Routing Nodes
     builder.add_node("router", router_node)
     builder.add_node("sql_gen", sql_generation_node)
     builder.add_node("mutation", mutation_node)
-    builder.add_node("hybrid_gen", hybrid_generation_node)
+    builder.add_node("hybrid_gen", hybrid_with_store)
 
     # CSRAG Nodes
     builder.add_node("ltm_remember", ltm_remember_node)

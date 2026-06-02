@@ -21,10 +21,10 @@ python-dotenv>=1.0.0
 loguru>=0.7.0
 voyageai>=0.2.0
 tavily-python>=0.3.0
-docling>=2.0.0
-opik>=1.0.0
+docling>=2.96.1  # py3-none-any wheel — Python 3.13 classifier confirmed
+opik>=2.0.54    # py3-none-any wheel — Python 3.13 classifier confirmed
 moto[s3]>=5.0.0  # S3 storage backend mocking for tests
 python-multipart>=0.0.12
-langgraph-checkpoint-postgres>=0.1.0
+langgraph-checkpoint-postgres>=3.0.5  # py3-none-any wheel — Python >= 3.10, 3.13 compatible
 watchtower>=3.0.0
 

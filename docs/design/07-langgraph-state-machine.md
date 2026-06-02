@@ -279,7 +279,12 @@ async def compile_idop_graph(conn_string: str):
 
 ## Related Workflows
 
-*   [02-unified-query-flow](./02-unified-query-flow.md) - The high-level API entry routes.
-*   [06-feature3-rag-pipeline](./06-feature3-rag-pipeline.md) - The RAG pipeline nodes details.
-*   [11-memory-system](./11-memory-system.md) - Deep dive into LTM Async Store and STM Saver mechanics.
-*   [13-service-initialization](./13-service-initialization.md) - Graph compilation during FastAPI lifespan hooks.
+*   [01-system-architecture](./01-system-architecture.md) — High-level component map, API endpoint list, deployment layout (this doc is the definitive graph reference).
+*   [02-unified-query-flow](./02-unified-query-flow.md) — The 5-path router entry routes.
+*   [04-feature1-sql-execution](./04-feature1-sql-execution.md) — SQL generation node (`sql_gen`) deep dive — Vanna, validator, LLM judge, approval gate.
+*   [05-feature2-mutation-pipeline](./05-feature2-mutation-pipeline.md) — Mutation node deep dive — file parsing, column mapping, business rules.
+*   [06-feature3-rag-pipeline](./06-feature3-rag-pipeline.md) — CSRAG pipeline deep dive — HyDE, hybrid search, reranking, CRAG, SRAG.
+*   [09-crag-pipeline](./09-crag-pipeline.md) — CRAG scoring details (the `evaluate_docs` node).
+*   [10-srag-pipeline](./10-srag-pipeline.md) — SRAG verification loops (`verify_support`, `verify_usefulness`).
+*   [11-memory-system](./11-memory-system.md) — LTM store and STM checkpointer mechanics.
+*   [13-service-initialization](./13-service-initialization.md) — Graph compilation during FastAPI lifespan hooks.
