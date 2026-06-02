@@ -939,7 +939,7 @@ Provide your answer in professional markdown with clear headings, bullet points,
 
 def route_after_router(
     state: CSRAGState,
-) -> Literal["sql_gen", "ltm_remember", "chat", "hybrid"]:
+) -> Literal["sql_gen", "mutation", "ltm_remember", "chat", "hybrid"]:
     q_type = state.get("query_type", "CHAT")
     if q_type == "SQL":
         return "sql_gen"
