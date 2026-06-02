@@ -25,13 +25,12 @@ from app.api.routes import (  # noqa: E402
     mutation,
     cache,
 )
-from app.config import get_settings  # noqa: E402
+from app.config import get_settings, __version__  # noqa: E402
 from app.core.csrag_engine import CSRAGEngine  # noqa: E402
 from app.core.vector_store import VectorStoreService  # noqa: E402
 from app.utils.logger import get_logger, setup_logging  # noqa: E402
 
 settings = get_settings()
-__version__ = "0.1.1"
 
 # Stores async context managers (from from_conn_string) indexed by resource id.
 # We MUST keep these alive until shutdown — otherwise Python's async generator GC

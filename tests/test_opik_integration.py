@@ -30,12 +30,24 @@ def test_opik_package_importable():
 
 
 def test_app_opik_module_imports():
-    """Verify app.opik module loads cleanly with OPIK available when installed."""
+    """Verify app.opik module loads cleanly.
+
+    When OPIK_TRACK_DISABLE is set to true (e.g. in test env), the real
+    Opik SDK import is skipped entirely — OPIK_AVAILABLE is False but
+    the no-op track decorator is still callable.
+    When OPIK_TRACK_DISABLE is not set, OPIK_AVAILABLE should be True.
+    """
     from app.opik import OPIK_AVAILABLE, track as app_track
 
-    assert (
-        OPIK_AVAILABLE is True
-    ), "OPIK_AVAILABLE should be True when opik package is installed"
+    opik_disabled = os.environ.get("OPIK_TRACK_DISABLE", "").lower() in ("true", "1")
+    if opik_disabled:
+        assert (
+            OPIK_AVAILABLE is False
+        ), "OPIK_AVAILABLE should be False when OPIK_TRACK_DISABLE=true"
+    else:
+        assert (
+            OPIK_AVAILABLE is True
+        ), "OPIK_AVAILABLE should be True when opik package is installed and not disabled"
     assert callable(app_track)
 
 

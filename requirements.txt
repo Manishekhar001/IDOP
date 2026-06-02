@@ -13,7 +13,6 @@ vanna>=0.2.0
 pandas>=2.0.0
 openpyxl>=3.1.0
 psycopg[binary]>=3.1.0
-psycopg2-binary>=2.9.0
 boto3>=1.28.0
 numpy>=1.24.0
 python-docx>=1.0.0
@@ -26,5 +25,6 @@ opik>=2.0.54    # py3-none-any wheel — Python 3.13 classifier confirmed
 moto[s3]>=5.0.0  # S3 storage backend mocking for tests
 python-multipart>=0.0.12
 langgraph-checkpoint-postgres>=3.0.5  # py3-none-any wheel — Python >= 3.10, 3.13 compatible
+langgraph-store-postgres>=0.1.0  # Required by langgraph.store.postgres.aio
 watchtower>=3.0.0
 

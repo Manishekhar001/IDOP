@@ -94,7 +94,9 @@ def build_graph(
     builder.add_edge(
         "generate_direct", "stm_summarize"
     )  # LOGIC-01: summarize conversation even for direct responses
-    builder.add_edge("hybrid_gen", "stm_summarize")
+    # Route HYBRID through SRAG verification so the synthesized answer
+    # gets the same support and usefulness checks as the RAG pipeline.
+    builder.add_edge("hybrid_gen", "verify_support")
 
     # Ingest document RAG pipeline sequence
     builder.add_edge("ltm_remember", "decide_retrieval")

@@ -3,6 +3,10 @@ from typing import Optional
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Single source of truth for the application version.
+# Imported by main.py and the settings object.
+__version__ = "0.1.1"
+
 
 class Settings(BaseSettings):
     @model_validator(mode="after")
@@ -51,7 +55,7 @@ class Settings(BaseSettings):
 
     # General App Config
     app_name: str = "Intelligent Data Operations Platform (IDOP)"
-    app_version: str = "0.1.1"
+    app_version: str = __version__
     environment: str = "development"
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"

@@ -85,8 +85,7 @@ class MutationApprovalGate:
                 logger.error(
                     f"Failed to persist mutation approval token in PostgreSQL: {e}"
                 )
-                if conn:
-                    conn.rollback()
+                conn.rollback()
             finally:
                 conn.close()
         else:
@@ -119,7 +118,6 @@ class MutationApprovalGate:
                         # Synchronize memory state if database is source of truth
                         if mutation_id in self.active_sessions:
                             del self.active_sessions[mutation_id]
-                        conn.close()
                         return False
 
                     stored_token = row[0]
@@ -139,21 +137,17 @@ class MutationApprovalGate:
                         logger.info(
                             f"✓ Verification success: Database mutation session closed for ID {mutation_id}"
                         )
-                        conn.close()
                         return True
 
                     logger.warning(
                         f"Verification failed: Incorrect token in DB for Mutation ID {mutation_id}"
                     )
-                    conn.close()
                     return False
             except Exception as e:
                 logger.error(
                     f"Database mutation token verification failed: {e}. Falling back to memory validation."
                 )
-                if conn:
-                    conn.rollback()
-                    conn.close()
+                conn.rollback()
             finally:
                 if conn and not conn.closed:
                     conn.close()

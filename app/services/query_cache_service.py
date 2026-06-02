@@ -14,6 +14,11 @@ class QueryCacheService:
     # Shared class-level local cache so all instances share the same data
     _local_cache_shared: Dict[str, str] = {}
 
+    @classmethod
+    def reset_local_cache(cls) -> None:
+        """Clear the shared in-memory local cache. Useful for test isolation."""
+        cls._local_cache_shared.clear()
+
     def __init__(
         self, redis_url: Optional[str] = None, redis_token: Optional[str] = None
     ):

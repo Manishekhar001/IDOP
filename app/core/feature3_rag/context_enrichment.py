@@ -11,10 +11,14 @@ class ContextEnrichmentService:
     """
     Implements Context Enrichment Window. Fetches neighboring chunks
     chronologically to expand the context window around each retrieved chunk.
+
+    Accepts an optional shared VectorStoreService to avoid creating a new
+    Qdrant connection on every enrichment. Falls back to creating one if
+    none is provided.
     """
 
-    def __init__(self):
-        self.vector_store = VectorStoreService()
+    def __init__(self, vector_store: VectorStoreService | None = None):
+        self.vector_store = vector_store or VectorStoreService()
 
     @track(name="context_enrichment_enrich")
     def enrich_documents(

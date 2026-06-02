@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.api.schemas import (
@@ -162,10 +163,12 @@ async def upload_mutation(
                 detail=f"Spreadsheet contains {len(rows)} rows, which exceeds the allowed maximum of {limit} rows.",
             )
 
-        # 2. Column Mapping
+        # 2. Column Mapping (synchronous OpenAI — offload to thread)
         headers = list(rows[0].keys())
         if parsed_auto_map:
-            col_mappings = mapper.get_semantic_mapping(table_name, headers)
+            col_mappings = await asyncio.to_thread(
+                mapper.get_semantic_mapping, table_name, headers
+            )
         else:
             col_mappings = {h: h for h in headers}
 
@@ -187,7 +190,7 @@ async def upload_mutation(
 
         # 4. Classify Mutation Type (INSERT, UPDATE, DELETE)
         classifier = OpClassifier()
-        op_type = classifier.classify_operation(request_intent)
+        op_type = await asyncio.to_thread(classifier.classify_operation, request_intent)
 
         # Generate SQL
         sql = ""
@@ -205,16 +208,16 @@ async def upload_mutation(
                 table_name, mapped_rows, primary_key=pk
             )
 
-        # 5. LLM Judge Audit Check
-        is_approved, explanation = judge.audit_mutation(
-            request_intent, table_name, op_type
+        # 5. LLM Judge Audit Check (synchronous OpenAI — offload to thread)
+        is_approved, explanation = await asyncio.to_thread(
+            judge.audit_mutation, request_intent, table_name, op_type
         )
         if not is_approved:
             validation_errors.append(f"Audit Warning: {explanation}")
 
-        # 6. Session setup
+        # 6. Session setup (synchronous psycopg2 — offload to thread)
         mutation_id = str(uuid.uuid4())
-        token = gate.generate_session(mutation_id)
+        token = await asyncio.to_thread(gate.generate_session, mutation_id)
 
         shared_pending_mutations[mutation_id] = {
             "table_name": table_name,
@@ -294,7 +297,9 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
 
     # 1. Verify Cryptographic Token
     if body.approved:
-        if not gate.verify_and_close_session(body.mutation_id, body.token):
+        if not await asyncio.to_thread(
+            gate.verify_and_close_session, body.mutation_id, body.token
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Invalid, expired or already used cryptographic approval token.",
@@ -321,19 +326,27 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
     try:
         rows_affected = 0
         if op_type == "INSERT":
-            rows_affected = executor.execute_insert_transaction(
+            rows_affected = await asyncio.to_thread(
+                executor.execute_insert_transaction,
                 body.mutation_id,
                 table_name,
                 session_info["sql"],
                 session_info["params"],
             )
         elif op_type == "UPDATE":
-            rows_affected = executor.execute_updates_transaction(
-                body.mutation_id, table_name, session_info["updates"]
+            rows_affected = await asyncio.to_thread(
+                executor.execute_updates_transaction,
+                body.mutation_id,
+                table_name,
+                session_info["updates"],
             )
         elif op_type == "DELETE":
-            rows_affected = executor.execute_delete_transaction(
-                body.mutation_id, table_name, session_info["sql"], session_info["ids"]
+            rows_affected = await asyncio.to_thread(
+                executor.execute_delete_transaction,
+                body.mutation_id,
+                table_name,
+                session_info["sql"],
+                session_info["ids"],
             )
 
         # Remove from pending queue

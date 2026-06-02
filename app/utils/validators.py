@@ -21,9 +21,12 @@ class ValidationError(Exception):
 class FileValidator:
     """Validates uploaded document files against allowed types and size limits.
 
-    Must stay in sync with DocumentProcessor.SUPPORTED_EXTENSIONS.
+    ALLOWED_EXTENSIONS keys are validated against
+    DocumentProcessor.SUPPORTED_EXTENSIONS at test time
+    (see TestExtensionSync in tests/test_features.py).
     """
 
+    # Sync verified by TestExtensionSync.test_validator_extensions_match_document_processor
     ALLOWED_EXTENSIONS: dict[str, str] = {
         ".pdf": "application/pdf",
         ".csv": "text/csv",

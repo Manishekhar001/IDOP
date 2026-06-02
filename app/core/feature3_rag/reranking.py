@@ -15,7 +15,7 @@ class RerankingService:
     def __init__(self):
         settings = get_settings()
         self.api_key = settings.voyage_api_key
-        self.model = "rerank-2"
+        self.model = "rerank-2.5"
         self.enabled = False
 
         if self.api_key:

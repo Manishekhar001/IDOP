@@ -426,3 +426,43 @@ class TestRuleValidator:
         is_valid, errors = validator.validate_rows("products", rows)
         assert is_valid is False
         assert "integer" in errors[0].lower()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Extension Sync Validation Tests
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestExtensionSync:
+    """
+    Validates that FileValidator.ALLOWED_EXTENSIONS keys stay in sync
+    with DocumentProcessor.SUPPORTED_EXTENSIONS.
+
+    DocumentProcessor.SUPPORTED_EXTENSIONS is the authoritative allow-list
+    for file types. FileValidator.ALLOWED_EXTENSIONS must mirror it exactly
+    so that validation rejects the same extensions that the processor cannot
+    handle.
+    """
+
+    def test_validator_extensions_match_document_processor(self):
+        """
+        FileValidator.ALLOWED_EXTENSIONS keys must be an exact match
+        with DocumentProcessor.SUPPORTED_EXTENSIONS.
+        """
+        # Lazy import: DocumentProcessor triggers docling/langchain imports (slow).
+        from app.core.document_processor import DocumentProcessor
+        from app.utils.validators import FileValidator
+
+        validator_keys = set(FileValidator.ALLOWED_EXTENSIONS.keys())
+        processor_exts = DocumentProcessor.SUPPORTED_EXTENSIONS
+
+        missing_in_validator = processor_exts - validator_keys
+        extra_in_validator = validator_keys - processor_exts
+
+        assert validator_keys == processor_exts, (
+            f"Extension sets out of sync!\n"
+            f"  Missing from FileValidator: {missing_in_validator}\n"
+            f"  Extra in FileValidator: {extra_in_validator}\n"
+            f"  FileValidator keys: {sorted(validator_keys)}\n"
+            f"  DocumentProcessor: {sorted(processor_exts)}"
+        )

@@ -246,6 +246,8 @@ async def upload_document(
                     metadata,
                 )
                 logger.info(f"Cached {len(chunks)} chunks for {filename}")
+            except Exception as e:
+                logger.warning(f"Failed to cache chunks for {filename}: {e}")
 
         logger.info(
             f"Indexed {filename}: {len(chunks)} chunks, {len(document_ids)} IDs"

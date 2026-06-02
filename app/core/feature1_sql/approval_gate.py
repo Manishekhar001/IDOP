@@ -83,8 +83,7 @@ class ApprovalGate:
                     )
             except Exception as e:
                 logger.error(f"Failed to persist approval token in PostgreSQL: {e}")
-                if conn:
-                    conn.rollback()
+                conn.rollback()
             finally:
                 conn.close()
         else:
@@ -115,7 +114,6 @@ class ApprovalGate:
                         # Synchronize memory state if database is source of truth
                         if query_id in self.active_sessions:
                             del self.active_sessions[query_id]
-                        conn.close()
                         return False
 
                     stored_token = row[0]
@@ -135,21 +133,17 @@ class ApprovalGate:
                         logger.info(
                             f"✓ Verification success: Database session closed for query {query_id}"
                         )
-                        conn.close()
                         return True
 
                     logger.warning(
                         f"Verification failed: Incorrect token in DB for query {query_id}"
                     )
-                    conn.close()
                     return False
             except Exception as e:
                 logger.error(
                     f"Database token verification failed: {e}. Falling back to memory validation."
                 )
-                if conn:
-                    conn.rollback()
-                    conn.close()
+                conn.rollback()
             finally:
                 if conn and not conn.closed:
                     conn.close()

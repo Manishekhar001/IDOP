@@ -5,6 +5,12 @@ Inject OPIK environment variables BEFORE importing the SDK so they are
 picked up during module initialisation. If OPIK is not installed, no-op
 implementations are provided so that @track annotations, start_as_current_trace,
 start_as_current_span, and opik_context are always safe to use.
+
+Import optimisation:
+  Setting OPIK_TRACK_DISABLE=true completely skips importing the real
+  opik SDK (which takes ~5s due to OpenTelemetry / httpx / grpcio).
+  This is safe because every module that uses @track has already been
+  written to handle a no-op decorator.
 """
 
 import os
@@ -22,18 +28,29 @@ if getattr(settings, "opik_api_key", None):
     if getattr(settings, "opik_project_name", None):
         os.environ["OPIK_PROJECT_NAME"] = settings.opik_project_name
 
-# OPIK monitoring (optional — gracefully handles if not configured)
-try:
-    from opik import track  # noqa: F401
-    from opik import start_as_current_trace, start_as_current_span  # noqa: F401
-    from opik import opik_context  # noqa: F401
+# ──────────────────────────────────────────────────────────────────
+# Optimisation: check OPIK_TRACK_DISABLE BEFORE importing the real
+# opik SDK.  `opik.config` pulls in OpenTelemetry + httpx + grpcio
+# and adds ~5 s to every cold import chain.
+# ──────────────────────────────────────────────────────────────────
+_OPIK_DISABLED = os.environ.get("OPIK_TRACK_DISABLE", "").lower() in ("true", "1")
 
-    OPIK_AVAILABLE = True
-except ImportError:
+if not _OPIK_DISABLED:
+    try:
+        # OPIK monitoring (optional — gracefully handles if not configured)
+        from opik import track  # noqa: F401
+        from opik import start_as_current_trace, start_as_current_span  # noqa: F401
+        from opik import opik_context  # noqa: F401
+
+        OPIK_AVAILABLE = True
+    except ImportError:
+        OPIK_AVAILABLE = False
+else:
     OPIK_AVAILABLE = False
 
+if not OPIK_AVAILABLE:
     # ── No-op decorator ──────────────────────────────────────────────
-    def track(name=None, **kwargs):  # type: ignore  # noqa: F811
+    def track(name=None, **kwargs):  # type: ignore
         def decorator(func):
             return func
 
@@ -41,11 +58,11 @@ except ImportError:
 
     # ── No-op context managers for astream ────────────────────────────
     @contextmanager
-    def start_as_current_trace(**kwargs):  # type: ignore  # noqa: F811
+    def start_as_current_trace(**kwargs):  # type: ignore
         yield
 
     @contextmanager
-    def start_as_current_span(**kwargs):  # type: ignore  # noqa: F811
+    def start_as_current_span(**kwargs):  # type: ignore
         yield
 
     # ── No-op opik_context ───────────────────────────────────────────
@@ -56,4 +73,4 @@ except ImportError:
         def update_current_trace(self, **kwargs):
             pass
 
-    opik_context = _FakeOpikContext()  # type: ignore  # noqa: F811
+    opik_context = _FakeOpikContext()  # type: ignore

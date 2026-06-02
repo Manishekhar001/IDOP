@@ -55,7 +55,7 @@ class CRAGEvaluator:
 
         llm = ChatOpenAI(
             model=settings.memory_llm_model,
-            temperature=settings.llm_temperature,
+            temperature=settings.memory_llm_temperature,
             api_key=settings.openai_api_key,
         )
         self._eval_chain = _DOC_EVAL_PROMPT | llm.with_structured_output(DocEvalScore)

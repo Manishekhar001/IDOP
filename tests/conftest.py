@@ -106,19 +106,29 @@ def mock_settings():
     """
     from unittest.mock import patch
     from app.services.cache_init import reset_caches
+    from app.services.pending_store import reset_pending_store
 
-    reset_caches()
+    reset_caches()          # also clears QueryCacheService._local_cache_shared
     _get_settings.cache_clear()
 
+    # IMPORTANT: reset_pending_store() calls PendingStore.clear() which tries to
+    # connect to the database. The patch below ensures _get_connection returns
+    # None (no DB available in tests), avoiding a ~30s TCP timeout per call.
     with patch(
         "app.core.feature1_sql.approval_gate.ApprovalGate._get_connection",
         return_value=None,
     ), patch(
         "app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection",
         return_value=None,
+    ), patch(
+        "app.services.pending_store.PendingStore._get_connection",
+        return_value=None,
     ):
+        reset_pending_store()
         yield _get_settings()
-    reset_caches()
+    reset_caches()          # also clears QueryCacheService._local_cache_shared
+    # reset_pending_store() is called after patching ends but PendingStore now
+    # has connect_timeout=2, so even if it tries to connect it fails fast.
 
 
 # ---------------------------------------------------------------------------

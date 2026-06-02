@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import uuid
 from functools import lru_cache
 from typing import Literal
 
@@ -33,6 +34,8 @@ from app.utils.logger import get_logger
 # so that schema training state and query cache are consistently shared with
 # the module-level sql_service in app.api.routes.sql.
 from app.core.feature1_sql.shared import sql_service as shared_sql_service
+
+import pandas as pd
 
 logger = get_logger(__name__)
 
@@ -132,8 +135,8 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             # Still offer with warning or mark rejected
             explanation = f"⚠️ LLM Judge Warning: {explanation}"
 
-        # Cryptographic Token Session
-        token = gate.generate_session(query_id)
+        # Cryptographic Token Session (synchronous psycopg2 — offload to thread)
+        token = await asyncio.to_thread(gate.generate_session, query_id)
 
         # Store in SHARED pending_queries so /sql/approve route can find it
         shared_pending_queries[query_id] = {
@@ -142,6 +145,12 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             "status": "pending_approval",
             "token": token,
         }
+
+        # Clean up the orphaned entry in TextToSQLService's internal pending_queries
+        # (generate_sql_for_approval stores there as a side effect, but the approval
+        # route only reads from shared_pending_queries above).
+        if query_id in sql_service.pending_queries:
+            del sql_service.pending_queries[query_id]
 
         return {
             "sql_query": sql,
@@ -186,18 +195,16 @@ async def mutation_node(state: CSRAGState) -> dict:
     from app.core.feature2_mutation.approval_gate import mutation_approval_gate as gate
     from app.services.pending_store import pending_mutations as shared_pending_mutations
 
-    import uuid
-
     try:
         # Determine mutation context from state
         table_name = state.get("mutation_table", "")
         op_type = state.get("mutation_op", "")
         rows = state.get("mutation_rows", [])
 
-        # Classify operation if not pre-set
+        # Classify operation if not pre-set (runs synchronously — offload to thread)
         if not op_type and question:
             classifier = OpClassifier()
-            op_type = classifier.classify_operation(question)
+            op_type = await asyncio.to_thread(classifier.classify_operation, question)
 
         # Guide user for bulk operations that need file upload
         if not table_name or not rows:
@@ -236,14 +243,16 @@ async def mutation_node(state: CSRAGState) -> dict:
         elif op_type == "DELETE":
             sql, ids = generator.generate_delete(table_name, rows, primary_key=pk)
 
-        # LLM Judge audit
-        is_approved, explanation = judge.audit_mutation(question, table_name, op_type)
+        # LLM Judge audit (synchronous OpenAI call — offload to thread)
+        is_approved, explanation = await asyncio.to_thread(
+            judge.audit_mutation, question, table_name, op_type
+        )
         if not is_approved:
             validation_errors.append(f"Audit Warning: {explanation}")
 
-        # Create approval session
+        # Create approval session (synchronous psycopg2 — offload to thread)
         mutation_id = str(uuid.uuid4())
-        token = gate.generate_session(mutation_id)
+        token = await asyncio.to_thread(gate.generate_session, mutation_id)
 
         shared_pending_mutations[mutation_id] = {
             "table_name": table_name,
@@ -354,8 +363,6 @@ async def decide_retrieval_node(state: CSRAGState) -> dict:
 
 @track(name="graph_generate_direct")
 async def generate_direct_node(state: CSRAGState) -> dict:
-    import uuid
-
     llm = _get_chat_llm()
     system_msg = _build_system_prompt(
         state.get("ltm_context", ""),
@@ -438,7 +445,7 @@ async def retrieve_docs_node(
     try:
         from app.core.feature3_rag.context_enrichment import ContextEnrichmentService
 
-        enricher = ContextEnrichmentService()
+        enricher = ContextEnrichmentService(vector_store=vector_store)
         docs = enricher.enrich_documents(
             docs, num_neighbors=1, chunk_overlap=get_settings().chunk_overlap
         )
@@ -678,8 +685,6 @@ async def rewrite_question_node(state: CSRAGState) -> dict:
 
 @track(name="graph_stm_summarize")
 async def stm_summarize_node(state: CSRAGState) -> dict:
-    import uuid
-
     answer = state.get("answer", "")
     ai_msg = AIMessage(content=answer, id=str(uuid.uuid4()))
 
@@ -832,7 +837,7 @@ async def hybrid_generation_node(
                 ContextEnrichmentService,
             )
 
-            enricher = ContextEnrichmentService()
+            enricher = ContextEnrichmentService(vector_store=vector_store)
             docs = enricher.enrich_documents(
                 docs, num_neighbors=1, chunk_overlap=settings.chunk_overlap
             )
@@ -840,11 +845,28 @@ async def hybrid_generation_node(
             logger.error(f"Hybrid RAG context enrichment failed: {enrich_err}")
 
         # CRAG verification
+        web_docs = []
         if docs:
             evaluator = get_crag_evaluator()
             verdict, reason, crag_good_docs = await evaluator.evaluate(question, docs)
             crag_verdict = verdict
             good_docs = crag_good_docs
+
+            # Web search fallback for INCORRECT or AMBIGUOUS verdicts
+            if crag_verdict in ("INCORRECT", "AMBIGUOUS"):
+                try:
+                    svc = get_web_search_service()
+                    web_query = await svc.rewrite_query(question)
+                    web_docs = await svc.search(web_query)
+                    logger.info(f"Hybrid: Web search returned {len(web_docs)} docs for {crag_verdict} verdict")
+                except Exception as web_err:
+                    logger.error(f"Hybrid web search fallback failed: {web_err}")
+
+            # Merge docs: for INCORRECT use web only, for AMBIGUOUS use both
+            if verdict == "INCORRECT":
+                good_docs = web_docs
+            elif verdict == "AMBIGUOUS":
+                good_docs = good_docs + web_docs
 
             # Sentence refinement
             raw_context = "\n\n".join(d.page_content for d in good_docs).strip()
@@ -884,8 +906,6 @@ async def hybrid_generation_node(
     # Format database data for LLM
     db_context = "No database results retrieved."
     if sql_results:
-        import pandas as pd
-
         df = pd.DataFrame(sql_results)
         db_context = f"SQL Query Executed:\n{sql_query}\n\nQuery Results (CSV Format):\n{df.to_csv(index=False)}"
 

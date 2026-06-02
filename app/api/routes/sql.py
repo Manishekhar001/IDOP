@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from app.api.schemas import (
     SQLApprovalRequest,
@@ -64,8 +65,8 @@ async def generate_sql(body: SQLGenerationRequest) -> SQLResponse:
             vanna_top_p=body.vanna_top_p,
         )
 
-        # Crypto gate generation
-        token = gate.generate_session(res["query_id"])
+        # Crypto gate generation (synchronous psycopg2 — offload to thread)
+        token = await asyncio.to_thread(gate.generate_session, res["query_id"])
 
         # Store in shared pending store so graph nodes and routes share the same data
         query_id = res["query_id"]
@@ -132,7 +133,9 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
 
     # 1. Verify Cryptographic Token
     if body.approved:
-        if not gate.verify_and_close_session(body.query_id, body.token):
+        if not await asyncio.to_thread(
+            gate.verify_and_close_session, body.query_id, body.token
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Invalid, expired or already used cryptographic approval token.",
@@ -162,7 +165,9 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
 
     try:
         # Run standard execute and log
-        results = executor.execute_and_log(body.query_id, question, sql)
+        results = await asyncio.to_thread(
+            executor.execute_and_log, body.query_id, question, sql
+        )
 
         # Remove from pending queue
         if body.query_id in shared_pending_queries:

@@ -58,10 +58,11 @@ def get_query_cache() -> Optional[QueryCacheService]:
 
 
 def reset_caches() -> None:
-    """Reset both cache singletons. Useful for testing or hot-reloading config."""
+    """Reset both cache singletons and clear in-memory cache data. Useful for testing or hot-reloading config."""
     global _doc_cache, _query_cache, _doc_cache_init_attempted, _query_cache_init_attempted
     _doc_cache = None
     _query_cache = None
     _doc_cache_init_attempted = False
     _query_cache_init_attempted = False
+    QueryCacheService.reset_local_cache()
     logger.info("Cache singletons reset — next access will re-initialize")
