@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
 from app.opik import track
@@ -13,7 +14,14 @@ class RuleValidator:
     Validates rows of payload data against business guardrails configured in business_rules/rules.json.
     """
 
-    def __init__(self, rules_path: str = "business_rules/rules.json"):
+    def __init__(self, rules_path: str | None = None):
+        if rules_path is None:
+            # Resolve relative to the project root (app/core/feature2_mutation/ -> ../.. -> project root)
+            rules_path = str(
+                Path(__file__).resolve().parent.parent.parent.parent
+                / "business_rules"
+                / "rules.json"
+            )
         self.rules_path = rules_path
         self.rules = {}
         self.load_rules()

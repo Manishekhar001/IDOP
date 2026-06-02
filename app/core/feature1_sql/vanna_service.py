@@ -199,7 +199,6 @@ class TextToSQLService:
             openai_api_key=self.openai_api_key,
             database_url=self.database_url,
         )
-        self.pending_queries: Dict[str, Dict[str, Any]] = {}
         self.is_trained = False
         self.schema_context = ""
 
@@ -530,16 +529,8 @@ class TextToSQLService:
                 logger.info(
                     f"SQL generation cache HIT for question: '{question[:50]}...'"
                 )
-                query_id = str(uuid.uuid4())
-                self.pending_queries[query_id] = {
-                    "question": question,
-                    "sql": cached_result["sql"],
-                    "status": "pending_approval",
-                    "generated_at": pd.Timestamp.now().isoformat(),
-                    "cache_hit": True,
-                }
                 return {
-                    "query_id": query_id,
+                    "query_id": str(uuid.uuid4()),
                     "question": question,
                     "sql": cached_result["sql"],
                     "explanation": (
@@ -631,17 +622,8 @@ Do not include any additional text outside the code block.
                     f"SQL generation cache MISS - cached for '{question[:50]}...' (TTL: {ttl}s)"
                 )
 
-            query_id = str(uuid.uuid4())
-            self.pending_queries[query_id] = {
-                "question": question,
-                "sql": sql,
-                "status": "pending_approval",
-                "generated_at": pd.Timestamp.now().isoformat(),
-                "cache_hit": False,
-            }
-
             return {
-                "query_id": query_id,
+                "query_id": str(uuid.uuid4()),
                 "question": question,
                 "sql": sql,
                 "explanation": explanation,
@@ -652,90 +634,10 @@ Do not include any additional text outside the code block.
         except Exception as e:
             raise Exception(f"Failed to generate SQL: {str(e)}")
 
-    async def execute_approved_query(
-        self, query_id: str, approved: bool
-    ) -> dict[str, Any]:
-        settings = get_settings()
-        if query_id not in self.pending_queries:
-            return {"error": "Query ID not found", "status": "error"}
-
-        query_info = self.pending_queries[query_id]
-
-        if not approved:
-            del self.pending_queries[query_id]
-            return {
-                "query_id": query_id,
-                "status": "rejected",
-                "message": "Query execution cancelled by user",
-            }
-
-        sql = query_info["sql"]
-        is_select_query = sql.strip().upper().startswith("SELECT")
-
-        if (
-            is_select_query
-            and self.query_cache_service
-            and (self.query_cache_service.enabled or self.query_cache_service.use_local)
-        ):
-            cache_key = self.query_cache_service.get_sql_result_key(sql)
-            cached_result = self.query_cache_service.get(
-                cache_key, cache_type="sql_result"
-            )
-
-            if cached_result and "results" in cached_result:
-                logger.info(f"SQL result cache HIT for query: '{sql[:50]}...'")
-                del self.pending_queries[query_id]
-                return {
-                    "query_id": query_id,
-                    "question": query_info["question"],
-                    "sql": sql,
-                    "results": cached_result["results"],
-                    "result_count": cached_result["result_count"],
-                    "status": "executed",
-                    "cache_hit": True,
-                    "cached_at": cached_result.get("executed_at"),
-                }
-
-        try:
-            results = await self.vanna.execute_sql_async(sql)
-
-            if (
-                is_select_query
-                and self.query_cache_service
-                and (
-                    self.query_cache_service.enabled
-                    or self.query_cache_service.use_local
-                )
-            ):
-                cache_key = self.query_cache_service.get_sql_result_key(sql)
-                cache_value = {
-                    "results": results,
-                    "result_count": len(results),
-                    "sql": sql,
-                    "executed_at": pd.Timestamp.now().isoformat(),
-                }
-                ttl = settings.cache_ttl_sql_result
-                self.query_cache_service.set(
-                    cache_key, cache_value, ttl=ttl, cache_type="sql_result"
-                )
-                logger.info(
-                    f"SQL result cache MISS - cached for '{sql[:50]}...' (TTL: {ttl}s)"
-                )
-
-            del self.pending_queries[query_id]
-
-            return {
-                "query_id": query_id,
-                "question": query_info["question"],
-                "sql": sql,
-                "results": results,
-                "result_count": len(results),
-                "status": "executed",
-                "cache_hit": False,
-            }
-
-        except Exception as e:
-            return {"query_id": query_id, "error": str(e), "status": "error"}
-
     def get_pending_queries(self) -> List[Dict[str, Any]]:
-        return [{"query_id": qid, **info} for qid, info in self.pending_queries.items()]
+        """
+        Deprecated: pending_queries are stored in the shared PendingStore
+        (app.services.pending_store), not in TextToSQLService. This method
+        is kept for backward compatibility — always returns empty list.
+        """
+        return []

@@ -132,9 +132,10 @@ class VectorStoreService:
         )
         dense_embeddings = self.embeddings.embed_documents(new_texts)
 
-        points = self._build_points(
+        points, new_ids = self._build_points(
             new_documents, dense_embeddings, new_texts, new_hashes, doc_ids
         )
+        doc_ids.extend(new_ids)
 
         try:
             self._ensure_and_retry(
@@ -189,15 +190,21 @@ class VectorStoreService:
         return new_documents, new_texts, new_hashes, doc_ids
 
     def _build_points(self, documents, dense_embeddings, texts, hashes, doc_ids):
-        """Build Qdrant PointStruct list from documents and embeddings."""
+        """Build Qdrant PointStruct list from documents and embeddings.
+
+        Returns (points, new_ids) tuple. The caller's doc_ids list is NOT
+        mutated — new chunk IDs are returned separately to avoid implicit
+        side-effect coupling.
+        """
         from qdrant_client.models import PointStruct
 
         points = []
+        new_ids = []
         for doc, dense, text, content_hash in zip(
             documents, dense_embeddings, texts, hashes
         ):
             chunk_id = str(uuid4())
-            doc_ids.append(chunk_id)
+            new_ids.append(chunk_id)
 
             sparse_vector = self.sparse_service.generate_sparse_vector(text)
 
@@ -211,7 +218,7 @@ class VectorStoreService:
                 )
             )
 
-        return points
+        return points, new_ids
 
     @track(name="vector_store_add_with_embeddings")
     def add_documents_with_embeddings(
@@ -251,9 +258,10 @@ class VectorStoreService:
             f"Upserting {len(new_documents)}/{len(documents)} cached chunks (skipped {len(documents) - len(new_documents)} duplicates)"
         )
 
-        points = self._build_points(
+        points, new_ids = self._build_points(
             new_documents, new_embeddings, new_texts, new_hashes, doc_ids
         )
+        doc_ids.extend(new_ids)
 
         try:
             self._ensure_and_retry(

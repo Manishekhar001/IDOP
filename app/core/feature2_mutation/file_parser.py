@@ -20,8 +20,17 @@ class FileParser:
     def parse_file(self, file_content: bytes, filename: str) -> List[Dict[str, Any]]:
         """
         Parse file bytes into a list of row dictionaries.
+
+        Warning: loads entire file into memory. For large Excel files (>50MB)
+        consider chunked processing via pd.read_excel(..., chunksize=...).
         """
-        logger.info(f"Parsing uploaded file: {filename}")
+        file_size_mb = len(file_content) / (1024 * 1024)
+        if file_size_mb > 50:
+            logger.warning(
+                f"Large file ({file_size_mb:.1f} MB) loaded entirely into memory. "
+                "Consider reducing file size for better performance."
+            )
+        logger.info(f"Parsing uploaded file: {filename} ({file_size_mb:.1f} MB)")
         if filename.endswith(".csv"):
             df = pd.read_csv(BytesIO(file_content))
         elif filename.endswith(".xlsx") or filename.endswith(".xls"):

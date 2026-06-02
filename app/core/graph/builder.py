@@ -88,12 +88,11 @@ def build_graph(
         },
     )
 
-    # Terminate direct branch endpoints
-    builder.add_edge("sql_gen", END)
-    builder.add_edge("mutation", END)
-    builder.add_edge(
-        "generate_direct", "stm_summarize"
-    )  # LOGIC-01: summarize conversation even for direct responses
+    # Terminate direct branch endpoints — all go through stm_summarize
+    # so conversation history is maintained even for non-RAG paths.
+    builder.add_edge("sql_gen", "stm_summarize")
+    builder.add_edge("mutation", "stm_summarize")
+    builder.add_edge("generate_direct", "stm_summarize")
     # Route HYBRID through SRAG verification so the synthesized answer
     # gets the same support and usefulness checks as the RAG pipeline.
     builder.add_edge("hybrid_gen", "verify_support")

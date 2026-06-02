@@ -41,13 +41,18 @@ class MutationExecutor:
     ) -> int:
         """
         Execute bulk insert inside a single safe transaction.
+
+        The audit table DDL is created BEFORE disabling autocommit so the
+        CREATE TABLE IF NOT EXISTS cannot break transaction atomicity.
         """
         logger.info(
             f"Executing INSERT transaction for mutation {mutation_id} in '{table_name}'"
         )
         conn = psycopg2.connect(self.conn_str)
-        conn.autocommit = False  # Ensure transaction block
-        self._ensure_audit_table(conn)
+        self._ensure_audit_table(
+            conn
+        )  # DDL commits on its own before transaction starts
+        conn.autocommit = False
 
         try:
             rows_inserted = 0
@@ -114,8 +119,8 @@ class MutationExecutor:
             f"Executing UPDATE transaction for mutation {mutation_id} in '{table_name}'"
         )
         conn = psycopg2.connect(self.conn_str)
+        self._ensure_audit_table(conn)  # DDL before transaction start
         conn.autocommit = False
-        self._ensure_audit_table(conn)
 
         try:
             rows_updated = 0
@@ -178,8 +183,8 @@ class MutationExecutor:
             f"Executing DELETE transaction for mutation {mutation_id} in '{table_name}'"
         )
         conn = psycopg2.connect(self.conn_str)
+        self._ensure_audit_table(conn)  # DDL before transaction start
         conn.autocommit = False
-        self._ensure_audit_table(conn)
 
         try:
             rows_deleted = 0

@@ -410,6 +410,7 @@ class CSRAGEngine:
             "query_type": state.get("query_type", ""),
             "sql_query": state.get("sql_query", ""),
             "sql_query_id": state.get("sql_query_id", ""),
+            "sql_explanation": state.get("sql_explanation", ""),
             "sql_status": state.get("sql_status", ""),
             "sql_results": state.get("sql_results", []),
             "approval_token": state.get("approval_token", ""),

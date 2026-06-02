@@ -124,6 +124,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
                 "sql_query": sql,
                 "sql_status": "error",
                 "sql_explanation": error_msg,
+                "answer": f"❌ SQL generation failed safety validation: {error_msg}",
             }
 
         # Run semantic audit judge
@@ -146,18 +147,13 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             "token": token,
         }
 
-        # Clean up the orphaned entry in TextToSQLService's internal pending_queries
-        # (generate_sql_for_approval stores there as a side effect, but the approval
-        # route only reads from shared_pending_queries above).
-        if query_id in sql_service.pending_queries:
-            del sql_service.pending_queries[query_id]
-
         return {
             "sql_query": sql,
             "sql_query_id": query_id,
             "sql_status": "pending_approval",
             "sql_explanation": explanation,
             "approval_token": token,
+            "answer": f"🔍 SQL query generated for: '{question[:80]}'. Status: pending_approval. Use the returned approval token to execute.",
         }
 
     except Exception as e:
@@ -165,6 +161,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
         return {
             "sql_status": "error",
             "sql_explanation": f"Generation failed: {str(e)}",
+            "answer": f"❌ SQL generation failed: {str(e)}",
         }
 
 
@@ -219,6 +216,7 @@ async def mutation_node(state: CSRAGState) -> dict:
                     "2. Review the preview (GET /mutation/pending)\n"
                     "3. Approve via POST /mutation/approve"
                 ),
+                "answer": f"📋 {op_type or 'Database'} mutation requires a file upload. See mutation_error for details.",
             }
 
         # Process mutation with available data (from prior upload or direct input)
@@ -275,6 +273,11 @@ async def mutation_node(state: CSRAGState) -> dict:
             "mutation_error": "; ".join(validation_errors) if validation_errors else "",
             "mutation_result_count": len(rows),
             "approval_token": token,
+            "answer": (
+                f"📋 Mutation '{op_type}' on '{table_name}' with {len(rows)} rows is "
+                f"{'pending approval' if not validation_errors else 'failed validation'}. "
+                f"Use the approval token to confirm."
+            ),
         }
 
     except Exception as e:
@@ -282,6 +285,7 @@ async def mutation_node(state: CSRAGState) -> dict:
         return {
             "mutation_status": "error",
             "mutation_error": f"Mutation processing failed: {str(e)}",
+            "answer": f"❌ Mutation processing failed: {str(e)}",
         }
 
 
@@ -709,18 +713,40 @@ async def stm_summarize_node(state: CSRAGState) -> dict:
 
 @track(name="graph_hybrid_generation")
 async def hybrid_generation_node(
-    state: CSRAGState, *, vector_store: VectorStoreService | None = None
+    state: CSRAGState,
+    config: RunnableConfig | None = None,
+    *,
+    vector_store: VectorStoreService | None = None,
+    store=None,
 ) -> dict:
     """
     Executes simultaneous Text-to-SQL database operations and RAG document search,
     then synthesizes both into a unified, source-cited comprehensive answer.
 
+    Injects LTM context if available in state or via the store.
+
     Args:
         vector_store: Shared VectorStoreService instance from app lifespan.
-                      If None, creates a new one (fallback for direct calls).
+        store: AsyncPostgresStore for LTM context retrieval (from compiled graph).
     """
     question = state.get("question", "")
     logger.info(f"Hybrid SQL + RAG node triggered for question: '{question}'")
+
+    # Ensure LTM context is available — fetch from store if not in state
+    ltm_context = state.get("ltm_context", "")
+    summary = state.get("summary", "")
+    if (
+        (not ltm_context or ltm_context == "(empty)")
+        and store is not None
+        and config is not None
+    ):
+        try:
+            user_id = config.get("configurable", {}).get("user_id", "default")
+            ltm = get_ltm_service()
+            ltm_context = await ltm.read_memories(store, user_id)
+            logger.info(f"Hybrid: LTM context injected for user={user_id}")
+        except Exception as e:
+            logger.warning(f"Hybrid: LTM context fetch failed: {e}")
 
     # Use shared service so schema training and cache are consistent with /sql/generate route
     sql_service = shared_sql_service
@@ -858,7 +884,9 @@ async def hybrid_generation_node(
                     svc = get_web_search_service()
                     web_query = await svc.rewrite_query(question)
                     web_docs = await svc.search(web_query)
-                    logger.info(f"Hybrid: Web search returned {len(web_docs)} docs for {crag_verdict} verdict")
+                    logger.info(
+                        f"Hybrid: Web search returned {len(web_docs)} docs for {crag_verdict} verdict"
+                    )
                 except Exception as web_err:
                     logger.error(f"Hybrid web search fallback failed: {web_err}")
 
@@ -910,8 +938,8 @@ async def hybrid_generation_node(
         db_context = f"SQL Query Executed:\n{sql_query}\n\nQuery Results (CSV Format):\n{df.to_csv(index=False)}"
 
     system_prompt = _build_system_prompt(
-        state.get("ltm_context", ""),
-        state.get("summary", ""),
+        ltm_context,  # Use locally fetched LTM context (may have been injected above)
+        summary,  # Use locally captured summary
     )
 
     synthesis_prompt = f"""
@@ -955,6 +983,7 @@ Provide your answer in professional markdown with clear headings, bullet points,
         "hyde_used": hyde_used,
         "hyde_hypotheses": hyde_hypotheses,
         "reranking_used": reranking_used,
+        "ltm_context": ltm_context,  # Return LTM context for downstream nodes
     }
 
 
@@ -966,11 +995,20 @@ Provide your answer in professional markdown with clear headings, bullet points,
 def route_after_router(
     state: CSRAGState,
 ) -> Literal["sql_gen", "mutation", "ltm_remember", "chat", "hybrid"]:
+    """
+    Route the query to the appropriate first pipeline node.
+
+    Returns the NEXT graph node name, not the pipeline name:
+    - "sql_gen"        → SQL pipeline (Feature 1)
+    - "mutation"       → Mutation pipeline (Feature 2)
+    - "ltm_remember"   → RAG pipeline (Feature 3 — starts with LTM recall)
+    - "hybrid"         → HYBRID pipeline (parallel SQL + RAG)
+    - "chat"           → Direct LLM response (no retrieval)
+    """
     q_type = state.get("query_type", "CHAT")
     if q_type == "SQL":
         return "sql_gen"
     elif q_type == "MUTATION":
-        # Route to the dedicated mutation node which processes through Feature 2 pipeline
         return "mutation"
     elif q_type == "RAG":
         return "ltm_remember"
