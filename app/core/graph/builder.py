@@ -116,6 +116,7 @@ def build_graph(
         {
             "refine_context": "refine_context",
             "rewrite_query": "rewrite_query",
+            "web_search": "web_search",
         },
     )
 

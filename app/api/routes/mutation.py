@@ -15,7 +15,7 @@ from app.core.feature2_mutation.column_mapper import ColumnMapper
 from app.core.feature2_mutation.rule_validator import RuleValidator
 from app.core.feature2_mutation.mutation_generator import MutationGenerator
 from app.core.feature2_mutation.llm_judge import MutationLLMJudge
-from app.core.feature2_mutation.approval_gate import MutationApprovalGate
+from app.core.feature2_mutation.approval_gate import mutation_approval_gate as gate
 from app.core.feature2_mutation.executor import MutationExecutor
 
 from app.services.pending_store import pending_mutations as shared_pending_mutations
@@ -31,7 +31,6 @@ mapper = ColumnMapper()
 validator = RuleValidator()
 generator = MutationGenerator()
 judge = MutationLLMJudge()
-gate = MutationApprovalGate()
 executor = MutationExecutor()
 
 

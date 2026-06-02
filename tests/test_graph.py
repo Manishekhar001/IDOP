@@ -150,9 +150,9 @@ class TestRouteAfterCrag:
         state = {"crag_verdict": "CORRECT"}
         assert route_after_crag(state) == "refine_context"
 
-    def test_ambiguous_verdict_routes_to_rewrite_query(self):
+    def test_ambiguous_verdict_routes_to_web_search(self):
         state = {"crag_verdict": "AMBIGUOUS"}
-        assert route_after_crag(state) == "rewrite_query"
+        assert route_after_crag(state) == "web_search"
 
     def test_incorrect_verdict_routes_to_rewrite_query(self):
         state = {"crag_verdict": "INCORRECT"}

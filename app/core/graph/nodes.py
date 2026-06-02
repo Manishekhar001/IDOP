@@ -183,7 +183,7 @@ async def mutation_node(state: CSRAGState) -> dict:
     from app.core.feature2_mutation.rule_validator import RuleValidator
     from app.core.feature2_mutation.mutation_generator import MutationGenerator
     from app.core.feature2_mutation.llm_judge import MutationLLMJudge
-    from app.core.feature2_mutation.approval_gate import MutationApprovalGate
+    from app.core.feature2_mutation.approval_gate import mutation_approval_gate as gate
     from app.services.pending_store import pending_mutations as shared_pending_mutations
 
     import uuid
@@ -218,7 +218,6 @@ async def mutation_node(state: CSRAGState) -> dict:
         validator = RuleValidator()
         generator = MutationGenerator()
         judge = MutationLLMJudge()
-        gate = MutationApprovalGate()
 
         # Validate business rules
         is_valid, validation_errors = validator.validate_rows(table_name, rows)
@@ -967,8 +966,17 @@ def route_after_decide(
     return "retrieve_docs" if state["need_retrieval"] else "generate_direct"
 
 
-def route_after_crag(state: CSRAGState) -> Literal["refine_context", "rewrite_query"]:
-    return "refine_context" if state["crag_verdict"] == "CORRECT" else "rewrite_query"
+def route_after_crag(
+    state: CSRAGState,
+) -> Literal["refine_context", "rewrite_query", "web_search"]:
+    verdict = state["crag_verdict"]
+    if verdict == "CORRECT":
+        return "refine_context"
+    elif verdict == "AMBIGUOUS":
+        # AMBIGUOUS: internal docs partially relevant — go directly to web search
+        # to supplement, skipping the query rewrite LLM round-trip.
+        return "web_search"
+    return "rewrite_query"
 
 
 def route_after_support(

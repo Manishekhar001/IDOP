@@ -177,3 +177,7 @@ class MutationApprovalGate:
             f"Verification failed (Memory Fallback): Incorrect token for Mutation ID {mutation_id}"
         )
         return False
+
+
+# Shared singleton instance for cross-module access
+mutation_approval_gate = MutationApprovalGate()
