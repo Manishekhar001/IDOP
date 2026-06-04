@@ -198,6 +198,14 @@ async def mutation_node(state: CSRAGState) -> dict:
         op_type = state.get("mutation_op", "")
         rows = state.get("mutation_rows", [])
 
+        from app.core.schema_registry import SUPPORTED_MUTATION_TABLES
+        if table_name and table_name not in SUPPORTED_MUTATION_TABLES:
+            return {
+                "mutation_status": "error",
+                "mutation_error": f"Target table '{table_name}' is not supported for mutations.",
+                "answer": f"❌ Target table '{table_name}' is not supported for mutations.",
+            }
+
         # Classify operation if not pre-set (runs synchronously — offload to thread)
         if not op_type and question:
             classifier = OpClassifier()
@@ -344,6 +352,21 @@ _DECIDE_RETRIEVAL_PROMPT = ChatPromptTemplate.from_messages(
 @track(name="graph_decide_retrieval")
 async def decide_retrieval_node(state: CSRAGState) -> dict:
     question = state["question"]
+
+    # If need_retrieval is already True in the incoming state (e.g., set by an
+    # ablation study script to force retrieval), skip the LLM call and keep it.
+    # This allows benchmarks to measure retrieval quality rather than the LLM's
+    # decision about whether retrieval is needed.
+    if state.get("need_retrieval", False):
+        logger.debug(
+            f"decide_retrieval: need_retrieval already True — skipping LLM call"
+        )
+        return {
+            "question": question,
+            "need_retrieval": True,
+            "retrieval_query": state.get("retrieval_query") or question,
+        }
+
     llm = _get_chat_llm()
     decider = _DECIDE_RETRIEVAL_PROMPT | llm.with_structured_output(RetrieveDecision)
 

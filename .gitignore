@@ -102,6 +102,7 @@ MANIFEST
 Thumbs.db
 __pycache__/
 active/
+benchmark_docs/
 build/
 cache_dir/
 cov-int/

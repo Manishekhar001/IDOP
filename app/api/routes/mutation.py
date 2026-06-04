@@ -23,6 +23,8 @@ from app.services.pending_store import pending_mutations as shared_pending_mutat
 from app.opik import track
 from app.utils.logger import get_logger
 
+from app.core.schema_registry import SUPPORTED_MUTATION_TABLES
+
 logger = get_logger(__name__)
 router = APIRouter(prefix="/mutation", tags=["Database Mutations"])
 
@@ -147,6 +149,13 @@ async def upload_mutation(
     logger.info(
         f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {parsed_auto_map}"
     )
+
+    if table_name not in SUPPORTED_MUTATION_TABLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Target table '{table_name}' is not supported for mutations. Supported tables: {list(SUPPORTED_MUTATION_TABLES)}",
+        )
+
     try:
         content = await file.read()
         filename = file.filename

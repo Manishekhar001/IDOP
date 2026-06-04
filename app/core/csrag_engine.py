@@ -363,6 +363,23 @@ class CSRAGEngine:
                     opik_context.update_current_span(output=span_output)
                     opik_context.update_current_trace(output=trace_output)
 
+    async def run_with_state(self, state: dict, config: dict) -> dict:
+        """
+        Run the graph with a pre-built state dict.
+
+        This is the public API for advanced use cases (e.g., ablation studies)
+        that need to inject custom initial state (e.g., forcing retrieval)
+        without accessing the private ``self._graph`` attribute.
+
+        Args:
+            state: A complete initial state dict (use _initial_state() as base).
+            config: A LangGraph config dict with ``configurable.thread_id`` etc.
+
+        Returns:
+            The final state dict after the graph finishes execution.
+        """
+        return await self._graph.ainvoke(state, config)
+
     def health_check(self) -> bool:
         return self._graph is not None
 

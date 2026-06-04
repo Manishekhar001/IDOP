@@ -37,10 +37,13 @@ Usage:
 
 Output:
     data/ablation_results/
-    ├── ablation_<timestamp>.json       # Full results (all configs × questions)
-    ├── ablation_<timestamp>.csv        # Summary table per configuration
-    ├── ablation_report_<timestamp>.txt  # Human-readable report
-    └── latest                       → symlink to the most recent run directory
+    ├── run_<timestamp>/
+    │   ├── config_<id>_<name>.json     # Per-configuration results
+    │   ├── ablation_summary.csv        # Summary table per configuration
+    │   ├── ablation_report.txt         # Human-readable report
+    │   ├── per_question_results.csv    # Per-question detailed results
+    │   └── ablation_full.json          # All results combined
+    └── ... (previous runs preserved)
 """
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -400,42 +403,6 @@ def _progress_bar(current: int, total: int, width: int = 40) -> str:
 _LAST_RESULTS_PATH: Optional[Path] = None  # set after a successful run
 
 
-async def _pg_connect_and_setup(
-    cls, database_url: str, name: str, max_retries: int = 3, delay: float = 1.0
-):
-    """
-    Create a Postgres async pool, enter context, run migrations, with retry.
-
-    Freshly-restarted Postgres containers sometimes close the first few
-    connections during background recovery. Retrying resolves this.
-    """
-    last_exc = None
-    for attempt in range(1, max_retries + 1):
-        resource = None
-        try:
-            resource = await cls.from_conn_string(database_url).__aenter__()
-            await resource.setup()
-            if attempt > 1:
-                print(f"  [OK] {name} connected on retry attempt {attempt}")
-            return resource
-        except Exception as e:
-            last_exc = e
-            print(
-                f"  [WARN] {name} attempt {attempt}/{max_retries} failed: "
-                f"{type(e).__name__}: {e}"
-            )
-            if resource is not None:
-                try:
-                    await resource.__aexit__(None, None, None)
-                except Exception:
-                    pass
-            if attempt < max_retries:
-                delay_secs = delay * (2 ** (attempt - 1))
-                print(f"  [INFO] Retrying {name} in {delay_secs}s...")
-                await asyncio.sleep(delay_secs)
-    raise last_exc  # type: ignore[misc]
-
-
 def _collect_contexts(state: dict) -> List[str]:
     """Extract context texts from a pipeline result state dict."""
     from langchain_core.documents import Document
@@ -451,15 +418,13 @@ def _collect_contexts(state: dict) -> List[str]:
     return contexts
 
 
-async def run_single_query(
-    question: str,
-    config: Dict[str, Any],
-    config_dir: Path,
-) -> Dict[str, Any]:
-    """
-    Run one question through one pipeline configuration.
-
-    Returns a dict with question, answer, contexts, ground_truth, and timing.
+async def _create_engine() -> tuple:
+    """Create a shared CSRAGEngine with Postgres resources.
+    
+    Returns (engine, store, checkpointer, store_cm, checkpointer_cm) for reuse
+    across multiple queries. The context managers (store_cm, checkpointer_cm)
+    MUST be held alive by the caller — if they are garbage collected, the
+    Postgres connection pools are closed prematurely.
     """
     from app.core.csrag_engine import CSRAGEngine
     from app.core.vector_store import VectorStoreService
@@ -469,55 +434,98 @@ async def run_single_query(
 
     settings = get_settings()
 
-    # Initialize services (with retry for Postgres startup race)
     vector_store = VectorStoreService()
-    store = await _pg_connect_and_setup(
-        AsyncPostgresStore,
-        settings.database_url,
-        "AsyncPostgresStore",
-        max_retries=5,
-        delay=1.0,
-    )
-    checkpointer = await _pg_connect_and_setup(
-        AsyncPostgresSaver,
-        settings.database_url,
-        "AsyncPostgresSaver",
-        max_retries=5,
-        delay=1.0,
-    )
 
+    # IMPORTANT: Keep references to the async context managers (cm_store, cm_checkpointer).
+    # If these are garbage collected, __aexit__ is called and the connection pool closes.
+    cm_store = AsyncPostgresStore.from_conn_string(settings.database_url)
+    store = await cm_store.__aenter__()
     try:
-        engine = CSRAGEngine(vector_store, store, checkpointer)
-        thread_id = f"ablation-cfg{config['id']}-{config_dir.name}"
+        await store.setup()
+    except BaseException:
+        await cm_store.__aexit__(None, None, None)
+        raise
 
-        t0 = time.monotonic()
-        res = await engine.aquery(
-            question=question,
-            thread_id=thread_id,
-            user_id="ablation-eval",
-            search_mode=config["search_mode"],
-            top_k=config["top_k"],
-            enable_hyde=config["enable_hyde"],
-            enable_reranking=config["enable_reranking"],
-        )
-        elapsed = time.monotonic() - t0
+    cm_checkpointer = AsyncPostgresSaver.from_conn_string(settings.database_url)
+    checkpointer = await cm_checkpointer.__aenter__()
+    try:
+        await checkpointer.setup()
+    except BaseException:
+        await cm_checkpointer.__aexit__(None, None, None)
+        await cm_store.__aexit__(None, None, None)
+        raise
 
-        answer = res.get("answer", "")
-        contexts = _collect_contexts(res)
+    engine = CSRAGEngine(vector_store, store, checkpointer)
+    return engine, store, checkpointer, cm_store, cm_checkpointer
 
-        return {
-            "question": question,
-            "answer": answer,
-            "contexts": contexts,
-            "pipeline_time_s": round(elapsed, 3),
-            "crag_verdict": res.get("crag_verdict", ""),
-            "issup": res.get("issup", ""),
-            "isuse": res.get("isuse", ""),
-        }
 
-    finally:
-        await store.__aexit__(None, None, None)
-        await checkpointer.__aexit__(None, None, None)
+async def run_single_query(
+    question: str,
+    config: Dict[str, Any],
+    config_dir: Path,
+    engine: Any,
+) -> Dict[str, Any]:
+    """
+    Run one question through one pipeline configuration using a shared engine.
+
+    Forces need_retrieval=True so the ablation measures retrieval quality,
+    not the LLM's general knowledge. Without this, decide_retrieval_node
+    asks the LLM if it needs retrieval, and for common-knowledge questions
+    (refund policies, corporate rules), the LLM says No and answers from
+    memory — defeating the ablation's purpose.
+    """
+    from app.core.csrag_engine import CSRAGEngine
+    from app.config import get_settings
+
+    thread_id = f"ablation-cfg{config['id']}-{config_dir.name}"
+    settings = get_settings()
+
+    # Build config for the graph
+    graph_config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "user_id": "ablation-eval",
+        },
+        "recursion_limit": 80,
+    }
+
+    # Build initial state WITH need_retrieval=True to force document retrieval
+    # (bypassing decide_retrieval_node's LLM gate that skips retrieval for
+    #  common-knowledge questions)
+    # Use CSRAGEngine._initial_state() as the base — this keeps state
+    # construction in one place and ensures consistency if _initial_state()
+    # adds/removes fields. Then override the fields we need for ablation.
+    init_state = CSRAGEngine._initial_state(
+        question=question,
+        search_mode=config["search_mode"],
+        top_k=config["top_k"],
+        enable_hyde=config["enable_hyde"],
+        enable_reranking=config["enable_reranking"],
+        enable_ragas=False,
+    )
+    # Override: force retrieval (bypasses decide_retrieval_node's LLM gate)
+    # and short-circuit LTM/memory steps for consistent measurement
+    init_state["need_retrieval"] = True
+    init_state["query_type"] = "RAG"
+    init_state["retrieval_query"] = question
+    init_state["user_id"] = "ablation-eval"
+
+    t0 = time.monotonic()
+    result_state = await engine.run_with_state(init_state, graph_config)
+    elapsed = time.monotonic() - t0
+
+    answer = result_state.get("answer", "")
+    contexts = _collect_contexts(result_state)
+
+    return {
+        "question": question,
+        "answer": answer,
+        "contexts": contexts,
+        "pipeline_time_s": round(elapsed, 3),
+        "crag_verdict": result_state.get("crag_verdict", ""),
+        "issup": result_state.get("issup", ""),
+        "isuse": result_state.get("isuse", ""),
+    }
 
 
 async def run_configuration(
@@ -529,6 +537,9 @@ async def run_configuration(
 ) -> Dict[str, Any]:
     """
     Run one ablation configuration against all benchmark questions.
+
+    Creates a shared CSRAGEngine once and reuses it for all questions
+    in this configuration to avoid Postgres connection lifecycle issues.
 
     Returns aggregated results dict:
         config_id, name, description, metrics {faithfulness, ...}, per-question list, timing
@@ -546,38 +557,48 @@ async def run_configuration(
     )
     print(f"{'=' * 70}")
 
+    # ── Create shared engine for this configuration ────────────────────
+    print("  [INIT] Creating CSRAGEngine...", end="", flush=True)
+    engine, store, checkpointer, cm_store, cm_checkpointer = await _create_engine()
+    print(" OK")
+
     # ── 1. Execute all queries ──────────────────────────────────────────
     pipeline_outputs: List[Dict[str, Any]] = []
     start_time = time.monotonic()
 
-    for q_idx, item in enumerate(benchmark, start=1):
-        progress = _progress_bar(q_idx, n_questions)
-        short_q = item["question"][:70]
-        print(f"  {progress}  {short_q}...", end="", flush=True)
+    try:
+        for q_idx, item in enumerate(benchmark, start=1):
+            progress = _progress_bar(q_idx, n_questions)
+            short_q = item["question"][:70]
+            print(f"  {progress}  {short_q}...", end="", flush=True)
 
-        try:
-            out = await run_single_query(item["question"], config, config_dir)
-            out["ground_truth"] = item["ground_truth"]
-            out["category"] = item.get("category", "")
-            out["config_id"] = cfg_id
-            pipeline_outputs.append(out)
-            print(f"  OK ({out['pipeline_time_s']:.1f}s)")
-        except Exception as exc:
-            print(f"  FAIL ERROR: {type(exc).__name__}: {exc}")
-            pipeline_outputs.append(
-                {
-                    "question": item["question"],
-                    "ground_truth": item["ground_truth"],
-                    "category": item.get("category", ""),
-                    "config_id": cfg_id,
-                    "answer": f"[ERROR] {type(exc).__name__}: {exc}",
-                    "contexts": [],
-                    "pipeline_time_s": 0.0,
-                    "crag_verdict": "",
-                    "issup": "",
-                    "isuse": "",
-                }
-            )
+            try:
+                out = await run_single_query(item["question"], config, config_dir, engine)
+                out["ground_truth"] = item["ground_truth"]
+                out["category"] = item.get("category", "")
+                out["config_id"] = cfg_id
+                pipeline_outputs.append(out)
+                print(f"  OK ({out['pipeline_time_s']:.1f}s)")
+            except Exception as exc:
+                print(f"  FAIL ERROR: {type(exc).__name__}: {exc}")
+                pipeline_outputs.append(
+                    {
+                        "question": item["question"],
+                        "ground_truth": item["ground_truth"],
+                        "category": item.get("category", ""),
+                        "config_id": cfg_id,
+                        "answer": f"[ERROR] {type(exc).__name__}: {exc}",
+                        "contexts": [],
+                        "pipeline_time_s": 0.0,
+                        "crag_verdict": "",
+                        "issup": "",
+                        "isuse": "",
+                    }
+                )
+    finally:
+        # Clean up Postgres connections via the context managers
+        await cm_checkpointer.__aexit__(None, None, None)
+        await cm_store.__aexit__(None, None, None)
 
     total_time = time.monotonic() - start_time
     avg_time = round(total_time / n_questions, 3)
@@ -990,11 +1011,6 @@ async def main_async() -> None:
     """Async entry point."""
     import asyncio
 
-    # Windows compatibility: psycopg async requires SelectorEventLoop
-    # rather than the default ProactorEventLoop
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
     args = parse_args()
     use_ragas = not args.no_ragas
     benchmark = list(BENCHMARK)
@@ -1105,6 +1121,12 @@ async def main_async() -> None:
 
 def main() -> None:
     """Synchronous entry point."""
+    # Windows compatibility: psycopg async requires SelectorEventLoop
+    # rather than the default ProactorEventLoop. This MUST be set BEFORE
+    # asyncio.run() creates the loop — setting it inside main_async() is
+    # too late because asyncio.run() has already created a ProactorEventLoop.
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main_async())
 
 

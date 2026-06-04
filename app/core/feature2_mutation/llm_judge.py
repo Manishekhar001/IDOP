@@ -61,4 +61,4 @@ Respond strictly in the following JSON format:
             return is_approved, explanation
         except Exception as e:
             logger.error(f"Mutation LLM Judge audit failed: {e}")
-            return True, f"Bypassed Audit due to error: {e}"
+            return False, f"Audit failed due to internal error: {e}"
