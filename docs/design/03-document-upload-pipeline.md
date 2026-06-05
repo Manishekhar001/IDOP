@@ -95,7 +95,7 @@ graph TB
 - **Accepts:** Multipart file upload
 - **Supported extensions:** `.pdf`, `.txt`, `.csv`
 - Unsupported extensions return `400 Bad Request` with supported format list
-- Source: [documents.py](../app/api/routes/documents.py)
+- Source: [documents.py](../../app/api/routes/documents.py)
 
 ### SHA-256 Document Deduplication
 
@@ -112,7 +112,7 @@ doc_id = sha256.hexdigest()
 - **Identical files** always produce the same `document_id`, regardless of filename
 - **Cache check** queries S3/local storage for existing `{doc_id}.{ext}` artifacts
 - If cached: skip parsing + embedding entirely, load pre-computed chunks
-- Source: [cache_service.py](../app/services/cache_service.py) (lines 48–59)
+- Source: [cache_service.py](../../app/services/cache_service.py) (lines 48–59)
 
 ### Document Parsing (`DocumentProcessor`)
 
@@ -127,7 +127,7 @@ doc_id = sha256.hexdigest()
 - Files are written to a temporary path before parsing
 - Temporary files are cleaned up (`unlink`) in a `finally` block
 - Each document's `metadata.source` is set to the original upload filename
-- Source: [document_processor.py](../app/core/document_processor.py) (lines 38–88)
+- Source: [document_processor.py](../../app/core/document_processor.py) (lines 38–88)
 
 ### Text Chunking
 
@@ -149,7 +149,7 @@ for idx, chunk in enumerate(chunks):
 
 This index metadata enables the **Context Enrichment Service** to fetch neighboring chunks by `(source, index ± 1)` during retrieval, expanding the context window around relevant hits.
 
-Source: [document_processor.py](../app/core/document_processor.py) (lines 90–102)
+Source: [document_processor.py](../../app/core/document_processor.py) (lines 90–102)
 
 ### Dense Embedding Generation
 
@@ -157,7 +157,7 @@ Source: [document_processor.py](../app/core/document_processor.py) (lines 90–1
 - **Dimensions:** 1536
 - **Method:** `OpenAIEmbeddings.embed_documents(texts)` — batch embedding of all chunk texts
 - Returns one 1536-dimensional float vector per chunk
-- Source: [embeddings.py](../app/core/embeddings.py)
+- Source: [embeddings.py](../../app/core/embeddings.py)
 
 ### Sparse Vector Generation (`SparseVectorService`)
 
@@ -173,7 +173,7 @@ SparseVector(indices=[...], values=[...])  # Qdrant-native format
 
 - No external model dependency — runs entirely in-process
 - Produces variable-length sparse vectors proportional to unique terms
-- Source: [sparse_vector_service.py](../app/core/sparse_vector_service.py)
+- Source: [sparse_vector_service.py](../../app/core/sparse_vector_service.py)
 
 ### Qdrant Dual-Vector Upsert
 
@@ -201,7 +201,7 @@ PointStruct(
 - **Collection:** `idop_documents` (configurable via `COLLECTION_NAME` env var)
 - **Dense config:** `VectorParams(size=1536, distance=Distance.COSINE)`
 - **Sparse config:** `SparseVectorParams()` (default BM25 settings)
-- Source: [vector_store.py](../app/core/vector_store.py) (lines 72–114)
+- Source: [vector_store.py](../../app/core/vector_store.py) (lines 72–114)
 
 ### Cache Persistence
 
@@ -222,7 +222,7 @@ After successful Qdrant upsert, chunks and embeddings are cached:
 | S3 failure (non-prod) | Local fallback | Automatic downgrade with warning log |
 | S3 failure (production) | **Error** | Raises `RuntimeError` — cache is required in prod |
 
-Source: [cache_service.py](../app/services/cache_service.py) (lines 76–104)
+Source: [cache_service.py](../../app/services/cache_service.py) (lines 76–104)
 
 ---
 

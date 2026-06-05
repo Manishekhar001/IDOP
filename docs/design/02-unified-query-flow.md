@@ -98,7 +98,7 @@ All queries are validated against the `ChatRequest` Pydantic model before reachi
 | `enable_hyde` | `bool` | Default: `false` | Enable HyDE query expansion |
 | `enable_reranking` | `bool` | Default: `false` | Enable Voyage AI cross-encoder reranking |
 
-Source: [schemas.py](../app/api/schemas.py) (lines 141–197)
+Source: [schemas.py](../../app/api/schemas.py) (lines 141–197)
 
 ### Service Availability Check
 
@@ -145,7 +145,7 @@ graph LR
 
 **Fallback behavior:** If the router call fails (network error, parsing failure), the system defaults to `CHAT` — the safest fallback that cannot modify data.
 
-Source: [router.py](../app/core/graph/router.py)
+Source: [router.py](../../app/core/graph/router.py)
 
 ---
 

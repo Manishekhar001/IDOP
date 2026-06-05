@@ -74,7 +74,7 @@ services:
         condition: service_healthy
 
   checkpoint-db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: idop-checkpoint-db
     restart: always
     environment:

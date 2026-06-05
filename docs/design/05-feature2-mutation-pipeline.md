@@ -52,13 +52,14 @@ graph TD
 
 ## Key Components
 
-The mutation pipeline relies on six specialized architectural layers:
+The mutation pipeline relies on seven specialized architectural layers:
 
 *   **FileParser (`app/core/feature2_mutation/file_parser.py`)**: Accepts Excel (`.xlsx`, `.xls`) or CSV uploads and parses them safely into high-performance `pandas` DataFrames, filtering out empty rows, bad encodings, and malicious macros.
 *   **OpClassifier (`app/core/feature2_mutation/op_classifier.py`)**: Uses a structured `GPT-4o-mini` call to evaluate the spreadsheet structure, sheet name, and user instruction to classify the overall operation type into exactly `INSERT`, `UPDATE`, or `DELETE`.
 *   **ColumnMapper (`app/core/feature2_mutation/column_mapper.py`)**: Uses LLM-driven schema matching to dynamically align spreadsheet headers with database column names, outputting a precise JSON dictionary mapping user columns to physical database columns.
 *   **RuleValidator (`app/core/feature2_mutation/rule_validator.py`)**: Executes programmatic type, range, regex, and integrity checks against the validation dictionary specified in `business_rules/rules.json`.
 *   **MutationGenerator (`app/core/feature2_mutation/mutation_generator.py`)**: Translates the mapped and validated rows into standard parameterized PostgreSQL mutation queries, keeping data parameterized to prevent SQL injection.
+*   **MutationLLMJudge (`app/core/feature2_mutation/llm_judge.py`)**: Audits draft queries for logical validation (e.g. massive deletion scope or out-of-bounds update ranges).
 *   **MutationApprovalGate (`app/core/feature2_mutation/approval_gate.py`)**: Generates a single-use cryptographically secure hex token (`secrets.token_hex(32)`) and stores the pending transaction payload in memory until the user signs off.
 
 ---
@@ -120,7 +121,7 @@ If rule validation succeeds, the `MutationGenerator` drafts SQL mutations. The d
 Once cleared, a session token is generated.
 
 > [!WARNING]
-> Transactions are **NEVER** executed automatically. The FastAPI server returns a pending status alongside an approval token. The operation is kept in a thread-safe cache for up to 30 minutes, awaiting confirmation at `/mutation/approve/{token}`.
+> Transactions are **NEVER** executed automatically. The FastAPI server returns a pending status alongside an approval token. The operation is kept in a thread-safe cache for up to 30 minutes, awaiting confirmation at `POST /mutation/approve` with the token.
 
 ### 5. Execution and Automatic Rollback
 When the user submits the correct cryptographic token, the `MutationExecutor` runs the transaction inside an isolated block on the Supabase PostgreSQL database:

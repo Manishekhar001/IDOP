@@ -251,8 +251,13 @@ curl -X PUT "https://YOUR-CLUSTER.aws.cloud.qdrant.io/collections/idop_documents
   -H "Content-Type: application/json" \
   -d '{
     "vectors": {
-      "size": 1536,
-      "distance": "Cosine"
+      "dense": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    "sparse_vectors": {
+      "sparse": {}
     }
   }'
 ```
@@ -732,7 +737,7 @@ services:
       - idop-net
 
   checkpoint-db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: idop-checkpoint-db
     restart: always
     environment:

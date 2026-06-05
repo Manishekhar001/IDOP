@@ -162,10 +162,10 @@ uvicorn app.main:app --reload
 
 ```bash
 # Full 50-query ablation study
-python -m scripts.eval_ragas --no-ragas
+python -m scripts.eval_ragas
 
 # Quick 10-query test
-python -m scripts.eval_ragas --subset 10 --no-ragas
+python -m scripts.eval_ragas --subset 10
 ```
 
 ---
@@ -175,8 +175,8 @@ python -m scripts.eval_ragas --subset 10 --no-ragas
 | Component | Technology |
 |-----------|-----------|
 | **Orchestration** | LangGraph (state machine) |
-| **LLM** | LiteLLM Router (4× Groq Llama 3.3 70B + OpenAI GPT-4o fallback) |
-| **Embeddings** | Voyage AI (voyage-3, 1024-dim) |
+| **LLM** | OpenAI GPT-4o (default) or LiteLLM Router (4x Groq Llama 3.3 70B + OpenAI fallback) |
+| **Embeddings** | OpenAI text-embedding-3-small (default, 1536-dim) or Voyage AI (voyage-3, 1024-dim) |
 | **Vector DB** | Qdrant (hybrid: dense + sparse) |
 | **Reranking** | Voyage AI Cross-Encoder |
 | **Web Search** | Tavily Search API |
@@ -184,7 +184,7 @@ python -m scripts.eval_ragas --subset 10 --no-ragas
 | **Database** | PostgreSQL 16 (checkpointer + store) |
 | **API** | FastAPI |
 | **Observability** | Opik (Comet ML) |
-| **Evaluation** | In-house RAGAS-style LLM evaluator |
+| **Evaluation** | In-house LLM-based evaluator |
 
 ---
 

@@ -95,12 +95,16 @@ def _build_litellm_router() -> Any:
         logger.warning("No Groq API keys configured for LiteLLM Router — falling back")
         return None
 
-    # Build deployment list — Groq keys first (primary), OpenAI last (fallback)
-    deployments = []
+    # Build model_list — Groq keys first (primary), OpenAI last (fallback)
+    # RPM goes at the model_list entry level (NOT inside litellm_params)
+    model_list = []
     for i, key in enumerate(groq_keys):
-        deployments.append({
-            "model": groq_model,
-            "api_key": key,
+        model_list.append({
+            "model_name": model_group,
+            "litellm_params": {
+                "model": groq_model,
+                "api_key": key,
+            },
             "rpm": 30,  # Groq free tier: 30 req/min per key
         })
         logger.info(f"  Groq deployment {i+1}: groq/{model}")
@@ -108,22 +112,17 @@ def _build_litellm_router() -> Any:
     # Add OpenAI as the final fallback
     openai_key = settings.openai_api_key
     if openai_key and openai_key.strip():
-        deployments.append({
-            "model": "openai/gpt-4o",
-            "api_key": openai_key.strip(),
+        model_list.append({
+            "model_name": model_group,
+            "litellm_params": {
+                "model": "openai/gpt-4o",
+                "api_key": openai_key.strip(),
+            },
             "rpm": 500,  # Higher RPM since it's the final fallback
         })
         logger.info(f"  OpenAI fallback: openai/gpt-4o")
 
     # Configure the Router with cooldown and retry settings
-    model_list = [
-        {
-            "model_name": model_group,  # all under one model group
-            "litellm_params": dep,
-        }
-        for dep in deployments
-    ]
-
     router = Router(
         model_list=model_list,
         num_retries=2,              # Retries per request on failure
@@ -134,7 +133,7 @@ def _build_litellm_router() -> Any:
     )
 
     logger.info(
-        f"LiteLLM Router initialized with {len(deployments)} total deployments "
+        f"LiteLLM Router initialized with {len(model_list)} total deployments "
         f"({len(groq_keys)} Groq + {1 if openai_key else 0} OpenAI) "
         f"for model group '{model_group}'"
     )
@@ -161,8 +160,13 @@ def get_chat_llm(
     resolved_model = model or settings.llm_model
     resolved_temp = temperature if temperature is not None else settings.llm_temperature
 
+    # Determine if an explicit non-default model was requested.
+    # When a specific model is requested (e.g., "llama-3.1-8b-instant" for evaluation)
+    # we skip the Router and use a direct provider to avoid model group conflicts.
+    is_explicit_model = model is not None and model != settings.llm_model
+
     # ── Option 1: LiteLLM Router (multi-key load balancing) ──────────────
-    if provider == "litellm":
+    if provider == "litellm" and not is_explicit_model:
         try:
             from langchain_litellm import ChatLiteLLMRouter
 

@@ -6,7 +6,7 @@ This document details the complete structure, state shape, nodes, and conditiona
 
 ## Overview
 
-The core execution engine of IDOP is built as a highly structured, stateful multi-agent system using **LangGraph**. The system represents queries and tasks as transitions through a directed acyclic graph (with loops for self-correction).
+The core execution engine of IDOP is built as a highly structured, stateful multi-agent system using **LangGraph**. The system represents queries and tasks as transitions through a directed graph (with loops for self-correction).
 
 The state machine is compiled using PostgreSQL-backed checkpointers for Short-Term Memory (STM) and PostgreSQL-backed stores for Long-Term Memory (LTM), allowing conversational sessions to survive service restarts and scale dynamically inside a multi-instance Docker environment.
 
@@ -116,12 +116,10 @@ graph TD
     Router -->|HYBRID| HybridNode[hybrid_generation_node: Parallel SQL + RAG]
     
     %% SQL Path
-    SQLGen --> SQLApproval[sql_approval_gate]
-    SQLApproval --> END([End Turn])
+    SQLGen --> STMSum
     
     %% Mutation Path
-    MutationNode --> MutApproval[mutation_approval_gate]
-    MutApproval --> END
+    MutationNode --> STMSum
     
     %% Direct Chat Path
     ChatGen --> STMSum[stm_summarize_node]
@@ -145,7 +143,7 @@ graph TD
     
     %% SRAG Loops
     GenAnswer --> SRAGSupport{verify_support_node}
-    SRAGSupport -->|Partially / No Support & Try < 2| ReviseAns[revise_answer_node] --> GenAnswer
+    SRAGSupport -->|Partially / No Support & Try < 2| ReviseAns[revise_answer_node] --> SRAGSupport
     SRAGSupport -->|Fully Supported| SRAGUse{verify_usefulness_node}
     
     SRAGUse -->|Not Useful & Try < 2| RewriteQ[rewrite_question_node] --> LTMMem
@@ -155,7 +153,6 @@ graph TD
 
     class Router,DecideRet,SRAGSupport,SRAGUse router;
     class SQLGen,MutationNode,ChatGen,LTMMem,HybridNode,RetrieveDocs,CRAGEval,WebSearch,Refine,GenAnswer,ReviseAns,RewriteQ,STMSum node;
-    class SQLApproval,MutApproval gate;
     class END endNode;
 ```
 
@@ -235,13 +232,15 @@ To compile the graph with persistent STM (Short-Term Session Memory) and LTM (Lo
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
 from app.core.graph.nodes import (
-    router_node, sql_gen_node, mutation_node, ltm_remember_node, 
-    retrieve_docs_node, evaluate_docs_node, web_search_node, 
-    refine_context_node, generate_answer_node, stm_summarize_node,
-    hybrid_generation_node, generate_direct_node
+    router_node, sql_generation_node, mutation_node, ltm_remember_node, 
+    decide_retrieval_node, generate_direct_node, retrieve_docs_node, 
+    evaluate_docs_node, rewrite_query_node, web_search_node, 
+    refine_context_node, generate_answer_node, verify_support_node, 
+    revise_answer_node, verify_usefulness_node, rewrite_question_node, 
+    stm_summarize_node, hybrid_generation_node
 )
 
-async def compile_idop_graph(conn_string: str):
+async def compile_idop_graph(conn_string: str, vector_store):
     # Setup Persistent Stores
     store = AsyncPostgresStore.from_conn_string(conn_string)
     checkpointer = AsyncPostgresSaver.from_conn_string(conn_string)
@@ -249,22 +248,27 @@ async def compile_idop_graph(conn_string: str):
     # Initialize StateGraph
     builder = StateGraph(CSRAGState)
     
-    # Register all nodes
+    # Register all 18 nodes
     builder.add_node("router", router_node)
-    builder.add_node("sql_gen", sql_gen_node)
+    builder.add_node("sql_gen", sql_generation_node)
     builder.add_node("mutation", mutation_node)
+    builder.add_node("hybrid_gen", hybrid_generation_node)
     builder.add_node("ltm_remember", ltm_remember_node)
+    builder.add_node("decide_retrieval", decide_retrieval_node)
+    builder.add_node("generate_direct", generate_direct_node)
     builder.add_node("retrieve_docs", retrieve_docs_node)
     builder.add_node("evaluate_docs", evaluate_docs_node)
+    builder.add_node("rewrite_query", rewrite_query_node)
     builder.add_node("web_search", web_search_node)
     builder.add_node("refine_context", refine_context_node)
     builder.add_node("generate_answer", generate_answer_node)
-    builder.add_node("generate_direct", generate_direct_node)
+    builder.add_node("verify_support", verify_support_node)
+    builder.add_node("revise_answer", revise_answer_node)
+    builder.add_node("verify_usefulness", verify_usefulness_node)
+    builder.add_node("rewrite_question", rewrite_question_node)
     builder.add_node("stm_summarize", stm_summarize_node)
-    builder.add_node("hybrid_gen", hybrid_generation_node)
     
-    # Configure recursion parameters
-    # The self-reflection loops require elevated bounds
+    # Configure recursion parameters and compile
     compiled_graph = builder.compile(
         checkpointer=checkpointer,
         store=store

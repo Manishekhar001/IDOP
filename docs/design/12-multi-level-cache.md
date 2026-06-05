@@ -80,7 +80,7 @@ To preserve system resilience, the `QueryCacheService` is designed to degrade gr
 
 If a connection timeout occurs:
 1.  The exception is captured silently without breaking the active request.
-2.  The engine falls back to a thread-safe local in-memory dictionary (`self._local_cache: Dict[str, bytes]`) containing a basic Least-Recently-Used (LRU) cache.
+2.  The engine falls back to a shared local in-memory dictionary (`self._local_cache: Dict[str, str]`).
 3.  Metrics tracking marks `redis_status: "disconnected"` and updates health checks.
 
 ```python

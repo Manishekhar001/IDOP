@@ -1,7 +1,7 @@
 # 01 — System Architecture
 
 **Project:** Intelligent Data Operations Platform (IDOP)
-**Version:** 0.1.0
+**Version:** 0.1.1
 **Last Updated:** 2026-05-25
 
 ---
@@ -40,7 +40,7 @@ graph TB
         CSRAG["CSRAGEngine"]
         Router["5-Class LLM Router"]
         Graph["StateGraph Compiler"]
-        Nodes["19 Graph Nodes"]
+        Nodes["18 Graph Nodes"]
         Edges["5 Conditional Edge Functions"]
     end
 
@@ -115,15 +115,15 @@ graph TB
 - **CORS middleware** with configurable allowed origins
 - **Lifespan manager** initializes Qdrant, PostgreSQL (LTM store + STM checkpointer), and compiles the LangGraph engine at startup
 - **Global exception handler** catches unhandled errors and returns standardized JSON error responses
-- Source: [main.py](../app/main.py)
+- Source: [main.py](../../app/main.py)
 
 ### LangGraph Engine (`CSRAGEngine`)
 
-- **Graph compiler** builds and compiles the `StateGraph[CSRAGState]` with 19 nodes and 5 conditional edge functions
+- **Graph compiler** builds and compiles the `StateGraph[CSRAGState]` with 18 nodes and 5 conditional edge functions
 - **Recursion limit** set to `80` to accommodate deep CRAG → SRAG → rewrite loops
 - **Dual invocation modes:** `aquery()` for full response, `astream()` for token-by-token SSE streaming
 - **Health check** verifies graph compilation state
-- Source: [csrag_engine.py](../app/core/csrag_engine.py)
+- Source: [csrag_engine.py](../../app/core/csrag_engine.py)
 
 ### OpenAI LLM Layer
 
@@ -140,7 +140,7 @@ graph TB
 - **Sparse vectors:** BM25-style term-frequency hashing via `SparseVectorService`
 - **RRF Fusion:** Reciprocal Rank Fusion merges dense and sparse result lists at query time
 - **Three search modes:** `dense`, `sparse`, `hybrid` — configurable per request
-- Source: [vector_store.py](../app/core/vector_store.py)
+- Source: [vector_store.py](../../app/core/vector_store.py)
 
 ### Supabase PostgreSQL (External)
 
@@ -161,14 +161,14 @@ graph TB
 - **SQL result cache:** Normalized SQL → execution results (TTL: 15 minutes)
 - **Embedding cache:** Text hash → embedding vector (TTL: 7 days)
 - Falls back to in-memory `dict` if Redis is unavailable
-- Source: [query_cache_service.py](../app/services/query_cache_service.py)
+- Source: [query_cache_service.py](../../app/services/query_cache_service.py)
 
 ### S3 / Local Storage
 
 - **Document chunk cache:** SHA-256 file hash → chunks + embeddings + metadata
 - **Dual backend:** S3 for production, local filesystem for development
 - **Automatic fallback:** S3 initialization failure in non-production environments falls back to local storage
-- Source: [cache_service.py](../app/services/cache_service.py)
+- Source: [cache_service.py](../../app/services/cache_service.py)
 
 ### External Services
 

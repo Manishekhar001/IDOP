@@ -1,7 +1,7 @@
 # IDOP Workflow Documentation Index
 
 **Project:** Intelligent Data Operations Platform (IDOP)
-**Version:** 1.0.0
+**Version:** 0.1.1
 **Stack:** FastAPI · LangGraph · OpenAI GPT-4o · Qdrant · Supabase · PostgreSQL · Redis · S3 · Voyage AI
 
 ---

@@ -90,7 +90,7 @@ The primary SQL generation engine, backed by Vanna's ChromaDB-based vectorstore 
 - **Generation:** `vanna.generate_sql(question)` produces SQL from natural language
 - **Query ID:** Each generation is assigned a UUID for session tracking
 - **Fallback:** If Vanna fails, falls back to direct GPT-4o SQL generation
-- Source: [vanna_service.py](../app/core/feature1_sql/vanna_service.py)
+- Source: [vanna_service.py](../../app/core/feature1_sql/vanna_service.py)
 
 ### SQLValidator
 
@@ -120,7 +120,7 @@ A static rule-based validator that enforces **read-only SELECT-only** policy. Ev
 
 > ⚠️ **Only read-only `SELECT` queries are permitted.** All DML commands (`INSERT`, `UPDATE`, `DELETE`) are blocked — mutations go through the separate Feature 2 mutation pipeline with its own approval gate.
 
-Source: [sql_validator.py](../app/core/feature1_sql/sql_validator.py)
+Source: [sql_validator.py](../../app/core/feature1_sql/sql_validator.py)
 
 ### LLMJudge (Semantic Audit)
 
@@ -138,7 +138,7 @@ A `GPT-4o-mini`-powered semantic evaluator that audits generated SQL for logical
 
 - If `is_correct=false`, the query still proceeds but with a `⚠️ LLM Judge Warning:` prefix in the explanation
 - The warning is surfaced to the user in the approval interface so they can make an informed decision
-- Source: [llm_judge.py](../app/core/feature1_sql/llm_judge.py)
+- Source: [llm_judge.py](../../app/core/feature1_sql/llm_judge.py)
 
 ### ApprovalGate
 
@@ -160,7 +160,7 @@ pending_queries[query_id] = {
 
 - Tokens are single-use — consumed on first approval/rejection
 - Sessions persist in memory on the EC2 instance (not Lambda, which would lose state)
-- Source: [approval_gate.py](../app/core/feature1_sql/approval_gate.py)
+- Source: [approval_gate.py](../../app/core/feature1_sql/approval_gate.py)
 
 ### SQLExecutor
 
@@ -170,7 +170,7 @@ Executes approved SQL queries against Supabase PostgreSQL and logs the results:
 - **Execution:** Parameterized query execution
 - **Audit logging:** Records `query_id`, `question`, `sql`, `result_count`, `timestamp`, `user_id`
 - **Error handling:** Database errors are caught and returned as structured error responses
-- Source: [executor.py](../app/core/feature1_sql/executor.py)
+- Source: [executor.py](../../app/core/feature1_sql/executor.py)
 
 ---
 
@@ -210,7 +210,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
 **Graph edge:** `sql_gen → END` — the pipeline terminates at the approval gate. Execution happens via a separate `/sql/approve` API call.
 
-Source: [nodes.py](../app/core/graph/nodes.py) (lines 91–148)
+Source: [nodes.py](../../app/core/graph/nodes.py) (lines 91–148)
 
 ---
 

@@ -22,6 +22,19 @@ Usage:
     # Run only a subset (faster for iterative development)
     python scripts/eval_ragas.py --subset 10
 
+    # Run one slice (to stay within API rate limits):
+    python scripts/eval_ragas.py --slice 1/5 --config 1  # 10 Qs, Dense Only
+    python scripts/eval_ragas.py --slice 2/5 --config 2  # 10 Qs, Hybrid (RRF)
+    python scripts/eval_ragas.py --slice 3/5 --config 3  # 10 Qs, Hybrid + HyDE
+    python scripts/eval_ragas.py --slice 4/5 --config 4  # 10 Qs, Hybrid + Rerank
+    python scripts/eval_ragas.py --slice 5/5 --config 5  # 10 Qs, Full CSRAG
+
+    # Run one config on all 50 questions:
+    python scripts/eval_ragas.py --config 1
+
+    # Combine all 5 slices into a single report:
+    python scripts/eval_ragas.py --combine data/ablation_results/run_<timestamp>
+
     # Skip pipeline execution (re-evaluate last run's results)
     python scripts/eval_ragas.py --reuse-last
 
@@ -271,6 +284,7 @@ async def run_configuration(
                 out["config_id"] = cfg_id
                 pipeline_outputs.append(out)
                 print(f"  OK ({out['pipeline_time_s']:.1f}s)")
+                await asyncio.sleep(5.0)  # Rate-limit delay between questions (5s to stay under 30 RPM)
             except Exception as exc:
                 print(f"  FAIL ERROR: {type(exc).__name__}: {exc}")
                 pipeline_outputs.append({
@@ -354,8 +368,8 @@ async def evaluate_config(
             eval_errors += 1
             print(f"    [{q_idx}] ERROR: {type(e).__name__}", flush=True)
         
-        # Rate-limit delay between questions
-        await asyncio.sleep(2.0)
+        # Rate-limit delay between evaluation questions
+        await asyncio.sleep(3.0)
 
     n = len(faith_scores) or 1
     metrics = {
@@ -398,11 +412,11 @@ def _compute_category_metrics(outputs: List[Dict[str, Any]]) -> Dict[str, Dict[s
 # Report Generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _build_report(all_results: List[Dict[str, Any]], benchmark_name: str, total_elapsed: float) -> str:
+def _build_report(all_results: List[Dict[str, Any]], benchmark_name: str, total_elapsed: float, actual_questions: int = 50) -> str:
     lines: List[str] = []
     lines.append("=" * 72)
     lines.append(f"  IDOP ABLATION STUDY REPORT")
-    lines.append(f"  Benchmark: {benchmark_name} ({len(BENCHMARK)} questions)")
+    lines.append(f"  Benchmark: {benchmark_name} ({actual_questions} questions)")
     lines.append(f"  Completed: {_timestamp()}")
     lines.append(f"  Total time: {total_elapsed:.1f}s")
     lines.append("=" * 72)
@@ -484,28 +498,161 @@ def _save_per_question_csv(results_dir: Path, all_results: List[Dict[str, Any]])
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="IDOP Ablation Study - benchmark 5 pipeline configurations", formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     parser.add_argument("--subset", "-n", type=int, default=None, help="Run on a random subset of N questions")
+    parser.add_argument("--slice", type=str, default=None, help="Run slice N/M (e.g., 1/5 = questions 0-9, 2/5 = 10-19)")
+    parser.add_argument("--combine", type=str, default=None, help="Combine all slices from a run directory into a single report")
     parser.add_argument("--output-dir", "-o", type=str, default="data/ablation_results", help="Output directory")
+    parser.add_argument("--config", type=int, default=None, help="Run only a specific config (1-5). Default: all 5 configs")
     parser.add_argument("--reuse-last", action="store_true", help="Skip pipeline execution, re-evaluate last run's results")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for subset selection")
     return parser.parse_args(argv)
+
+
+def _parse_slice(slice_str: str) -> tuple[int, int]:
+    """Parse '1/5' into (slice_num=0, total_slices=5)."""
+    parts = slice_str.split("/")
+    if len(parts) != 2:
+        print(f"  [ERROR] Invalid --slice format: '{slice_str}'. Use N/M (e.g., 1/5)")
+        sys.exit(1)
+    try:
+        num = int(parts[0]) - 1  # 0-indexed
+        total = int(parts[1])
+        if num < 0 or num >= total:
+            raise ValueError
+        return num, total
+    except ValueError:
+        print(f"  [ERROR] Invalid --slice values: '{slice_str}'. N must be 1..M")
+        sys.exit(1)
+
+
+def _get_slice(num: int, total: int, full: list) -> list:
+    """Get a contiguous slice of the benchmark.
+    
+    Slices are evenly divided. The last slice gets any remainder.
+    """
+    n = len(full)
+    slice_size = n // total
+    start = num * slice_size
+    if num == total - 1:
+        end = n  # last slice gets remainder
+    else:
+        end = start + slice_size
+    return full[start:end]
 
 
 async def main_async() -> None:
     args = parse_args()
     benchmark = list(BENCHMARK)
 
+    # ── Handle --combine ─────────────────────────────────────────────────
+    if args.combine:
+        combine_dir = Path(args.combine)
+        if not combine_dir.is_dir():
+            print(f"  [ERROR] Combine directory not found: {combine_dir}")
+            sys.exit(1)
+        print(f"\n  [COMBINE] Merging slice results from {combine_dir}...")
+        # Find all slice subdirectories
+        slice_dirs = sorted(combine_dir.glob("slice_*"))
+        if not slice_dirs:
+            print(f"  [ERROR] No slice_* directories found in {combine_dir}")
+            sys.exit(1)
+        print(f"  [COMBINE] Found {len(slice_dirs)} slices: {[d.name for d in slice_dirs]}")
+
+        all_results = []
+        total_questions = 0
+        total_pipeline_time = 0.0
+
+        for sd in slice_dirs:
+            for cfg in ABLATION_CONFIGS:
+                cfg_file = sd / f"config_{cfg['id']:02d}_{cfg['name'].replace(' ', '_').lower()}.json"
+                if cfg_file.exists():
+                    with open(cfg_file) as f:
+                        data = json.load(f)
+                    # Find or create the config-level result
+                    existing = next((r for r in all_results if r["config_id"] == data["config_id"]), None)
+                    if existing:
+                        # Merge metrics (weighted average)
+                        old_n = existing.get("_question_count", 0)
+                        new_n = data.get("question_count", 10)
+                        total_n = old_n + new_n
+                        for key in ("faithfulness", "answer_relevancy", "context_precision", "context_recall"):
+                            existing["metrics"][key] = (
+                                existing["metrics"][key] * old_n + data["metrics"][key] * new_n
+                            ) / total_n
+                        existing["_question_count"] = total_n
+                        existing["timing"]["total_seconds"] += data["timing"]["total_seconds"]
+                        existing["timing"]["avg_seconds_per_query"] = round(
+                            existing["timing"]["total_seconds"] / total_n, 3
+                        )
+                    else:
+                        data["_question_count"] = data.get("question_count", 10)
+                        all_results.append(data)
+
+        all_results.sort(key=lambda r: r["config_id"])
+        total_pipeline_time = sum(r["timing"]["total_seconds"] for r in all_results)
+
+        # Generate combined report
+        total_questions = sum(r.get("_question_count", 0) for r in all_results)
+        report = _build_report(all_results, f"IDOP Combined ({total_questions} questions)", total_pipeline_time)
+        report_path = combine_dir / "ablation_report_combined.txt"
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(report)
+
+        _save_csv(combine_dir, all_results)
+
+        full_json = {
+            "report": {"timestamp": _timestamp(), "benchmark_size": total_questions, "configurations": len(ABLATION_CONFIGS), "combined_from": len(slice_dirs), "elapsed_seconds": round(total_pipeline_time, 3)},
+            "configurations": [
+                {k: v for k, v in r.items() if k not in ("questions", "_question_count")}
+                for r in all_results
+            ],
+        }
+        with open(combine_dir / "ablation_combined.json", "w", encoding="utf-8") as f:
+            json.dump(full_json, f, indent=2, default=str)
+
+        print(f"\n{report}")
+        print(f"\n  [COMBINE] Report saved to {report_path}")
+        return
+
+    # ── Handle --slice (subset of questions by index) ────────────────────
+    if args.slice:
+        slice_num, total_slices = _parse_slice(args.slice)
+        benchmark = _get_slice(slice_num, total_slices, benchmark)
+        print(f"  [SLICE] Using slice {args.slice} ({len(benchmark)} questions: idx {slice_num * (50 // total_slices)}-{slice_num * (50 // total_slices) + len(benchmark) - 1})")
+
+    # ── Handle --subset (random subset, applied AFTER --slice) ───────────
     if args.subset and 0 < args.subset < len(benchmark):
         rng = random.Random(args.seed)
         rng.shuffle(benchmark)
         benchmark = benchmark[:args.subset]
         print(f"  [SUBSET] Using {len(benchmark)} questions (--subset={args.subset}, seed={args.seed})")
-    else:
+
+    if not args.slice and not args.subset:
         print(f"  [FULL] Using all {len(benchmark)} benchmark questions")
+
+    # Filter configs if --config is specified
+    configs_to_run = list(ABLATION_CONFIGS)
+    if args.config is not None:
+        if args.config < 1 or args.config > len(ABLATION_CONFIGS):
+            print(f"  [ERROR] Invalid --config: {args.config}. Must be 1-{len(ABLATION_CONFIGS)}")
+            sys.exit(1)
+        configs_to_run = [cfg for cfg in ABLATION_CONFIGS if cfg["id"] == args.config]
+        print(f"  [CONFIG] Running only config {args.config}: {configs_to_run[0]['name']}")
 
     base_dir = Path(args.output_dir)
     base_dir.mkdir(parents=True, exist_ok=True)
     run_ts = _timestamp()
-    config_dir = base_dir / f"run_{run_ts}"
+    if args.slice:
+        slice_label = args.slice.replace("/", "-")
+        config_dir = base_dir / f"run_{run_ts}_slice{slice_label}"
+    else:
+        config_dir = base_dir / f"run_{run_ts}"
+    # Also create a parent 'combined' directory for later --combine
+    # All slices for the same run will be under run_<ts>/slice_*/
+    if args.slice:
+        # Use parent dir for combining
+        parent_dir = base_dir / f"run_{run_ts}"
+        parent_dir.mkdir(parents=True, exist_ok=True)
+        config_dir = parent_dir / f"slice_{slice_label}"
     config_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Phase 1: Run pipeline (or reuse last) ───────────────────────────
@@ -518,7 +665,7 @@ async def main_async() -> None:
         prev = runs[1]
         print(f"  [REUSE] Loading from {prev.name}")
         all_pipeline_results = []
-        for cfg in ABLATION_CONFIGS:
+        for cfg in configs_to_run:
             cfg_file = prev / f"config_{cfg['id']:02d}_{cfg['name'].replace(' ', '_').lower()}.json"
             if cfg_file.exists():
                 with open(cfg_file) as f:
@@ -535,7 +682,7 @@ async def main_async() -> None:
 
         all_pipeline_results = []
         t_start = time.monotonic()
-        for cfg in ABLATION_CONFIGS:
+        for cfg in configs_to_run:
             result = await run_configuration(cfg, benchmark, config_dir)
             all_pipeline_results.append(result)
         total_pipeline_elapsed = time.monotonic() - t_start
@@ -552,14 +699,15 @@ async def main_async() -> None:
     # ── Phase 2: Evaluate each config separately with rate-limit delays ─
     print(f"\n  {'=' * 50}")
     print(f"  Phase 2: Evaluating {len(all_pipeline_results)} configurations")
-    print(f"  (2s delay between questions, 10s delay between configs)")
+    print(f"  (5s delay between pipeline questions, 3s between eval questions, 10s between configs)")
     print(f"  {'=' * 50}")
 
-    for r in all_pipeline_results:
+    for idx, r in enumerate(all_pipeline_results):
         cfg_id = r["config_id"]
         cfg_name = r["name"]
         questions = r.get("questions", [])
-        print(f"\n  >>> Evaluating Config {cfg_id}/5: {cfg_name} ({len(questions)} questions)", flush=True)
+        total_cfgs = len(all_pipeline_results)
+        print(f"\n  >>> Evaluating Config {idx+1}/{total_cfgs}: {cfg_name} ({len(questions)} questions)", flush=True)
 
         metrics = await evaluate_config(questions, cfg_id, cfg_name)
         r["metrics"] = metrics
@@ -574,7 +722,7 @@ async def main_async() -> None:
         print(f"    [SAVED] {cfg_file.name}", flush=True)
 
         # 10s delay between configs to allow rate limits to reset
-        if cfg_id < len(ABLATION_CONFIGS):
+        if idx < len(all_pipeline_results) - 1:
             print(f"    Waiting 10s before next config...", flush=True)
             await asyncio.sleep(10)
 
@@ -582,7 +730,8 @@ async def main_async() -> None:
         len(r.get("questions", [])) * 2.0 for r in all_pipeline_results
     ) + (len(all_pipeline_results) - 1) * 10.0
     # Build final report
-    report = _build_report(all_pipeline_results, f"IDOP Benchmark ({len(benchmark)} questions)", total_elapsed)
+    n_questions_actual = len(benchmark)
+    report = _build_report(all_pipeline_results, f"IDOP Benchmark ({n_questions_actual} questions)", total_elapsed, actual_questions=n_questions_actual)
     report_path = config_dir / "ablation_report.txt"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
@@ -591,7 +740,7 @@ async def main_async() -> None:
     _save_per_question_csv(config_dir, all_pipeline_results)
 
     full_json = {
-        "report": {"timestamp": run_ts, "benchmark_size": len(benchmark), "configurations": len(ABLATION_CONFIGS), "elapsed_seconds": round(total_elapsed, 3)},
+        "report": {"timestamp": run_ts, "benchmark_size": len(benchmark), "configurations": len(all_pipeline_results), "elapsed_seconds": round(total_elapsed, 3)},
         "configurations": [{k: v for k, v in r.items() if k != "questions"} for r in all_pipeline_results],
     }
     with open(config_dir / "ablation_full.json", "w", encoding="utf-8") as f:
