@@ -1,12 +1,9 @@
 """
-Embedding Service — supports OpenAI (text-embedding-3-small) and Voyage AI (voyage-3).
+Embedding Service — Voyage AI only (voyage-3).
 
 Configuration (in .env):
-    EMBEDDING_PROVIDER=openai   # "openai" or "voyage"
-    OPENAI_API_KEY=sk-...       # Required if EMBEDDING_PROVIDER=openai
-    # OR
-    VOYAGE_API_KEY=pa-...       # Required if EMBEDDING_PROVIDER=voyage
-    VOYAGE_EMBEDDING_MODEL=voyage-3  # Optional, defaults to voyage-3
+    VOYAGE_API_KEY=pa-...                    # Required
+    VOYAGE_EMBEDDING_MODEL=voyage-3          # Optional, defaults to voyage-3
 """
 
 import time
@@ -80,40 +77,26 @@ def _retry_on_quota(
 
 def _create_embedding_model() -> Any:
     """
-    Create and return an embedding model based on settings.
+    Create and return a Voyage AI embedding model.
     Returns an object with .embed_query(text) and .embed_documents(texts) methods.
     """
     settings = get_settings()
-    provider = settings.embedding_provider
+    voyage_api_key = settings.voyage_api_key
 
-    if provider == "voyage":
-        voyage_api_key = settings.voyage_api_key
-        if not voyage_api_key:
-            raise ValueError("EMBEDDING_PROVIDER=voyage but VOYAGE_API_KEY is not set.")
-        try:
-            from langchain_voyageai import VoyageAIEmbeddings
-
-            model = settings.voyage_embedding_model or "voyage-3"
-            logger.info(f"Initializing Voyage embeddings: model={model}")
-            return VoyageAIEmbeddings(
-                voyage_api_key=voyage_api_key,
-                model=model,
-            )
-        except ImportError:
-            logger.warning(
-                "langchain-voyageai is not installed. "
-                "Run: uv pip install langchain-voyageai"
-            )
-            raise
-    else:
-        # Default: OpenAI
-        from langchain_openai import OpenAIEmbeddings
-
-        logger.info("Initializing OpenAI embeddings: model=text-embedding-3-small")
-        return OpenAIEmbeddings(
-            openai_api_key=settings.openai_api_key,
-            model="text-embedding-3-small",
+    if not voyage_api_key:
+        raise ValueError(
+            "VOYAGE_API_KEY is not set. "
+            "Voyage AI is the only supported embedding provider."
         )
+
+    from langchain_voyageai import VoyageAIEmbeddings
+
+    model = settings.voyage_embedding_model or "voyage-3"
+    logger.info(f"Initializing Voyage embeddings: model={model}")
+    return VoyageAIEmbeddings(
+        voyage_api_key=voyage_api_key,
+        model=model,
+    )
 
 
 @lru_cache
@@ -123,7 +106,7 @@ def get_embeddings() -> Any:
 
 
 class EmbeddingsService:
-    """Unified embedding service supporting both OpenAI and Voyage."""
+    """Embedding service using Voyage AI."""
 
     def __init__(self) -> None:
         self.embeddings = get_embeddings()
@@ -140,3 +123,4 @@ class EmbeddingsService:
     def _embed_documents(self, docs: list[str]) -> list[list[float]]:
         logger.debug(f"Embedding {len(docs)} documents")
         return self.embeddings.embed_documents(docs)
+

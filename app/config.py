@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     memory_llm_temperature: float = 0.0
 
     # Embedding Provider Configuration
-    embedding_provider: str = "openai"  # "openai" or "voyage"
+    embedding_provider: str = "voyage"  # Voyage AI is the only supported provider
     voyage_api_key: str | None = (
         None  # Voyage API key (used for both embeddings and reranking)
     )
