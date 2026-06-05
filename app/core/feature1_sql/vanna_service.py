@@ -40,6 +40,8 @@ class VannaAgentWrapper:
             from vanna.core.registry import ToolRegistry
             from vanna.tools import RunSqlTool
             from vanna.integrations.local.agent_memory import DemoAgentMemory
+            from vanna.core.user.resolver import UserResolver
+            from vanna.core.user.models import User
 
             settings = get_settings()
             self.llm = OpenAILlmService(
@@ -75,10 +77,17 @@ class VannaAgentWrapper:
                 access_groups=["admin", "user"],
             )
 
+            # Create a simple user resolver (Vanna 2.x requires this)
+            class SimpleUserResolver(UserResolver):
+                """Minimal UserResolver that returns a default user."""
+                def resolve_user(self, request_context) -> User:
+                    return User(data={"user_id": "default", "name": "IDOP User"})
+
             self.agent = VannaAgent(
                 llm_service=self.llm,
                 tool_registry=self.tools,
                 agent_memory=DemoAgentMemory(),
+                user_resolver=SimpleUserResolver(),
             )
             self._available = True
             logger.info("Vanna Agent Wrapper initialized successfully")
