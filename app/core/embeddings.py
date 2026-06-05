@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 
 class EmbeddingQuotaError(Exception):
     """Raised when the embedding provider returns HTTP 429 (insufficient quota)."""
+
     pass
 
 
@@ -34,6 +35,7 @@ def _retry_on_quota(
     Decorator that retries an embedding API call with exponential backoff
     on HTTP 429 (rate limit / quota) errors.
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -87,16 +89,12 @@ def _create_embedding_model() -> Any:
     if provider == "voyage":
         voyage_api_key = settings.voyage_api_key
         if not voyage_api_key:
-            raise ValueError(
-                "EMBEDDING_PROVIDER=voyage but VOYAGE_API_KEY is not set."
-            )
+            raise ValueError("EMBEDDING_PROVIDER=voyage but VOYAGE_API_KEY is not set.")
         try:
             from langchain_voyageai import VoyageAIEmbeddings
 
             model = settings.voyage_embedding_model or "voyage-3"
-            logger.info(
-                f"Initializing Voyage embeddings: model={model}"
-            )
+            logger.info(f"Initializing Voyage embeddings: model={model}")
             return VoyageAIEmbeddings(
                 voyage_api_key=voyage_api_key,
                 model=model,
@@ -111,9 +109,7 @@ def _create_embedding_model() -> Any:
         # Default: OpenAI
         from langchain_openai import OpenAIEmbeddings
 
-        logger.info(
-            "Initializing OpenAI embeddings: model=text-embedding-3-small"
-        )
+        logger.info("Initializing OpenAI embeddings: model=text-embedding-3-small")
         return OpenAIEmbeddings(
             openai_api_key=settings.openai_api_key,
             model="text-embedding-3-small",

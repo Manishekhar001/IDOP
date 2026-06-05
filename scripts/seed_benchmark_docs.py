@@ -14,12 +14,10 @@ Usage:
 
 import argparse
 import asyncio
-import json
 import os
 import subprocess
 import sys
 import time
-import uuid
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
@@ -204,6 +202,7 @@ def create_document_files():
 # Upload documents via FastAPI
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 async def upload_document(api_base: str, filepath: Path) -> dict:
     """Upload a single document via the /documents/upload endpoint."""
     import httpx
@@ -220,7 +219,9 @@ async def upload_document(api_base: str, filepath: Path) -> dict:
                 )
                 return data
             else:
-                print(f"  [FAIL] {filepath.name}: HTTP {resp.status_code} — {resp.text[:200]}")
+                print(
+                    f"  [FAIL] {filepath.name}: HTTP {resp.status_code} — {resp.text[:200]}"
+                )
                 return {"error": resp.text, "filename": filepath.name}
 
 
@@ -239,9 +240,7 @@ async def upload_all_documents(api_base: str):
 
     # Print summary
     print(f"\n{'='*60}")
-    total_chunks = sum(
-        r.get("chunks_created", 0) for r in results if "error" not in r
-    )
+    total_chunks = sum(r.get("chunks_created", 0) for r in results if "error" not in r)
     successes = sum(1 for r in results if "error" not in r)
     failures = sum(1 for r in results if "error" in r)
     print(f"  Upload complete: {successes} succeeded, {failures} failed")
@@ -254,6 +253,7 @@ async def upload_all_documents(api_base: str):
 # Start FastAPI server
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def start_server(port: int = 8088) -> subprocess.Popen:
     """Start the FastAPI server in the background."""
     print(f"\n  Starting FastAPI server on port {port}...")
@@ -261,7 +261,15 @@ def start_server(port: int = 8088) -> subprocess.Popen:
     env["LOG_LEVEL"] = "WARNING"
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", f"--port={port}"],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "127.0.0.1",
+            f"--port={port}",
+        ],
         cwd=str(PROJECT_ROOT),
         env=env,
         stdout=subprocess.DEVNULL,
@@ -270,6 +278,7 @@ def start_server(port: int = 8088) -> subprocess.Popen:
 
     # Wait for server to be ready
     import httpx
+
     api_base = f"http://127.0.0.1:{port}"
     for i in range(30):
         try:
@@ -288,14 +297,29 @@ def start_server(port: int = 8088) -> subprocess.Popen:
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Create benchmark documents and upload them to Qdrant",
     )
-    parser.add_argument("--run", action="store_true", help="Also run the ablation study after uploading")
-    parser.add_argument("--subset", "-n", type=int, default=None, help="Run ablation on a subset of N questions")
-    parser.add_argument("--port", type=int, default=8088, help="Port for the FastAPI server")
-    parser.add_argument("--no-ragas", action="store_true", help="Skip RAGAS library, use in-house evaluator")
+    parser.add_argument(
+        "--run", action="store_true", help="Also run the ablation study after uploading"
+    )
+    parser.add_argument(
+        "--subset",
+        "-n",
+        type=int,
+        default=None,
+        help="Run ablation on a subset of N questions",
+    )
+    parser.add_argument(
+        "--port", type=int, default=8088, help="Port for the FastAPI server"
+    )
+    parser.add_argument(
+        "--no-ragas",
+        action="store_true",
+        help="Skip RAGAS library, use in-house evaluator",
+    )
     return parser.parse_args(argv)
 
 

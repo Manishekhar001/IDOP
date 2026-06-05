@@ -14,7 +14,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from app.opik import track
-from app.config import get_settings
 from app.core.llm_factory import get_memory_llm
 
 logger = logging.getLogger("idop_app.ragas_evaluator")
@@ -205,9 +204,15 @@ class RagasEvaluator:
         llm = get_memory_llm(temperature=0.0)
         # Use .bind() instead of .with_structured_output() for broader LLM compatibility.
         # Some models (Llama on Groq) have inconsistent structured output support.
-        self._relevancy_chain = _RELEVANCY_PROMPT | llm.bind(response_format={"type": "json_object"})
-        self._faithfulness_chain = _FAITHFULNESS_PROMPT | llm.bind(response_format={"type": "json_object"})
-        self._precision_chain = _CONTEXT_PRECISION_PROMPT | llm.bind(response_format={"type": "json_object"})
+        self._relevancy_chain = _RELEVANCY_PROMPT | llm.bind(
+            response_format={"type": "json_object"}
+        )
+        self._faithfulness_chain = _FAITHFULNESS_PROMPT | llm.bind(
+            response_format={"type": "json_object"}
+        )
+        self._precision_chain = _CONTEXT_PRECISION_PROMPT | llm.bind(
+            response_format={"type": "json_object"}
+        )
         logger.info("RAGASEvaluator initialized")
 
     @track(name="ragas_evaluator_evaluate")
@@ -222,7 +227,9 @@ class RagasEvaluator:
         Returns a RagasScores object, or None if evaluation fails entirely.
         """
         if not answer or answer.startswith("[ERROR]"):
-            logger.warning(f"RAGAS evaluation skipped: invalid answer (len={len(answer)})")
+            logger.warning(
+                f"RAGAS evaluation skipped: invalid answer (len={len(answer)})"
+            )
             return None
 
         try:
@@ -236,7 +243,9 @@ class RagasEvaluator:
                 relevancy = RelevancyScore(score=0.5, reason="Parsing fallback")
 
             # 2. Faithfulness
-            context_str = "\n\n---\n\n".join(contexts) if contexts else "(no context provided)"
+            context_str = (
+                "\n\n---\n\n".join(contexts) if contexts else "(no context provided)"
+            )
             faithfulness_raw = await self._faithfulness_chain.ainvoke(
                 {"context": context_str, "answer": answer}
             )
@@ -244,8 +253,11 @@ class RagasEvaluator:
 
             # 3. Context Precision
             chunks_text = (
-                "\n\n---\n\n".join(f"Chunk {i+1}: {c[:500]}" for i, c in enumerate(contexts[:10]))
-                if contexts else "(no chunks retrieved)"
+                "\n\n---\n\n".join(
+                    f"Chunk {i+1}: {c[:500]}" for i, c in enumerate(contexts[:10])
+                )
+                if contexts
+                else "(no chunks retrieved)"
             )
             precision_raw = await self._precision_chain.ainvoke(
                 {"question": question, "chunks_text": chunks_text}
@@ -266,10 +278,13 @@ class RagasEvaluator:
             logger.error(f"RAGAS evaluation failed: {e}", exc_info=True)
             return None
 
-    def _parse_json_score(self, content: str, schema_class: type) -> Optional[BaseModel]:
+    def _parse_json_score(
+        self, content: str, schema_class: type
+    ) -> Optional[BaseModel]:
         """Parse JSON from LLM response and validate against a Pydantic schema."""
         import json
         import re
+
         try:
             # Try direct JSON parse first
             data = json.loads(content)
@@ -277,7 +292,7 @@ class RagasEvaluator:
         except (json.JSONDecodeError, Exception):
             pass
         # Try extracting JSON from markdown code blocks
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)```", content)
         if match:
             try:
                 data = json.loads(match.group(1))
@@ -293,7 +308,9 @@ class RagasEvaluator:
             return result
         return FaithfulnessScore(score=0.0, unsupported_claims=[])
 
-    def _parse_precision(self, content: str, total_chunks: int) -> ContextPrecisionScore:
+    def _parse_precision(
+        self, content: str, total_chunks: int
+    ) -> ContextPrecisionScore:
         """Parse precision score. Returns 0.0 on parse failure so failed evals are visible."""
         result = self._parse_json_score(content, ContextPrecisionScore)
         if result:

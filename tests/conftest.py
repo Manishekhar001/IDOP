@@ -78,7 +78,6 @@ _TEST_ENV = {
     "RETRIEVAL_K": "5",
     # Opik — disable tracking entirely to prevent real HTTP calls in tests
     "OPIK_TRACK_DISABLE": "true",
-
     # Chunking
     "CHUNK_SIZE": "512",
     "CHUNK_OVERLAP": "50",
@@ -88,7 +87,9 @@ for _key, _val in _TEST_ENV.items():
     os.environ[_key] = _val
 
 # Clear the get_settings LRU cache so it picks up the test env vars on first call
-from app.config import get_settings as _get_settings  # noqa: E402 — intentional: env vars must be set first
+from app.config import (
+    get_settings as _get_settings,
+)  # noqa: E402 — intentional: env vars must be set first
 
 _get_settings.cache_clear()
 
@@ -108,7 +109,7 @@ def mock_settings():
     from app.services.cache_init import reset_caches
     from app.services.pending_store import reset_pending_store
 
-    reset_caches()          # also clears QueryCacheService._local_cache_shared
+    reset_caches()  # also clears QueryCacheService._local_cache_shared
     _get_settings.cache_clear()
 
     # IMPORTANT: reset_pending_store() calls PendingStore.clear() which tries to
@@ -126,7 +127,7 @@ def mock_settings():
     ):
         reset_pending_store()
         yield _get_settings()
-    reset_caches()          # also clears QueryCacheService._local_cache_shared
+    reset_caches()  # also clears QueryCacheService._local_cache_shared
     # reset_pending_store() is called after patching ends but PendingStore now
     # has connect_timeout=2, so even if it tries to connect it fails fast.
 

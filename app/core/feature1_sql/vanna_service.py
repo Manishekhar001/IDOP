@@ -80,6 +80,7 @@ class VannaAgentWrapper:
             # Create a simple user resolver (Vanna 2.x requires this)
             class SimpleUserResolver(UserResolver):
                 """Minimal UserResolver that returns a default user."""
+
                 def resolve_user(self, request_context) -> User:
                     return User(data={"user_id": "default", "name": "IDOP User"})
 

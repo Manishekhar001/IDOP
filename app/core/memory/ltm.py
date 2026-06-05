@@ -4,8 +4,8 @@ from functools import lru_cache
 from langchain_core.messages import SystemMessage
 from pydantic import BaseModel, Field
 
-from app.opik import track
 from app.config import get_settings
+from app.opik import track
 from app.core.llm_factory import get_memory_llm
 from app.utils.logger import get_logger
 
@@ -51,6 +51,7 @@ class LTMService:
     def __init__(self) -> None:
         self._llm = get_memory_llm()
         self._extractor = self._llm.with_structured_output(MemoryDecision)
+        settings = get_settings()
         logger.info(f"LTMService ready — model={settings.memory_llm_model}")
 
     @staticmethod

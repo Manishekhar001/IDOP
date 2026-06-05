@@ -13,10 +13,10 @@ Usage:
 
 import argparse
 import asyncio
-import hashlib
 import sys
-import time
 from pathlib import Path
+
+from langchain_core.documents import Document
 
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -32,15 +32,15 @@ DOCS_DIR = PROJECT_ROOT / "benchmark_docs"
 # consistency between the upload script and what's indexed in Qdrant.
 # If you update benchmark_docs/*.txt, these will pick up the changes.
 
-import os
-from pathlib import Path
 
 _DOCS_DIR = Path(__file__).parent.parent / "benchmark_docs"
+
 
 def _load_doc(filename: str) -> str:
     path = _DOCS_DIR / filename
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 REFUND_POLICY_DOC = _load_doc("refund_policy.txt")
 EMPLOYEE_HANDBOOK_DOC = _load_doc("employee_handbook.txt")
@@ -49,13 +49,6 @@ REFUND_POLICY_2025_DOC = _load_doc("refund_policy_2025_superseded.txt")
 EMPLOYEE_HANDBOOK_2025_DOC = _load_doc("employee_handbook_2025_superseded.txt")
 REGIONAL_POLICY_DOC = _load_doc("regional_policy.txt")
 INTERNAL_MEMOS_DOC = _load_doc("internal_memos.txt")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Document processor helpers (mirrors app.core.document_processor logic)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-from langchain_core.documents import Document
 
 
 async def upload_document_direct(
@@ -98,16 +91,24 @@ async def upload_document_direct(
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 async def main_async():
     parser = argparse.ArgumentParser(
         description="Upload benchmark documents directly to Qdrant (no server needed)"
     )
-    parser.add_argument("--run-ablation", action="store_true", help="Also run the ablation study after uploading")
-    parser.add_argument("--subset", "-n", type=int, default=None, help="Run ablation on a subset")
+    parser.add_argument(
+        "--run-ablation",
+        action="store_true",
+        help="Also run the ablation study after uploading",
+    )
+    parser.add_argument(
+        "--subset", "-n", type=int, default=None, help="Run ablation on a subset"
+    )
     args = parser.parse_args()
 
     # Set up event loop for Windows
     import asyncio
+
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -117,7 +118,6 @@ async def main_async():
 
     # Initialize vector store
     from app.core.vector_store import VectorStoreService
-    from app.core.embeddings import EmbeddingsService
 
     print("\n  [1/3] Initializing VectorStoreService (Qdrant + OpenAI)...")
     vector_store = VectorStoreService()
@@ -125,10 +125,12 @@ async def main_async():
 
     # Check current collection state
     info = vector_store.get_collection_info()
-    print(f"  Current Qdrant collection: '{info['name']}' — {info['points_count']} points")
+    print(
+        f"  Current Qdrant collection: '{info['name']}' — {info['points_count']} points"
+    )
 
     # Upload documents
-    print(f"\n  [2/3] Uploading benchmark documents...\n")
+    print("\n  [2/3] Uploading benchmark documents...\n")
 
     documents = [
         ("refund_policy.txt", REFUND_POLICY_DOC),
@@ -168,6 +170,7 @@ async def main_async():
 
         # Override sys.argv for the ablation script
         import sys as _sys
+
         _sys.argv = ["eval_ragas.py", "--no-ragas"]
         if args.subset:
             _sys.argv.extend(["--subset", str(args.subset)])

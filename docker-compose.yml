@@ -13,6 +13,16 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - idop-net
+    command:
+      # Prevent Postgres from closing idle connections — the LangGraph
+      # AsyncPostgresSaver uses a persistent connection pool that must
+      # stay alive between requests. Default postgres idle timeout kills
+      # these connections after ~5 minutes.
+      - "postgres"
+      - "-c"
+      - "idle_in_transaction_session_timeout=0"
+      - "-c"
+      - "statement_timeout=0"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1"]
       interval: 5s
@@ -28,11 +38,14 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      # Override DATABASE_URL for Docker networking — inside the container,
+      # 'localhost' refers to the container itself, not the host. The Postgres
+      # service on the Docker network is reachable by its service name.
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
     depends_on:
       postgres:
         condition: service_healthy
-    # DATABASE_URL removed — .env handles it. The docker-compose DATABASE_URL
-    # overrides the .env file at runtime, breaking local dev setups.
     networks:
       - idop-net
     restart: unless-stopped

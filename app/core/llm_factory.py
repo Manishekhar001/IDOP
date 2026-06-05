@@ -99,36 +99,40 @@ def _build_litellm_router() -> Any:
     # RPM goes at the model_list entry level (NOT inside litellm_params)
     model_list = []
     for i, key in enumerate(groq_keys):
-        model_list.append({
-            "model_name": model_group,
-            "litellm_params": {
-                "model": groq_model,
-                "api_key": key,
-            },
-            "rpm": 30,  # Groq free tier: 30 req/min per key
-        })
+        model_list.append(
+            {
+                "model_name": model_group,
+                "litellm_params": {
+                    "model": groq_model,
+                    "api_key": key,
+                },
+                "rpm": 30,  # Groq free tier: 30 req/min per key
+            }
+        )
         logger.info(f"  Groq deployment {i+1}: groq/{model}")
 
     # Add OpenAI as the final fallback
     openai_key = settings.openai_api_key
     if openai_key and openai_key.strip():
-        model_list.append({
-            "model_name": model_group,
-            "litellm_params": {
-                "model": "openai/gpt-4o",
-                "api_key": openai_key.strip(),
-            },
-            "rpm": 500,  # Higher RPM since it's the final fallback
-        })
-        logger.info(f"  OpenAI fallback: openai/gpt-4o")
+        model_list.append(
+            {
+                "model_name": model_group,
+                "litellm_params": {
+                    "model": "openai/gpt-4o",
+                    "api_key": openai_key.strip(),
+                },
+                "rpm": 500,  # Higher RPM since it's the final fallback
+            }
+        )
+        logger.info("  OpenAI fallback: openai/gpt-4o")
 
     # Configure the Router with cooldown and retry settings
     router = Router(
         model_list=model_list,
-        num_retries=2,              # Retries per request on failure
-        retry_after=5.0,            # Seconds between retries
-        allowed_fails=3,            # Max consecutive fails before cooldown
-        cooldown_time=60.0,         # Seconds to cool down a failed deployment
+        num_retries=2,  # Retries per request on failure
+        retry_after=5.0,  # Seconds between retries
+        allowed_fails=3,  # Max consecutive fails before cooldown
+        cooldown_time=60.0,  # Seconds to cool down a failed deployment
         routing_strategy="latency-based-routing",
     )
 
@@ -239,9 +243,7 @@ def get_memory_llm(
     """
     settings = get_settings()
     resolved_model = (
-        model
-        or getattr(settings, "memory_llm_model", None)
-        or settings.llm_model
+        model or getattr(settings, "memory_llm_model", None) or settings.llm_model
     )
     resolved_temp = (
         temperature

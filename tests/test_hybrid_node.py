@@ -10,6 +10,7 @@ Tests verify:
 
 import pytest
 
+
 class TestHybridGenerationNode:
     """Tests for the hybrid_generation_node graph node function.
 
@@ -23,17 +24,28 @@ class TestHybridGenerationNode:
         from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
 
-        result = await hybrid_generation_node({
-            "question": "Compare sales data with policy documents",
-            "messages": [HumanMessage(content="Compare sales data with policy documents")],
-            "ltm_context": "",
-            "summary": "",
-        })
+        result = await hybrid_generation_node(
+            {
+                "question": "Compare sales data with policy documents",
+                "messages": [
+                    HumanMessage(content="Compare sales data with policy documents")
+                ],
+                "ltm_context": "",
+                "summary": "",
+            }
+        )
         expected_keys = {
-            "sql_query", "sql_results", "sql_status",
-            "docs", "good_docs", "refined_context",
-            "crag_verdict", "answer",
-            "hyde_used", "hyde_hypotheses", "reranking_used",
+            "sql_query",
+            "sql_results",
+            "sql_status",
+            "docs",
+            "good_docs",
+            "refined_context",
+            "crag_verdict",
+            "answer",
+            "hyde_used",
+            "hyde_hypotheses",
+            "reranking_used",
         }
         assert expected_keys.issubset(set(result.keys()))
 
@@ -42,12 +54,14 @@ class TestHybridGenerationNode:
         """Should not crash with an empty question string."""
         from app.core.graph.nodes import hybrid_generation_node
 
-        result = await hybrid_generation_node({
-            "question": "",
-            "messages": [],
-            "ltm_context": "",
-            "summary": "",
-        })
+        result = await hybrid_generation_node(
+            {
+                "question": "",
+                "messages": [],
+                "ltm_context": "",
+                "summary": "",
+            }
+        )
         assert "answer" in result
         assert "sql_status" in result
         assert "sql_results" in result
@@ -57,11 +71,13 @@ class TestHybridGenerationNode:
         """Should not crash when question key is missing."""
         from app.core.graph.nodes import hybrid_generation_node
 
-        result = await hybrid_generation_node({
-            "messages": [],
-            "ltm_context": "",
-            "summary": "",
-        })
+        result = await hybrid_generation_node(
+            {
+                "messages": [],
+                "ltm_context": "",
+                "summary": "",
+            }
+        )
         assert "answer" in result
 
     @pytest.mark.asyncio
@@ -70,12 +86,14 @@ class TestHybridGenerationNode:
         from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
 
-        result = await hybrid_generation_node({
-            "question": "Tell me about policies",
-            "messages": [HumanMessage(content="Tell me about policies")],
-            "ltm_context": "",
-            "summary": "",
-        })
+        result = await hybrid_generation_node(
+            {
+                "question": "Tell me about policies",
+                "messages": [HumanMessage(content="Tell me about policies")],
+                "ltm_context": "",
+                "summary": "",
+            }
+        )
         assert result["sql_status"] in ("skipped", "error", "failed_safety")
         assert result["sql_results"] == []
 
@@ -85,12 +103,16 @@ class TestHybridGenerationNode:
         from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
 
-        result = await hybrid_generation_node({
-            "question": "Show orders and compare with policy",
-            "messages": [HumanMessage(content="Show orders and compare with policy")],
-            "ltm_context": "",
-            "summary": "",
-        })
+        result = await hybrid_generation_node(
+            {
+                "question": "Show orders and compare with policy",
+                "messages": [
+                    HumanMessage(content="Show orders and compare with policy")
+                ],
+                "ltm_context": "",
+                "summary": "",
+            }
+        )
         assert isinstance(result["sql_status"], str)
 
     @pytest.mark.asyncio
@@ -99,10 +121,12 @@ class TestHybridGenerationNode:
         from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
 
-        result = await hybrid_generation_node({
-            "question": "What is our sales data showing?",
-            "messages": [HumanMessage(content="What is our sales data showing?")],
-            "ltm_context": "",
-            "summary": "",
-        })
+        result = await hybrid_generation_node(
+            {
+                "question": "What is our sales data showing?",
+                "messages": [HumanMessage(content="What is our sales data showing?")],
+                "ltm_context": "",
+                "summary": "",
+            }
+        )
         assert isinstance(result["answer"], str)

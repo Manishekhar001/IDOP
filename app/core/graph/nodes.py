@@ -2,7 +2,6 @@ import asyncio
 import json
 import re
 import uuid
-from functools import lru_cache
 from typing import Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -193,6 +192,7 @@ async def mutation_node(state: CSRAGState) -> dict:
         rows = state.get("mutation_rows", [])
 
         from app.core.schema_registry import SUPPORTED_MUTATION_TABLES
+
         if table_name and table_name not in SUPPORTED_MUTATION_TABLES:
             return {
                 "mutation_status": "error",
@@ -353,7 +353,7 @@ async def decide_retrieval_node(state: CSRAGState) -> dict:
     # decision about whether retrieval is needed.
     if state.get("need_retrieval", False):
         logger.debug(
-            f"decide_retrieval: need_retrieval already True — skipping LLM call"
+            "decide_retrieval: need_retrieval already True — skipping LLM call"
         )
         return {
             "question": question,

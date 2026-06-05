@@ -5,11 +5,9 @@ Runs faster than the full ablation study by avoiding the per-query engine setup 
 """
 
 import asyncio
-import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -96,9 +94,11 @@ CONFIGS = [
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
+
 def _extract_contexts(result_state: dict) -> list[str]:
     """Extract context texts from pipeline result."""
     from langchain_core.documents import Document
+
     contexts = []
     for key in ("good_docs", "docs", "web_docs"):
         docs = result_state.get(key, []) or []
@@ -112,13 +112,13 @@ def _extract_contexts(result_state: dict) -> list[str]:
 
 # ── Benchmark Runner ───────────────────────────────────────────────────────
 
+
 async def run_benchmark():
     from app.core.csrag_engine import CSRAGEngine
     from app.core.vector_store import VectorStoreService
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from langgraph.store.postgres.aio import AsyncPostgresStore
     from app.config import get_settings
-    from langchain_core.messages import HumanMessage
 
     settings = get_settings()
     vector_store = VectorStoreService()
@@ -143,7 +143,9 @@ async def run_benchmark():
         for cfg in CONFIGS:
             print(f"\n{'='*60}")
             print(f"  Config {cfg['id']}: {cfg['name']}")
-            print(f"  {cfg['search_mode']}, hyde={cfg['enable_hyde']}, rerank={cfg['enable_reranking']}, top_k={cfg['top_k']}")
+            print(
+                f"  {cfg['search_mode']}, hyde={cfg['enable_hyde']}, rerank={cfg['enable_reranking']}, top_k={cfg['top_k']}"
+            )
             print(f"{'='*60}")
 
             faith_scores = []
@@ -151,7 +153,11 @@ async def run_benchmark():
             prec_scores = []
 
             for q_idx, item in enumerate(BENCHMARK, 1):
-                print(f"  [{q_idx}/{len(BENCHMARK)}] {item['question'][:60]}...", end=" ", flush=True)
+                print(
+                    f"  [{q_idx}/{len(BENCHMARK)}] {item['question'][:60]}...",
+                    end=" ",
+                    flush=True,
+                )
 
                 t0 = time.monotonic()
 
@@ -169,7 +175,10 @@ async def run_benchmark():
                 init_state["retrieval_query"] = item["question"]
 
                 config = {
-                    "configurable": {"thread_id": f"bench-cfg{cfg['id']}-q{q_idx}", "user_id": "bench"},
+                    "configurable": {
+                        "thread_id": f"bench-cfg{cfg['id']}-q{q_idx}",
+                        "user_id": "bench",
+                    },
                     "recursion_limit": 80,
                 }
 
@@ -181,7 +190,10 @@ async def run_benchmark():
                     contexts = _extract_contexts(result)
 
                     # Evaluate
-                    from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
+                    from app.core.feature3_rag.ragas_evaluator import (
+                        get_ragas_evaluator,
+                    )
+
                     evaluator = get_ragas_evaluator()
                     scores = await evaluator.evaluate(
                         question=item["question"],
@@ -203,11 +215,19 @@ async def run_benchmark():
             # Aggregate
             n = len(faith_scores) or 1
             metrics = {
-                "faithfulness": round(sum(faith_scores) / n, 4) if faith_scores else 0.0,
-                "answer_relevancy": round(sum(relev_scores) / n, 4) if relev_scores else 0.0,
-                "context_precision": round(sum(prec_scores) / n, 4) if prec_scores else 0.0,
+                "faithfulness": (
+                    round(sum(faith_scores) / n, 4) if faith_scores else 0.0
+                ),
+                "answer_relevancy": (
+                    round(sum(relev_scores) / n, 4) if relev_scores else 0.0
+                ),
+                "context_precision": (
+                    round(sum(prec_scores) / n, 4) if prec_scores else 0.0
+                ),
             }
-            print(f"\n  >> {cfg['name']}: faith={metrics['faithfulness']:.4f}, relev={metrics['answer_relevancy']:.4f}, prec={metrics['context_precision']:.4f}")
+            print(
+                f"\n  >> {cfg['name']}: faith={metrics['faithfulness']:.4f}, relev={metrics['answer_relevancy']:.4f}, prec={metrics['context_precision']:.4f}"
+            )
 
             all_results.append({"config": cfg["name"], "metrics": metrics})
 
@@ -217,16 +237,22 @@ async def run_benchmark():
         print(f"{'='*60}")
         for r in all_results:
             m = r["metrics"]
-            print(f"  {r['config']:<20} faith={m['faithfulness']:.4f}  relev={m['answer_relevancy']:.4f}  prec={m['context_precision']:.4f}")
+            print(
+                f"  {r['config']:<20} faith={m['faithfulness']:.4f}  relev={m['answer_relevancy']:.4f}  prec={m['context_precision']:.4f}"
+            )
 
         if len(all_results) >= 2:
             first = all_results[0]["metrics"]
             last = all_results[-1]["metrics"]
-            print(f"\n  Improvement ({all_results[0]['config']} -> {all_results[-1]['config']}):")
+            print(
+                f"\n  Improvement ({all_results[0]['config']} -> {all_results[-1]['config']}):"
+            )
             for key in ["faithfulness", "answer_relevancy", "context_precision"]:
                 delta = last[key] - first[key]
                 pct = (delta / first[key] * 100) if first[key] > 0 else 0
-                print(f"    {key:<20} {first[key]:.4f} -> {last[key]:.4f}  ({pct:+.1f}%)")
+                print(
+                    f"    {key:<20} {first[key]:.4f} -> {last[key]:.4f}  ({pct:+.1f}%)"
+                )
 
     finally:
         await cm_checkpointer.__aexit__(None, None, None)

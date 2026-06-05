@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     groq_api_key_2: str | None = None
     groq_api_key_3: str | None = None
     groq_api_key_4: str | None = None
-    
+
     llm_provider: str = "openai"  # "openai" or "groq" or "litellm"
     llm_model: str = "gpt-4o"
     llm_temperature: float = 0.0
@@ -79,7 +79,9 @@ class Settings(BaseSettings):
 
     # Embedding Provider Configuration
     embedding_provider: str = "openai"  # "openai" or "voyage"
-    voyage_api_key: str | None = None   # Voyage API key (used for both embeddings and reranking)
+    voyage_api_key: str | None = (
+        None  # Voyage API key (used for both embeddings and reranking)
+    )
     voyage_embedding_model: str = "voyage-3"
     voyage_embedding_dimension: int = 1024
     openai_embedding_dimension: int = 1536
@@ -95,11 +97,20 @@ class Settings(BaseSettings):
     def groq_api_keys(self) -> list[str]:
         """Return all configured non-empty Groq API keys."""
         keys = []
-        for attr in ["groq_api_key_1", "groq_api_key_2", "groq_api_key_3", "groq_api_key_4"]:
+        for attr in [
+            "groq_api_key_1",
+            "groq_api_key_2",
+            "groq_api_key_3",
+            "groq_api_key_4",
+        ]:
             val = getattr(self, attr, None)
             if val and str(val).strip():
                 keys.append(str(val).strip())
-        if self.groq_api_key and str(self.groq_api_key).strip() and str(self.groq_api_key).strip() not in keys:
+        if (
+            self.groq_api_key
+            and str(self.groq_api_key).strip()
+            and str(self.groq_api_key).strip() not in keys
+        ):
             keys.append(str(self.groq_api_key).strip())
         return keys
 

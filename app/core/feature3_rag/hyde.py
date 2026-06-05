@@ -3,7 +3,6 @@ import asyncio
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from app.opik import track
-from app.config import get_settings
 from app.core.llm_factory import get_memory_llm
 
 logger = logging.getLogger("idop_app.hyde")
