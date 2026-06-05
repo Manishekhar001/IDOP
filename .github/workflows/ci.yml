@@ -93,10 +93,10 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 4: SETUP PYTHON RUNTIME + INSTALL DEPENDENCIES
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 4/7: Setup Python 3.13"
+      - name: "Step 4/7: Setup Python 3.12"
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: 'pip'
 
       - name: "Step 4b/7: Install system libraries"
