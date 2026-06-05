@@ -2,10 +2,10 @@ from functools import lru_cache
 import uuid
 
 from langchain_core.messages import HumanMessage, RemoveMessage
-from langchain_openai import ChatOpenAI
 
 from app.opik import track
 from app.config import get_settings
+from app.core.llm_factory import get_memory_llm
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,11 +15,7 @@ class STMSummarizer:
     def __init__(self) -> None:
         settings = get_settings()
         self._threshold = settings.stm_message_threshold
-        self._llm = ChatOpenAI(
-            model=settings.memory_llm_model,
-            temperature=settings.llm_temperature,
-            api_key=settings.openai_api_key,
-        )
+        self._llm = get_memory_llm()
         logger.info(f"STMSummarizer ready — threshold={self._threshold} messages")
 
     def should_summarize(self, messages: list) -> bool:

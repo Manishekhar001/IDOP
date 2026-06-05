@@ -17,25 +17,35 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # ── Benchmark questions (subset for speed) ──────────────────────────────────
 
 BENCHMARK = [
+    # Version Conflict — tests CRAG contradiction detection
     {
-        "question": "What is the standard refund window for retail products?",
-        "ground_truth": "Retail products are eligible for a full refund within 30 days of purchase with receipt.",
-        "category": "Refund & Support",
+        "question": "Are there any restocking fees for opened electronics?",
+        "ground_truth": "Opened electronics are subject to a 15% restocking fee if returned within the 30-day window.",
+        "category": "Version Conflict",
     },
+    # Out-of-Document — tests CRAG INCORRECT detection + web fallback
     {
-        "question": "What is the standard office core hours requirement?",
-        "ground_truth": "Core collaboration hours are from 10:00 AM to 3:00 PM EST daily.",
-        "category": "Corporate Policy",
+        "question": "What is the refund policy for the new subscription box service?",
+        "ground_truth": "Customers may cancel within 14 days of the first billing date for a full refund; subsequent months are non-refundable but can be cancelled.",
+        "category": "Out-of-Document Knowledge",
     },
+    # Regional Policy — tests HyDE query expansion
     {
-        "question": "What is the maximum allowed salary for a junior analyst role?",
-        "ground_truth": "According to rules.json, the maximum permitted salary for junior tiers is capped at $120,000.",
-        "category": "Platform Operations",
+        "question": "What restocking fee applies to EU customers returning opened electronics?",
+        "ground_truth": "No restocking fees of any kind may be applied to EU customer returns under EU consumer protection laws.",
+        "category": "Regional Policy",
     },
+    # Multi-hop Synthesis — tests context enrichment + multi-doc reasoning
     {
-        "question": "If an international user returned opened electronics, what is the fee policy?",
-        "ground_truth": "International returns require the customer to cover shipping, and opened electronics are subject to a 15% restocking fee.",
-        "category": "Multi-hop Reasoning",
+        "question": "If an EU customer returns opened electronics bought in January 2026 before the new policy took effect, what fees apply?",
+        "ground_truth": "No restocking fee applies because the order was placed under the 2025 policy (which had no restocking fee for electronics) and EU policies override standard fees.",
+        "category": "Multi-hop Synthesis",
+    },
+    # Ambiguous Query — tests HyDE disambiguation
+    {
+        "question": "What benefits did the company cut this year?",
+        "ground_truth": "Despite the label 'budget cuts', only contract worker dental benefits and 401(k) match were eliminated. All other benefits increased.",
+        "category": "Ambiguous Query",
     },
 ]
 

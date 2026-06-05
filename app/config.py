@@ -63,18 +63,51 @@ class Settings(BaseSettings):
     allowed_origins: str = "*"
     git_commit_sha: str = "unknown"
 
-    # OpenAI API Configuration
+    # LLM Provider Configuration
     openai_api_key: str
+    groq_api_key: str | None = None
+    groq_api_key_1: str | None = None
+    groq_api_key_2: str | None = None
+    groq_api_key_3: str | None = None
+    groq_api_key_4: str | None = None
+    
+    llm_provider: str = "openai"  # "openai" or "groq" or "litellm"
     llm_model: str = "gpt-4o"
     llm_temperature: float = 0.0
     memory_llm_model: str = "gpt-4o-mini"
     memory_llm_temperature: float = 0.0
 
+    # Embedding Provider Configuration
+    embedding_provider: str = "openai"  # "openai" or "voyage"
+    voyage_api_key: str | None = None
+    voyage_embedding_model: str = "voyage-3"
+    voyage_embedding_dimension: int = 1024
+    static_embedding_dimension: int = 1536  # OpenAI default; overridden by voyage_embedding_dimension
+
+    @property
+    def embedding_dimension(self) -> int:
+        """Return the correct embedding dimension based on the active provider."""
+        if self.embedding_provider == "voyage":
+            return self.voyage_embedding_dimension
+        return self.static_embedding_dimension
+
+    @property
+    def groq_api_keys(self) -> list[str]:
+        """Return all configured Groq API keys as a list (excluding empty/None)."""
+        keys = []
+        for attr in ["groq_api_key_1", "groq_api_key_2", "groq_api_key_3", "groq_api_key_4"]:
+            val = getattr(self, attr, None)
+            if val and val.strip():
+                keys.append(val.strip())
+        # Also include groq_api_key if set (backward compat)
+        if self.groq_api_key and self.groq_api_key.strip() and self.groq_api_key.strip() not in keys:
+            keys.append(self.groq_api_key.strip())
+        return keys
+
     # Qdrant Vector DB Configuration
     qdrant_url: str
     qdrant_api_key: str
     collection_name: str = "idop_documents"
-    embedding_dimension: int = 1536
 
     # Relational Database Configuration
     database_url: str
@@ -103,7 +136,8 @@ class Settings(BaseSettings):
     # Search & Reranking APIs
     tavily_api_key: str
     tavily_max_results: int = 5
-    voyage_api_key: Optional[str] = None
+    # Voyage reranking (separate from embeddings)
+    voyage_rerank_api_key: Optional[str] = None
 
     # LangGraph State Configuration
     stm_message_threshold: int = 6

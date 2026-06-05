@@ -8,7 +8,6 @@ from typing import Literal
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
@@ -16,6 +15,7 @@ from app.core.crag.evaluator import get_crag_evaluator
 from app.core.crag.web_search import get_web_search_service
 from app.core.graph.state import CSRAGState
 from app.core.graph.router import QueryRouter
+from app.core.llm_factory import get_chat_llm as _get_chat_llm
 from app.core.memory.ltm import get_ltm_service
 from app.core.memory.stm import get_stm_summarizer
 from app.core.srag.verifier import get_srag_verifier
@@ -40,14 +40,8 @@ import pandas as pd
 logger = get_logger(__name__)
 
 
-@lru_cache
-def _get_chat_llm() -> ChatOpenAI:
-    settings = get_settings()
-    return ChatOpenAI(
-        model=settings.llm_model,
-        temperature=settings.llm_temperature,
-        api_key=settings.openai_api_key,
-    )
+# _get_chat_llm is imported from app.core.llm_factory (see top of file).
+# The lru_cache decorator in llm_factory.py handles caching.
 
 
 def _build_system_prompt(ltm_context: str, summary: str) -> str:

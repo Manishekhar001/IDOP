@@ -9,7 +9,7 @@ from app.api.schemas import (
     ErrorResponse,
 )
 from app.core.document_processor import DocumentProcessor
-from app.core.embeddings import OpenAIQuotaError
+from app.core.embeddings import EmbeddingQuotaError
 from app.core.vector_store import VectorStoreService
 from app.services.cache_init import get_doc_cache
 from app.opik import track
@@ -268,7 +268,7 @@ async def upload_document(
         raise
     except Exception as e:
         # Distinguish OpenAI quota errors (429) from generic 500 failures
-        if isinstance(e, OpenAIQuotaError):
+        if isinstance(e, EmbeddingQuotaError):
             logger.error(f"OpenAI quota exhausted during document upload: {e}")
             raise HTTPException(
                 status_code=429,

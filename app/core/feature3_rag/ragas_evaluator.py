@@ -11,11 +11,11 @@ from functools import lru_cache
 from typing import Optional
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from app.opik import track
 from app.config import get_settings
+from app.core.llm_factory import get_memory_llm
 
 logger = logging.getLogger("idop_app.ragas_evaluator")
 
@@ -199,15 +199,10 @@ _CONTEXT_PRECISION_PROMPT = ChatPromptTemplate.from_messages(
 
 
 class RagasEvaluator:
-    """Lightweight RAGAS evaluation service using OpenAI LLM."""
+    """Lightweight RAGAS evaluation service using configurable LLM (Groq or OpenAI)."""
 
     def __init__(self) -> None:
-        settings = get_settings()
-        llm = ChatOpenAI(
-            model=settings.memory_llm_model,
-            temperature=0.0,
-            api_key=settings.openai_api_key,
-        )
+        llm = get_memory_llm(temperature=0.0)
         self._relevancy_chain = _RELEVANCY_PROMPT | llm.with_structured_output(
             RelevancyScore
         )

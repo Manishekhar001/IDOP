@@ -70,260 +70,289 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # ─────────────────────────────────────────────────────────────────────────────
 
 BENCHMARK = [
-    # ── Category 1: Refund & Customer Support Policies (10 questions) ──────
+    # ═════════════════════════════════════════════════════════════════════════
+    # Category 1: Version Conflicts (10 questions)
+    # Tests CRAG's ability to detect contradictions between old (2025) and
+    # current (2026) policies. Both versions exist in Qdrant. Simple dense
+    # retrieval may grab the WRONG (superseded) version, causing low
+    # faithfulness. Full CSRAG detects the conflict and resolves it.
+    # ═════════════════════════════════════════════════════════════════════════
     {
         "question": "What is the standard refund window for retail products?",
         "ground_truth": "Retail products are eligible for a full refund within 30 days of purchase with receipt.",
-        "category": "Refund & Support",
+        "category": "Version Conflict",
     },
     {
-        "question": "How are international refund shipping costs handled?",
-        "ground_truth": "For international orders, customers must cover return shipping costs unless the product arrived damaged.",
-        "category": "Refund & Support",
-    },
-    {
-        "question": "Are clearance items eligible for refunds?",
-        "ground_truth": "All clearance items are marked as final sale and are strictly non-refundable.",
-        "category": "Refund & Support",
-    },
-    {
-        "question": "What is the processing time for approved digital credits?",
-        "ground_truth": "Approved digital credits are processed within 24 to 48 business hours of verification.",
-        "category": "Refund & Support",
-    },
-    {
-        "question": "How long does a bank transfer refund take to reflect?",
-        "ground_truth": "Direct bank transfer refunds typically take 5 to 7 business days to post to the account.",
-        "category": "Refund & Support",
-    },
-    {
-        "question": "Can gift cards be returned for cash refunds?",
-        "ground_truth": "Gift cards cannot be returned, exchanged, or redeemed for cash refunds under any circumstances.",
-        "category": "Refund & Support",
-    },
-    {
-        "question": "What is the policy for restocking fees on opened electronics?",
+        "question": "Are there any restocking fees for opened electronics?",
         "ground_truth": "Opened electronics are subject to a 15% restocking fee if returned within the 30-day window.",
-        "category": "Refund & Support",
+        "category": "Version Conflict",
     },
     {
-        "question": "What happens if a package is lost in transit by the carrier?",
-        "ground_truth": "Lost in transit claims must be filed within 14 days, and the company will issue a replacement or full refund.",
-        "category": "Refund & Support",
+        "question": "What is the international return shipping policy for customers?",
+        "ground_truth": "For international orders, customers must cover return shipping costs unless the product arrived damaged.",
+        "category": "Version Conflict",
     },
     {
-        "question": "Are shipping fees refundable on voluntary returns?",
-        "ground_truth": "Original shipping and handling fees are non-refundable for voluntary customer returns.",
-        "category": "Refund & Support",
+        "question": "Can clearance items be returned for a refund?",
+        "ground_truth": "All clearance items are marked as final sale and are strictly non-refundable.",
+        "category": "Version Conflict",
     },
     {
-        "question": "What is the return window for promotional bundle items?",
-        "ground_truth": "Promotional bundle items must be returned together to receive a full refund; partial returns are rejected.",
-        "category": "Refund & Support",
-    },
-    # ── Category 2: Corporate & Administrative Policies (10 questions) ──────
-    {
-        "question": "What is the standard office core hours requirement?",
-        "ground_truth": "Core collaboration hours are from 10:00 AM to 3:00 PM EST daily.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "How is the annual health wellness stipend claimed?",
-        "ground_truth": "Wellness stipends of up to $500 are claimed by submitting receipts through the HR Expense portal before December 1st.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "What is the default employee referral bonus payout?",
+        "question": "What is the employee referral bonus amount and how is it paid?",
         "ground_truth": "The standard referral bonus is $2,000, paid in two installments after the new hire completes 90 and 180 days.",
-        "category": "Corporate Policy",
+        "category": "Version Conflict",
     },
     {
-        "question": "What are the rules for travel flight class booking approvals?",
-        "ground_truth": "All business flights under 6 hours must be booked in economy class. Business class requires VP approval.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "How many consecutive days of paid sick leave require a doctor note?",
-        "ground_truth": "Consecutive sick leaves of 3 or more days require a valid medical certificate submitted to HR.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "What is the equipment return timeline upon employee departure?",
-        "ground_truth": "Departing employees must return all company-owned hardware within 5 business days of their final day.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "What is the maximum corporate gift value employees can accept?",
-        "ground_truth": "Employees cannot accept corporate gifts exceeding a nominal value of $100 without compliance sign-off.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "How is the tuition reimbursement program structured?",
-        "ground_truth": "The company reimburses up to $5,250 annually for pre-approved, job-related graduate coursework with grade B or higher.",
-        "category": "Corporate Policy",
-    },
-    {
-        "question": "What is the standard parental leave benefit duration?",
+        "question": "How many weeks of parental leave are available for new parents?",
         "ground_truth": "The platform provides 12 weeks of fully paid parental leave for primary and secondary caregivers after 1 year of service.",
-        "category": "Corporate Policy",
+        "category": "Version Conflict",
     },
     {
-        "question": "Are contract workers eligible for dental insurance plans?",
+        "question": "Are contract workers eligible for dental insurance benefits?",
         "ground_truth": "Contract workers are generally ineligible for corporate group dental benefits unless explicitly detailed in their agreement.",
-        "category": "Corporate Policy",
-    },
-    # ── Category 3: Database & SQL Inquiries (10 questions) ─────────────────
-    {
-        "question": "What is the primary table to retrieve active subscriber records?",
-        "ground_truth": "Active subscriber records are stored inside the 'subscriptions' table where 'status' equals 'active'.",
-        "category": "Database Schema",
+        "category": "Version Conflict",
     },
     {
-        "question": "Which column holds employee salary details in the employees schema?",
-        "ground_truth": "Salary details are stored in the 'salary' column of the 'employees' table as a numeric type.",
-        "category": "Database Schema",
+        "question": "What is the annual tuition reimbursement cap for employees?",
+        "ground_truth": "The company reimburses up to $5,250 annually for pre-approved, job-related graduate coursework with grade B or higher.",
+        "category": "Version Conflict",
     },
     {
-        "question": "How is a database query for top 5 products by order volume structured?",
-        "ground_truth": "Query SELECT product_id, SUM(quantity) FROM order_items GROUP BY product_id ORDER BY SUM(quantity) DESC LIMIT 5;",
-        "category": "Database Schema",
+        "question": "How many consecutive sick days require a doctor's note?",
+        "ground_truth": "Consecutive sick leaves of 3 or more days require a valid medical certificate submitted to HR.",
+        "category": "Version Conflict",
     },
     {
-        "question": "What is the table representing database security audit logs?",
-        "ground_truth": "Security audit logs are stored in the 'audit_logs' database table containing query and mutation signatures.",
-        "category": "Database Schema",
+        "question": "Can customers exchange gift cards for cash or store credit?",
+        "ground_truth": "Gift cards cannot be returned, exchanged, or redeemed for cash refunds under any circumstances.",
+        "category": "Version Conflict",
+    },
+    # ═════════════════════════════════════════════════════════════════════════
+    # Category 2: Out-of-Document Knowledge (10 questions)
+    # Tests CRAG's INCORRECT detection + web search fallback. Questions are
+    # NOT fully answerable from any single internal document. Configs 1-4
+    # (no CRAG) hallucinate → low faithfulness. Config 5 (Full CSRAG)
+    # detects INCORRECT via CRAG → triggers web fallback → high faithfulness.
+    # ═════════════════════════════════════════════════════════════════════════
+    {
+        "question": "What is the refund policy for the new subscription box service?",
+        "ground_truth": "Customers may cancel within 14 days of the first billing date for a full refund; subsequent months are non-refundable but can be cancelled to stop future billing.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "Which table links orders to customer profiles?",
-        "ground_truth": "The 'orders' table contains a 'customer_id' foreign key linking directly to the 'customers' table.",
-        "category": "Database Schema",
+        "question": "How are refund disputes handled for items sold by third-party marketplace sellers?",
+        "ground_truth": "The refund policy is managed by the seller. Customers should contact the seller directly. If the seller is unresponsive for more than 7 days, IDOP may issue a courtesy credit of up to 50% of the purchase price.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "How is employee department allocation mapped in the database?",
-        "ground_truth": "Employee department mapping uses the 'employee_departments' junction table linking 'employee_id' and 'department_id'.",
-        "category": "Database Schema",
+        "question": "What is the refund policy for IDOP Collectibles novelty items?",
+        "ground_truth": "Novelty items including collectible pins, limited-edition packaging, and event merchandise are final sale and non-refundable.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "What is the column tracking cryptographically signed approval tokens?",
-        "ground_truth": "Cryptographic tokens are mapped in the 'approval_token' string column inside the 'pending_transactions' register table.",
-        "category": "Database Schema",
+        "question": "Are novelty items non-refundable for EU customers too?",
+        "ground_truth": "Yes, novelty items are final sale and non-refundable for ALL markets including EU customers, overriding standard EU return policies for this specific category.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "What table maps product inventory count across warehouses?",
-        "ground_truth": "Product stock levels are managed in the 'inventory' table keyed by 'product_id' and 'warehouse_id'.",
-        "category": "Database Schema",
+        "question": "What benefits do contract workers lose in the 2026 policy transition?",
+        "ground_truth": "Contract workers lose access to dental benefits and the 401(k) match as of February 1, 2026 under the budget-driven 2026 policy changes.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "Which field logs transaction status during mutation attempts?",
-        "ground_truth": "The mutation transaction status is tracked in the 'status' enum column mapping to 'pending', 'executed', or 'failed'.",
-        "category": "Database Schema",
+        "question": "What is the refund processing time for customers in Latin America?",
+        "ground_truth": "Refunds to LATAM customers may take up to 15 business days to process due to local banking regulations.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "What represents the main catalog table for store listings?",
-        "ground_truth": "Listings are stored inside the 'catalog_items' table containing pricing, descriptors, and stock identifiers.",
-        "category": "Database Schema",
-    },
-    # ── Category 4: HR, Roles & Workspace Operations (10 questions) ─────────
-    {
-        "question": "What is the threshold limit for bulk rows uploads in mutations?",
-        "ground_truth": "The platform enforces a strict threshold limit of 1000 rows per spreadsheet mutation upload to protect database memory.",
-        "category": "Platform Operations",
+        "question": "What is the mandatory legal warranty period for products sold in the European Union?",
+        "ground_truth": "All products sold to EU customers carry a mandatory 2-year legal warranty covering manufacturing defects, separate from the standard refund policy.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "What is the default department enum values allowed?",
-        "ground_truth": "Allowed corporate department enums are 'HR', 'Engineering', 'Sales', and 'Finance'.",
-        "category": "Platform Operations",
+        "question": "What employee discount is available on company products?",
+        "ground_truth": "No employee discount policy exists in the current documentation. There is no established employee discount on company products.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "Where are business rule configurations declared?",
-        "ground_truth": "Validation constraints are declared in the local 'business_rules/rules.json' configuration file.",
-        "category": "Platform Operations",
+        "question": "What is the data deletion policy for EU customers under GDPR?",
+        "ground_truth": "EU customers have the right to request complete deletion of their personal data under GDPR Article 17. Data deletion requests must be processed within 30 calendar days.",
+        "category": "Out-of-Document Knowledge",
     },
     {
-        "question": "What is the maximum allowed salary for a junior analyst role?",
-        "ground_truth": "According to rules.json, the maximum permitted salary for junior tiers is capped at $120,000.",
-        "category": "Platform Operations",
+        "question": "What is the company's policy on cryptocurrency refunds?",
+        "ground_truth": "No cryptocurrency refund policy exists in the current documentation. There are no established policies for cryptocurrency-based transactions or refunds.",
+        "category": "Out-of-Document Knowledge",
+    },
+    # ═════════════════════════════════════════════════════════════════════════
+    # Category 3: Regional & Policy Variations (10 questions)
+    # Tests HyDE query expansion and reranking for precision. Questions
+    # require the regional_policy.txt document which contains EU, APAC, and
+    # LATAM exceptions. Standard retrieval struggles because regional terms
+    # (GDPR, APAC, LATAM) are absent from the main policy docs.
+    # ═════════════════════════════════════════════════════════════════════════
+    {
+        "question": "What return window do APAC customers have for electronics?",
+        "ground_truth": "APAC customers have a 7-day return window for electronics under local regulations.",
+        "category": "Regional Policy",
     },
     {
-        "question": "Who must approve a transaction mutation after rule validation?",
-        "ground_truth": "All validated mutations require human-in-the-loop validation using a secure token at the '/mutation/approve' route.",
-        "category": "Platform Operations",
+        "question": "What restocking fee applies to EU customers returning opened electronics?",
+        "ground_truth": "No restocking fees of any kind may be applied to EU customer returns under EU consumer protection laws.",
+        "category": "Regional Policy",
     },
     {
-        "question": "How are empty spreadsheet cells treated in rule checking?",
-        "ground_truth": "Empty or null cells are rejected with validation errors if the rule declares the column as required/non-null.",
-        "category": "Platform Operations",
+        "question": "What currency do LATAM customers receive refunds in?",
+        "ground_truth": "All refunds to LATAM customers are processed in local currency at the exchange rate prevailing on the date of refund approval.",
+        "category": "Regional Policy",
     },
     {
-        "question": "What is the default thread checkpoint save interval?",
-        "ground_truth": "The LangGraph state checkpointer commits checkpoints instantly upon transition of every active processing node.",
-        "category": "Platform Operations",
+        "question": "Which APAC markets receive free return shipping?",
+        "ground_truth": "Customers in Japan, South Korea, and Singapore receive free return shipping. All other APAC markets require customers to cover return shipping costs.",
+        "category": "Regional Policy",
     },
     {
-        "question": "What database container engine is active for checkpointer data?",
-        "ground_truth": "IDOP uses an internal PostgreSQL Docker container for checkpoint states and user facts stores.",
-        "category": "Platform Operations",
+        "question": "Do EU customers have to pay for return shipping on international orders?",
+        "ground_truth": "No, the company bears all return shipping costs for EU customers within the return window, superseding the standard international shipping policy.",
+        "category": "Regional Policy",
     },
     {
-        "question": "Which external API handles semantic query reranking?",
-        "ground_truth": "Semantic query reranking is offloaded to the Voyage AI Rerank-2.5 Cross-Encoder API.",
-        "category": "Platform Operations",
+        "question": "What is the standard APAC return window for non-electronics?",
+        "ground_truth": "APAC customers have a 14-day return window for all products except electronics.",
+        "category": "Regional Policy",
     },
     {
-        "question": "What dense vector dimension size is active in Qdrant collections?",
-        "ground_truth": "Qdrant utilizes 1536-dimensional dense vectors generated by OpenAI text-embedding-3-small.",
-        "category": "Platform Operations",
-    },
-    # ── Category 5: Complex Hybrid Scenarios (10 questions) ─────────────────
-    {
-        "question": "If an international user returned opened electronics, what is the fee policy?",
-        "ground_truth": "International returns require the customer to cover shipping, and opened electronics are subject to a 15% restocking fee.",
-        "category": "Multi-hop Reasoning",
+        "question": "What happens if an EU customer requests deletion of their personal data?",
+        "ground_truth": "EU customers can request complete deletion of their personal data under GDPR Article 17. Data deletion requests must be processed within 30 calendar days.",
+        "category": "Regional Policy",
     },
     {
-        "question": "What happens if a VP wants to book a flight over 6 hours?",
-        "ground_truth": "Flights over 6 hours do not have class restrictions, but standard flights under 6 hours require economy class unless approved by VP.",
-        "category": "Multi-hop Reasoning",
+        "question": "What is the APAC restocking fee percentage on opened electronics?",
+        "ground_truth": "A 20% restocking fee applies to opened electronics in APAC markets, higher than the standard 15% due to local distributor requirements.",
+        "category": "Regional Policy",
     },
     {
-        "question": "How are customer support refunds on final clearance sales items evaluated?",
-        "ground_truth": "Customer support agents must reject refunds on final sale clearance items because they are strictly non-refundable.",
-        "category": "Multi-hop Reasoning",
+        "question": "Can LATAM customers receive refunds in US dollars?",
+        "ground_truth": "No, all refunds to LATAM customers are processed in local currency at the exchange rate prevailing on the date of refund approval. Currency conversion fees are borne by the company.",
+        "category": "Regional Policy",
     },
     {
-        "question": "Does a contractor referral bonus follow the same payout timeframe?",
-        "ground_truth": "Referral bonuses apply only to full-time hires; contract worker referrals are ineligible for standard HR referral payouts.",
-        "category": "Multi-hop Reasoning",
+        "question": "What warranty do EU customers have in addition to the standard refund policy?",
+        "ground_truth": "EU customers have a mandatory 2-year legal warranty covering manufacturing defects, separate from and in addition to the standard refund policy.",
+        "category": "Regional Policy",
+    },
+    # ═════════════════════════════════════════════════════════════════════════
+    # Category 4: Multi-hop Synthesis (10 questions)
+    # Tests context enrichment and multi-document reasoning. Requires
+    # combining information from 3+ documents. Simple dense retrieval
+    # misses one or more required documents → incomplete answer.
+    # ═════════════════════════════════════════════════════════════════════════
+    {
+        "question": "If an EU customer returns opened electronics bought in January 2026 before the new policy took effect, what fees apply?",
+        "ground_truth": "No restocking fee applies because the order was placed under the 2025 policy (which had no restocking fee for electronics) and EU policies override standard fees. Additionally, the company bears all return shipping costs for EU customers.",
+        "category": "Multi-hop Synthesis",
     },
     {
-        "question": "What is the database column to check if an employee has completed equipment return?",
-        "ground_truth": "Check 'returned_at' timestamp inside 'assets_log' where employee_id matches and state equals 'returned'.",
-        "category": "Multi-hop Reasoning",
+        "question": "An employee hired in 2023 wants to know their tuition reimbursement cap under the current policy. What is it?",
+        "ground_truth": "Employees hired before January 1, 2024 are grandfathered under the 2024 benefit terms with a $6,000 annual tuition reimbursement cap, which persists indefinitely and is not affected by the standard $5,250 cap.",
+        "category": "Multi-hop Synthesis",
     },
     {
-        "question": "Does a bank transfer refund on opened electronics include original shipping?",
-        "ground_truth": "Original shipping is non-refundable on voluntary returns, and opened electronics are docked 15% restocking fee.",
-        "category": "Multi-hop Reasoning",
+        "question": "A customer bought a clearance item in January 2026 but is returning it in February 2026. What refund policy applies?",
+        "ground_truth": "Orders placed before February 1, 2026 are governed by the 2025 policy terms. Under the 2025 policy, clearance items could be returned with a 25% restocking fee applied to the refund amount. The 2026 policy making clearance non-refundable does not apply.",
+        "category": "Multi-hop Synthesis",
     },
     {
-        "question": "If an active subscriber claims lost package, does the platform auto-replace?",
-        "ground_truth": "The platform issues replacement or refund after loss verification, provided the claim is filed within 14 days of shipment.",
-        "category": "Multi-hop Reasoning",
+        "question": "An employee hired in 2023 wants parental leave. How many weeks and at what pay?",
+        "ground_truth": "Employees hired before January 1, 2024 are grandfathered under the 2024 benefit terms providing 14 weeks of fully paid parental leave, which is not affected by the standard 12-week policy.",
+        "category": "Multi-hop Synthesis",
     },
     {
-        "question": "Can wellness stipend submit flight receipts for reimbursement?",
-        "ground_truth": "No, wellness stipends of up to $500 are reserved for health/wellness expenses. Travel flight expenses follow corporate travel claims.",
-        "category": "Multi-hop Reasoning",
+        "question": "A customer bought a subscription box service and wants to cancel after 3 months. What refund are they entitled to?",
+        "ground_truth": "The subscription box service is not yet covered by the standard refund policy. Customers may cancel within 14 days of the first billing date for a full refund. Subsequent months after the first billing are non-refundable but can be cancelled to stop future billing.",
+        "category": "Multi-hop Synthesis",
     },
     {
-        "question": "If a referral resigns after 100 days, is the entire bonus paid?",
-        "ground_truth": "No, only the first referral installment is paid at 90 days. The second installment at 180 days is voided if they resign.",
-        "category": "Multi-hop Reasoning",
+        "question": "What is the combined net effect of the 2026 benefit changes on an employee's total compensation package?",
+        "ground_truth": "Despite being labeled budget cuts, most benefits increased: wellness stipend increased from $300 to $500 (+$200), tuition reimbursement from $3,000 to $5,250 (+$2,250), parental leave from 8 to 12 weeks (+4 weeks), referral bonus from $1,500 to $2,000 (+$500). The only reduction was elimination of contract worker dental and 401(k) match.",
+        "category": "Multi-hop Synthesis",
     },
     {
-        "question": "What is the validation action if upload contains an unmapped column?",
-        "ground_truth": "The ColumnMapper matches headings using GPT-4o-mini; any entirely unmapped or irrelevant columns are ignored or raise a schema error.",
-        "category": "Multi-hop Reasoning",
+        "question": "A contractor hired in 2025 submits a dental insurance claim in March 2026. Is it covered?",
+        "ground_truth": "No. While the 2025 policy made contract workers eligible for dental benefits after 6 months, the 2026 policy changes eliminated contract worker dental and 401(k) match benefits effective February 1, 2026.",
+        "category": "Multi-hop Synthesis",
+    },
+    {
+        "question": "Can an EU customer return an IDOP Collectibles novelty item that they purchased?",
+        "ground_truth": "No. Novelty items including collectible pins, limited-edition packaging, and event merchandise are final sale and non-refundable for ALL markets including EU customers, overriding standard EU return policies for this specific category.",
+        "category": "Multi-hop Synthesis",
+    },
+    {
+        "question": "An employee referred a new hire who starts March 1 and resigns after 100 days. What referral bonus is paid?",
+        "ground_truth": "Only the first installment of $1,000 is paid at 90 days. The second installment of $1,000 at 180 days is voided because the referred hire resigned before completing the full 180-day period.",
+        "category": "Multi-hop Synthesis",
+    },
+    {
+        "question": "A customer bought opened electronics internationally from Japan. What fees and shipping costs apply if returning?",
+        "ground_truth": "A 20% restocking fee applies (APAC rate, higher than the standard 15%), and the customer receives free return shipping because Japan is one of the APAC markets with free return shipping along with South Korea and Singapore.",
+        "category": "Multi-hop Synthesis",
+    },
+    # ═════════════════════════════════════════════════════════════════════════
+    # Category 5: Ambiguous Queries & Edge Cases (10 questions)
+    # Tests HyDE query expansion for disambiguation and SRAG verification.
+    # Questions are intentionally vague or leading — simple retrieval retrieves
+    # the wrong document or misses key context. HyDE expands the query to
+    # disambiguate. SRAG verifies factual correctness against retrieved docs.
+    # ═════════════════════════════════════════════════════════════════════════
+    {
+        "question": "What changed in the employee benefits this year compared to last year?",
+        "ground_truth": "Wellness stipend increased from $300 to $500, tuition reimbursement from $3,000 to $5,250, parental leave from 8 to 12 weeks, referral bonus from $1,500 to $2,000, and contract worker benefits were eliminated. Despite the budget cuts label, most benefits actually increased as part of a retention initiative.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "What is the return policy update from last year?",
+        "ground_truth": "The return window was reduced from 45 to 30 days, international shipping shifted from company-paid to customer-paid (except EU), a 15% restocking fee on opened electronics was introduced, and clearance items changed from returnable with 25% fee to strictly non-refundable.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "Can I get my money back if I change my mind after buying something?",
+        "ground_truth": "It depends on the product type. Standard retail products can be returned within 30 days for a full refund. Clearance items are final sale and non-refundable. Opened electronics are subject to a 15% restocking fee. Gift cards cannot be returned. Promotional bundles must be returned together.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "What benefits did the company cut this year?",
+        "ground_truth": "Despite the label 'budget cuts,' only contract worker dental benefits and 401(k) match were actually eliminated. All other benefits increased: wellness stipend, tuition reimbursement, parental leave, and referral bonus.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "Do I need a doctor's note if I call in sick?",
+        "ground_truth": "It depends on the duration. For 1-2 consecutive sick days, no doctor's note is needed. For 3 or more consecutive sick days, a valid medical certificate must be submitted to HR.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "What is the best way to return an expensive item I just bought?",
+        "ground_truth": "The return process depends on the item type (electronics vs non-electronics), region (EU/APAC/LATAM/standard), and purchase date (orders before February 1, 2026 are grandfathered under the 2025 policy). Electronics may incur restocking fees. Regional policies may override standard terms.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "Can executives and VPs fly business class on business trips?",
+        "ground_truth": "All business flights under 6 hours must be booked in economy class regardless of seniority. Business class on flights under 6 hours requires VP-level approval. Flights over 6 hours do not have class restrictions.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "What happens to my tuition reimbursement if I get a grade of C in a course?",
+        "ground_truth": "Under the current 2026 policy, a grade of C does not qualify for tuition reimbursement. Only grades of B or higher are eligible. Under the superseded 2025 policy, grade C or higher qualified but only up to a $3,000 annual cap.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "I am an EU customer and bought a laptop that arrived with a manufacturing defect. What are my rights and options?",
+        "ground_truth": "EU customers have a mandatory 2-year legal warranty covering manufacturing defects. You can also return the laptop within 30 days at no cost with no restocking fee. The company bears all return shipping costs for EU customers.",
+        "category": "Ambiguous Query",
+    },
+    {
+        "question": "What is the total monetary value of all employee benefit increases from 2025 to 2026?",
+        "ground_truth": "The total monetary increase is $2,950: wellness stipend +$200, tuition reimbursement +$2,250, and referral bonus +$500. Parental leave increased by 4 weeks which is non-monetary. These increases are part of a strategic retention program despite being labeled as budget cuts.",
+        "category": "Ambiguous Query",
     },
 ]
 

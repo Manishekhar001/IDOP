@@ -1,10 +1,10 @@
 import logging
 import asyncio
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from app.opik import track
 from app.config import get_settings
+from app.core.llm_factory import get_memory_llm
 
 logger = logging.getLogger("idop_app.hyde")
 
@@ -51,12 +51,7 @@ class HydeService:
     """
 
     def __init__(self):
-        settings = get_settings()
-        llm = ChatOpenAI(
-            model=settings.memory_llm_model,  # gpt-4o-mini
-            temperature=0.7,
-            api_key=settings.openai_api_key,
-        )
+        llm = get_memory_llm(temperature=0.7)
         self._hyde_chain = _HYDE_PROMPT | llm.with_structured_output(HydeHypotheses)
 
     @track(name="hyde_generate")
