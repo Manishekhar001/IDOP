@@ -185,6 +185,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
         "configuration": {
             "openai_configured": bool(settings.openai_api_key),
             "voyage_configured": bool(settings.voyage_api_key),
+            "nomic_configured": bool(settings.nomic_api_key),
             "tavily_configured": bool(settings.tavily_api_key),
             "database_configured": bool(settings.database_url),
             "supabase_configured": bool(settings.supabase_db_url),

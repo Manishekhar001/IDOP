@@ -49,6 +49,7 @@ _TEST_ENV = {
     "QDRANT_URL": "http://localhost:6333",
     "QDRANT_API_KEY": "test-qdrant-key",
     "COLLECTION_NAME": "idop_test_documents",
+    "EMBEDDING_PROVIDER": "openai",
     "EMBEDDING_DIMENSION": "1536",
     # Database
     "DATABASE_URL": "postgresql://test:test@localhost:5432/idop_test",

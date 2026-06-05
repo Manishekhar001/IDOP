@@ -95,6 +95,9 @@ class ConfigurationStatus(BaseModel):
     voyage_configured: bool = Field(
         ..., description="True if VOYAGE_API_KEY is set for reranking."
     )
+    nomic_configured: bool = Field(
+        ..., description="True if NOMIC_API_KEY is set for embeddings."
+    )
     tavily_configured: bool = Field(
         ..., description="True if TAVILY_API_KEY is set for web search."
     )
@@ -117,6 +120,7 @@ class ConfigurationStatus(BaseModel):
                 {
                     "openai_configured": True,
                     "voyage_configured": True,
+                    "nomic_configured": True,
                     "tavily_configured": True,
                     "database_configured": True,
                     "supabase_configured": True,
@@ -265,6 +269,7 @@ class DetailedHealthResponse(BaseModel):
                     "configuration": {
                         "openai_configured": True,
                         "voyage_configured": True,
+                        "nomic_configured": True,
                         "tavily_configured": True,
                         "database_configured": True,
                         "supabase_configured": True,

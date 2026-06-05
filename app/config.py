@@ -78,12 +78,15 @@ class Settings(BaseSettings):
     memory_llm_temperature: float = 0.0
 
     # Embedding Provider Configuration
-    embedding_provider: str = "voyage"  # Voyage AI is the only supported provider
+    embedding_provider: str = "voyage"  # "voyage" or "nomic" or "openai"
     voyage_api_key: str | None = (
         None  # Voyage API key (used for both embeddings and reranking)
     )
     voyage_embedding_model: str = "voyage-3"
     voyage_embedding_dimension: int = 1024
+    nomic_api_key: str | None = None
+    nomic_embedding_model: str = "nomic-embed-text-v1.5"
+    nomic_embedding_dimension: int = 768
     openai_embedding_dimension: int = 1536
 
     @property
@@ -91,6 +94,8 @@ class Settings(BaseSettings):
         """Return the correct embedding dimension based on the active provider."""
         if self.embedding_provider == "voyage":
             return self.voyage_embedding_dimension
+        elif self.embedding_provider == "nomic":
+            return self.nomic_embedding_dimension
         return self.openai_embedding_dimension
 
     @property

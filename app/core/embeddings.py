@@ -77,26 +77,52 @@ def _retry_on_quota(
 
 def _create_embedding_model() -> Any:
     """
-    Create and return a Voyage AI embedding model.
+    Create and return an embedding model based on the active provider.
     Returns an object with .embed_query(text) and .embed_documents(texts) methods.
     """
     settings = get_settings()
-    voyage_api_key = settings.voyage_api_key
+    provider = settings.embedding_provider.lower() if settings.embedding_provider else "voyage"
 
-    if not voyage_api_key:
-        raise ValueError(
-            "VOYAGE_API_KEY is not set. "
-            "Voyage AI is the only supported embedding provider."
+    if provider == "voyage":
+        voyage_api_key = settings.voyage_api_key
+        if not voyage_api_key:
+            raise ValueError(
+                "VOYAGE_API_KEY is not set. "
+                "Voyage AI is the active embedding provider."
+            )
+        from langchain_voyageai import VoyageAIEmbeddings
+        model = settings.voyage_embedding_model or "voyage-3"
+        logger.info(f"Initializing Voyage embeddings: model={model}")
+        return VoyageAIEmbeddings(
+            voyage_api_key=voyage_api_key,
+            model=model,
         )
-
-    from langchain_voyageai import VoyageAIEmbeddings
-
-    model = settings.voyage_embedding_model or "voyage-3"
-    logger.info(f"Initializing Voyage embeddings: model={model}")
-    return VoyageAIEmbeddings(
-        voyage_api_key=voyage_api_key,
-        model=model,
-    )
+    elif provider == "nomic":
+        nomic_api_key = settings.nomic_api_key
+        if not nomic_api_key:
+            raise ValueError(
+                "NOMIC_API_KEY is not set. "
+                "Nomic is the active embedding provider."
+            )
+        from langchain_nomic import NomicEmbeddings
+        model = settings.nomic_embedding_model or "nomic-embed-text-v1.5"
+        dimensionality = settings.nomic_embedding_dimension or 768
+        logger.info(f"Initializing Nomic embeddings: model={model}, dimensionality={dimensionality}")
+        return NomicEmbeddings(
+            nomic_api_key=nomic_api_key,
+            model=model,
+            dimensionality=dimensionality,
+        )
+    else:
+        # Fallback to OpenAI if configured
+        openai_api_key = settings.openai_api_key
+        if not openai_api_key:
+            raise ValueError(
+                f"Unsupported embedding provider '{provider}' and OPENAI_API_KEY is not set."
+            )
+        from langchain_openai import OpenAIEmbeddings
+        logger.info("Initializing OpenAI embeddings fallback")
+        return OpenAIEmbeddings(openai_api_key=openai_api_key)
 
 
 @lru_cache

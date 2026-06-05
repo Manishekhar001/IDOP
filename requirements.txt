@@ -21,6 +21,8 @@ python-dotenv>=1.0.0
 loguru>=0.7.0
 voyageai==0.3.7
 langchain-voyageai==0.3.3
+nomic>=3.5.3
+langchain-nomic==1.0.1
 langchain-groq==1.1.2
 langchain-litellm==0.6.6
 litellm==1.87.1
