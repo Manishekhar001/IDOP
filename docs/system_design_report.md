@@ -49,7 +49,7 @@ graph TD
 ### 2. Dual-Vector Hybrid Search and Voyage AI Rerank-2.5
 *   **Decision**: Deploying dense + sparse named vector indexing inside Qdrant and fusing scores with Reciprocal Rank Fusion (RRF), followed by Voyage AI cross-encoder reranking.
 *   **Rationale**: 
-    - **Dense vectors** (OpenAI `text-embedding-3-small`) capture conceptual meaning but miss exact identifiers (SKU codes, serial numbers, email strings).
+    - **Dense vectors** (Nomic `nomic-embed-text-v1.5`) capture conceptual meaning but miss exact identifiers (SKU codes, serial numbers, email strings).
     - **Sparse vectors** (BM25 keyword tokens) catch alphanumeric exact matches. Fusing them via RRF ($k=60$) guarantees high-precision document extraction.
     - **Voyage AI Rerank-2.5** analyzes raw query-document syntax cross-relations, ensuring that the highest-context paragraphs are fed into the prompt's first 500 tokens (minimizing LLM context degradation).
 

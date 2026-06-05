@@ -52,7 +52,7 @@ graph TB
 
     subgraph Embed["Dual-Vector Embedding"]
         style Embed fill:#e0f2f1,stroke:#009688,stroke-width:2px
-        Dense["OpenAI text-embedding-3-small<br/>→ 1536-dim dense vectors"]
+        Dense["Nomic nomic-embed-text-v1.5<br/>→ 768-dim dense vectors"]
         Sparse["SparseVectorService<br/>→ BM25 term-frequency<br/>sparse vectors"]
     end
 
@@ -153,10 +153,10 @@ Source: [document_processor.py](../../app/core/document_processor.py) (lines 90�
 
 ### Dense Embedding Generation
 
-- **Model:** OpenAI `text-embedding-3-small`
-- **Dimensions:** 1536
-- **Method:** `OpenAIEmbeddings.embed_documents(texts)` — batch embedding of all chunk texts
-- Returns one 1536-dimensional float vector per chunk
+- **Model:** Nomic `nomic-embed-text-v1.5`
+- **Dimensions:** 768
+- **Method:** `NomicEmbeddings.embed_documents(texts)` — batch embedding of all chunk texts
+- Returns one 768-dimensional float vector per chunk
 - Source: [embeddings.py](../../app/core/embeddings.py)
 
 ### Sparse Vector Generation (`SparseVectorService`)
@@ -183,7 +183,7 @@ Each chunk is stored as a `PointStruct` with two named vector spaces:
 PointStruct(
     id=chunk_uuid,           # UUID4 string
     vector={
-        "dense": [0.012, ...],    # 1536-dim float list
+        "dense": [0.012, ...],    # 768-dim float list
         "sparse": SparseVector(   # BM25 indices + values
             indices=[...],
             values=[...]
@@ -199,7 +199,7 @@ PointStruct(
 ```
 
 - **Collection:** `idop_documents` (configurable via `COLLECTION_NAME` env var)
-- **Dense config:** `VectorParams(size=1536, distance=Distance.COSINE)`
+- **Dense config:** `VectorParams(size=768, distance=Distance.COSINE)`
 - **Sparse config:** `SparseVectorParams()` (default BM25 settings)
 - Source: [vector_store.py](../../app/core/vector_store.py) (lines 72–114)
 
@@ -255,7 +255,7 @@ Check cache: S3/local for doc_id
         Tag each chunk with index + source
         │
         ▼
-        Dense: OpenAI text-embedding-3-small → 1536-dim vectors[]
+        Dense: Nomic nomic-embed-text-v1.5 → 768-dim vectors[]
         Sparse: SparseVectorService → BM25 SparseVector[]
         │
         ▼
@@ -280,7 +280,7 @@ Check cache: S3/local for doc_id
 | **Cache hit** (load + upsert) | ~200–500 ms | Skips parsing + embedding entirely |
 | **PDF parsing** (50 pages) | ~3–10 s | Docling DocumentConverter with layout analysis |
 | **Chunking** (500 chunks) | ~50 ms | In-memory text splitting |
-| **Dense embedding** (500 chunks) | ~3–8 s | OpenAI API batch call (rate-limited) |
+| **Dense embedding** (500 chunks) | ~3–8 s | Nomic API batch call (rate-limited) |
 | **Sparse vectors** (500 chunks) | ~100 ms | In-process tokenization + hashing |
 | **Qdrant upsert** (500 points) | ~200–500 ms | Batch upsert with dual vectors |
 | **Cache save** (S3) | ~300–800 ms | Chunks JSON + embeddings NumPy + metadata |
@@ -296,7 +296,7 @@ Check cache: S3/local for doc_id
 |---|---|---|
 | Unsupported file extension | `400 Bad Request` | Client retries with supported format |
 | PDF parsing failure | `500 Internal Server Error` | Error logged, temp file cleaned up |
-| OpenAI embedding API error | Exception propagated | Temp file cleaned up in `finally` block |
+| Nomic embedding API error | Exception propagated | Temp file cleaned up in `finally` block |
 | Qdrant upsert failure | Exception propagated | Partial cache not saved (transactional) |
 | S3 cache save failure | Warning logged | Document is indexed but not cached for next time |
 | Cache corruption on load | Returns `None` | Falls through to full re-processing |

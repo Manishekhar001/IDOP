@@ -70,7 +70,7 @@ graph TD
 If `enable_hyde=True`, the engine prompts GPT-4o to generate three hypothetical documents containing answers to the user's question. These hypothetical answers are embedded and used as vectors to search the database. This bridges semantic gaps between questions and actual repository texts.
 
 ### 3. Dual-Vector Hybrid Retrieval & Fusion
-The system queries Qdrant using both dense vectors (text-embedding-3-small) and sparse vectors (BM25 token vectors):
+The system queries Qdrant using both dense vectors (nomic-embed-text-v1.5) and sparse vectors (BM25 token vectors):
 *   **Reciprocal Rank Fusion (RRF)**: Combines the rank scores from both dense and sparse retrieval using a constant $k=60$.
 *   **Reranking**: Voyage AI `rerank-2.5` reranks the fused results to place the most precise chunks at the top of the pile.
 *   **Context Enrichment**: Neighbor chunk windowing pulls the surrounding sentences (chunk indices $i-1$ and $i+1$) to ensure complete context.

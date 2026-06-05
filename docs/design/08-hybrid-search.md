@@ -2,7 +2,7 @@
 
 **Module:** `app/core/vector_store.py` · `app/core/sparse_vector_service.py`
 **Qdrant Collection:** `idop_documents`
-**Embedding Model:** OpenAI `text-embedding-3-small` (1536-dim)
+**Embedding Model:** Nomic `nomic-embed-text-v1.5` (768-dim)
 
 ---
 
@@ -17,9 +17,9 @@ IDOP uses a **dual-vector hybrid search** architecture within a single Qdrant co
 ```mermaid
 flowchart TD
     subgraph Ingestion["Document Ingestion"]
-        A["Raw Text Chunk"] --> B["OpenAI text-embedding-3-small"]
+        A["Raw Text Chunk"] --> B["Nomic nomic-embed-text-v1.5"]
         A --> C["SparseVectorService.generate_sparse_vector"]
-        B --> D["Dense Vector<br/>1536-dim float32"]
+        B --> D["Dense Vector<br/>768-dim float32"]
         C --> E["Sparse Vector<br/>BM25 term frequencies"]
     end
 
@@ -58,14 +58,14 @@ flowchart TD
 The collection is created in [VectorStoreService._ensure_collection](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/vector_store.py#L46-L70):
 
 - **Collection name:** `idop_documents` (configurable via `settings.collection_name`)
-- **Dense vector config:** `VectorParams(size=1536, distance=Distance.COSINE)` → named vector `"dense"`
+- **Dense vector config:** `VectorParams(size=768, distance=Distance.COSINE)` → named vector `"dense"`
 - **Sparse vector config:** `SparseVectorParams()` → named vector `"sparse"`
 - **Index type:** HNSW (Qdrant default for dense), inverted index for sparse
 
 ### Dense Embeddings
 
-- **Model:** OpenAI `text-embedding-3-small` via LangChain `OpenAIEmbeddings`
-- **Dimensions:** 1536 floats
+- **Model:** Nomic `nomic-embed-text-v1.5` via LangChain `NomicEmbeddings`
+- **Dimensions:** 768 floats
 - **Distance metric:** Cosine similarity
 - **Source:** [app/core/embeddings.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/embeddings.py)
 
@@ -86,7 +86,7 @@ Each indexed chunk is stored as a `PointStruct`:
 PointStruct(
     id="uuid4-string",
     vector={
-        "dense": [0.012, -0.034, ...],   # 1536 floats
+        "dense": [0.012, -0.034, ...],   # 768 floats
         "sparse": SparseVector(
             indices=[42981, 18823, ...],  # hashed token IDs
             values=[2.0, 1.0, ...]        # term frequencies
@@ -112,7 +112,7 @@ The `search()` method in [VectorStoreService](file:///c:/Users/manis/Downloads/A
 
 | Mode | Method | What It Does |
 |---|---|---|
-| `"dense"` | `search_dense()` | Cosine similarity on 1536-dim embeddings only |
+| `"dense"` | `search_dense()` | Cosine similarity on 768-dim embeddings only |
 | `"sparse"` | `search_sparse()` | BM25 keyword matching on sparse vectors only |
 | `"hybrid"` (default) | `search_hybrid()` | Both vectors → Qdrant native RRF fusion |
 
@@ -121,7 +121,7 @@ The `search()` method in [VectorStoreService](file:///c:/Users/manis/Downloads/A
 ```python
 client.query_points(
     collection_name="idop_documents",
-    query=query_vector,          # 1536-dim float list
+    query=query_vector,          # 768-dim float list
     using="dense",
     limit=top_k,
     with_payload=True

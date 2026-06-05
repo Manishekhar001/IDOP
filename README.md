@@ -119,7 +119,7 @@ Documents: 7 benchmark files (2025 + 2026 policies with contradictions, regional
 
 ### 📚 Feature 3: Corrective RAG (CSRAG)
 - **HyDE**: Hypothetical Document Embeddings for query expansion (3 hypotheses)
-- **Hybrid Search**: Dense (Voyage) + Sparse (BM25) with RRF fusion
+- **Hybrid Search**: Dense (Nomic) + Sparse (BM25) with RRF fusion
 - **Reranking**: Voyage AI Cross-Encoder for precision refinement
 - **CRAG**: Corrective RAG — evaluates chunk relevance, triggers web search fallback on INCORRECT/AMBIGUOUS verdicts
 - **SRAG**: Self-RAG — verifies factual support and answer usefulness, revises if needed
@@ -158,7 +158,7 @@ source .venv/bin/activate  # Linux/Mac
 
 # Install dependencies
 uv pip install -r requirements.txt
-uv pip install litellm langchain-litellm langchain-voyageai langchain-groq
+uv pip install litellm langchain-litellm langchain-voyageai langchain-nomic langchain-groq
 
 # Configure environment
 cp .env.example .env
@@ -189,9 +189,9 @@ python -m scripts.eval_ragas --subset 10
 |-----------|-----------|
 | **Orchestration** | LangGraph (state machine) |
 | **LLM** | OpenAI GPT-4o (default) or LiteLLM Router (4x Groq Llama 3.3 70B + OpenAI fallback) |
-| **Embeddings** | OpenAI text-embedding-3-small (default, 1536-dim) or Voyage AI (voyage-3, 1024-dim) |
+| **Embeddings** | Nomic Embeddings (nomic-embed-text-v1.5, 768-dim) |
 | **Vector DB** | Qdrant (hybrid: dense + sparse) |
-| **Reranking** | Voyage AI Cross-Encoder |
+| **Reranking** | Voyage AI Cross-Encoder (rerank-2.5) |
 | **Web Search** | Tavily Search API |
 | **Caching** | Upstash Redis + S3/Local |
 | **Database** | PostgreSQL 16 (checkpointer + store) |
@@ -219,7 +219,7 @@ app/
 │   ├── crag/              # Corrective RAG (evaluator, web search)
 │   ├── srag/              # Self-RAG (verifier)
 │   ├── memory/            # LTM and STM services
-│   ├── embeddings.py      # Voyage AI embedding service
+│   ├── embeddings.py      # Nomic / Voyage / OpenAI embedding service
 │   ├── llm_factory.py     # LiteLLM Router (multi-key fallback)
 │   ├── vector_store.py    # Qdrant client
 │   └── ...

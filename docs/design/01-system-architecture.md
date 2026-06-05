@@ -48,12 +48,12 @@ graph TB
         style LLMs fill:#fce4ec,stroke:#E91E63,stroke-width:2px
         GPT4o["GPT-4o<br/>Generation · SQL · Judge"]
         GPT4oMini["GPT-4o-mini<br/>Routing · CRAG · Memory"]
-        Embed["text-embedding-3-small<br/>1536-dim Embeddings"]
+        Embed["nomic-embed-text-v1.5<br/>768-dim Embeddings"]
     end
 
     subgraph VectorDB["Qdrant Vector Database"]
         style VectorDB fill:#f3e5f5,stroke:#9C27B0,stroke-width:2px
-        Dense["Dense Vectors<br/>1536-dim Cosine"]
+        Dense["Dense Vectors<br/>768-dim Cosine"]
         Sparse["Sparse Vectors<br/>BM25 Term Frequency"]
         RRF["RRF Fusion Engine"]
     end
@@ -131,12 +131,12 @@ graph TB
 |---|---|---|---|
 | `gpt-4o` | Primary generation | 0.0 | Answer generation, SQL compilation, LLM Judge audits, HyDE hypotheses, SRAG verification |
 | `gpt-4o-mini` | Lightweight classification | 0.0 | 5-class routing, CRAG chunk scoring, memory extraction, retrieval decisions |
-| `text-embedding-3-small` | Dense embeddings | — | 1536-dimensional vectors for document chunks and query embedding |
+| `nomic-embed-text-v1.5` | Dense embeddings | — | 768-dimensional vectors for document chunks and query embedding |
 
 ### Qdrant Vector Database
 
 - **Dual-vector collection** (`idop_documents`) with both dense and sparse vector spaces
-- **Dense vectors:** 1536-dim cosine similarity via OpenAI `text-embedding-3-small`
+- **Dense vectors:** 768-dim cosine similarity via Nomic `nomic-embed-text-v1.5`
 - **Sparse vectors:** BM25-style term-frequency hashing via `SparseVectorService`
 - **RRF Fusion:** Reciprocal Rank Fusion merges dense and sparse result lists at query time
 - **Three search modes:** `dense`, `sparse`, `hybrid` — configurable per request
@@ -219,7 +219,7 @@ LangGraph StateGraph.ainvoke()
     │
     ├── OpenAI GPT-4o-mini (routing / classification)
     ├── OpenAI GPT-4o (generation / SQL / judging)
-    ├── OpenAI text-embedding-3-small (embeddings)
+    ├── Nomic nomic-embed-text-v1.5 (embeddings)
     ├── Qdrant (dual-vector hybrid search)
     ├── Supabase PostgreSQL (business data queries)
     ├── Docker PostgreSQL (STM checkpoints + LTM facts)

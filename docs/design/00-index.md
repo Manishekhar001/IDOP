@@ -2,7 +2,7 @@
 
 **Project:** Intelligent Data Operations Platform (IDOP)
 **Version:** 0.1.1
-**Stack:** FastAPI · LangGraph · OpenAI GPT-4o · Qdrant · Supabase · PostgreSQL · Redis · S3 · Voyage AI
+**Stack:** FastAPI · LangGraph · OpenAI GPT-4o · Qdrant · Supabase · PostgreSQL · Redis · S3 · Voyage AI · Nomic
 
 ---
 
@@ -48,7 +48,7 @@ All three features share one LangGraph state machine, one memory system (STM + L
 | Deployment | EC2 + Docker Compose | Human approval gate can be pending indefinitely — Lambda 15-min timeout breaks this |
 | LLM (generation, SQL, judge) | OpenAI `gpt-4o` | Highest quality for critical outputs |
 | LLM (routing, CRAG scoring, memory) | OpenAI `gpt-4o-mini` | 15× cheaper, quality gap negligible on classification tasks |
-| Embeddings | OpenAI `text-embedding-3-small` (1536-dim) | Consistent with Vanna internal embeddings, no Ollama daemon needed |
+| Embeddings | Nomic `nomic-embed-text-v1.5` (768-dim) | High performance, Matryoshka support, and low latency |
 | Vector store | Qdrant (dense + sparse dual-vector) | Native BM25 + dense + RRF fusion in single collection |
 | NL-to-SQL | Vanna 2.0 | Production-grade, handles schema training + few-shot internally |
 | Business data | Supabase | External, isolated from AI infrastructure |

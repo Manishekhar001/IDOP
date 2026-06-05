@@ -26,7 +26,7 @@ Enterprise data ecosystems are notoriously fragmented. Analysts and business dec
 *   **Rationale**: **Voyage AI Rerank-2.5** acts as a cross-encoder, comparing the precise syntax of the query and documents simultaneously. This ensures the absolute highest relevance context is pushed to the first 500 tokens of the context window, drastically reducing LLM hallucinations.
 
 ### Decision 2.3: Dual-Vector Hybrid Search vs. Single Vector
-*   **Problem**: Dense embeddings (e.g. OpenAI `text-embedding-3-small`) excel at capturing high-level intent but perform poorly on exact keyword lookups (serial numbers, email patterns, SKU codes). Sparse algorithms (BM25) capture keywords but miss semantic meaning.
+*   **Problem**: Dense embeddings (e.g. Nomic `nomic-embed-text-v1.5`) excel at capturing high-level intent but perform poorly on exact keyword lookups (serial numbers, email patterns, SKU codes). Sparse algorithms (BM25) capture keywords but miss semantic meaning.
 *   **Rationale**: **Qdrant Dual-Vector Search** implements both. High-dimensional dense vectors represent abstract intent, while sparse BM25 indices capture alphanumeric exactness. Results are fused using **Reciprocal Rank Fusion (RRF)**, offering the best of both worlds.
 
 ### Decision 2.4: Redis Upstash vs. Disk Storage Cache
