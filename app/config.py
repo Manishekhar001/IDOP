@@ -79,29 +79,28 @@ class Settings(BaseSettings):
 
     # Embedding Provider Configuration
     embedding_provider: str = "openai"  # "openai" or "voyage"
-    voyage_api_key: str | None = None
+    voyage_api_key: str | None = None   # Voyage API key (used for both embeddings and reranking)
     voyage_embedding_model: str = "voyage-3"
     voyage_embedding_dimension: int = 1024
-    static_embedding_dimension: int = 1536  # OpenAI default; overridden by voyage_embedding_dimension
+    openai_embedding_dimension: int = 1536
 
     @property
     def embedding_dimension(self) -> int:
         """Return the correct embedding dimension based on the active provider."""
         if self.embedding_provider == "voyage":
             return self.voyage_embedding_dimension
-        return self.static_embedding_dimension
+        return self.openai_embedding_dimension
 
     @property
     def groq_api_keys(self) -> list[str]:
-        """Return all configured Groq API keys as a list (excluding empty/None)."""
+        """Return all configured non-empty Groq API keys."""
         keys = []
         for attr in ["groq_api_key_1", "groq_api_key_2", "groq_api_key_3", "groq_api_key_4"]:
             val = getattr(self, attr, None)
-            if val and val.strip():
-                keys.append(val.strip())
-        # Also include groq_api_key if set (backward compat)
-        if self.groq_api_key and self.groq_api_key.strip() and self.groq_api_key.strip() not in keys:
-            keys.append(self.groq_api_key.strip())
+            if val and str(val).strip():
+                keys.append(str(val).strip())
+        if self.groq_api_key and str(self.groq_api_key).strip() and str(self.groq_api_key).strip() not in keys:
+            keys.append(str(self.groq_api_key).strip())
         return keys
 
     # Qdrant Vector DB Configuration
@@ -136,8 +135,8 @@ class Settings(BaseSettings):
     # Search & Reranking APIs
     tavily_api_key: str
     tavily_max_results: int = 5
-    # Voyage reranking (separate from embeddings)
-    voyage_rerank_api_key: Optional[str] = None
+    # Voyage reranking uses the same voyage_api_key as embeddings above.
+    # voyage_rerank_api_key is deprecated - use voyage_api_key instead.
 
     # LangGraph State Configuration
     stm_message_threshold: int = 6

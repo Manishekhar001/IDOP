@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-RAGAS Ablation Study — IDOP Pipeline Benchmarking Suite
-========================================================
+Ablation Study — IDOP Pipeline Benchmarking Suite
+==================================================
 
 Runs a fixed 50-item benchmark dataset against 5 incremental pipeline
-configurations, evaluates using the RAGAS framework (and an in-house LLM
-evaluator as fallback), and produces a timestamped CSV/JSON report.
+configurations, evaluates using the in-house LLM evaluator, and produces
+a timestamped CSV/JSON report.
 
 Pipeline configurations tested:
 
@@ -15,10 +15,6 @@ Pipeline configurations tested:
   4. Hybrid + Rerank   — Hybrid search + Voyage AI cross-encoder reranking
   5. Full CSRAG        — All features: HyDE + hybrid + reranking + CRAG + SRAG
 
-Each configuration is a strict superset of the previous one (except Run 1→2
-which switches search mode), isolating the marginal contribution of each
-component.
-
 Usage:
     # Default — run all 50 questions through all 5 configs
     python scripts/eval_ragas.py
@@ -26,24 +22,17 @@ Usage:
     # Run only a subset (faster for iterative development)
     python scripts/eval_ragas.py --subset 10
 
-    # Skip actual pipeline execution (use saved results from last run)
+    # Skip pipeline execution (re-evaluate last run's results)
     python scripts/eval_ragas.py --reuse-last
-
-    # Skip RAGAS dependency — use in-house LLM evaluator
-    python scripts/eval_ragas.py --no-ragas
-
-    # Custom output directory
-    python scripts/eval_ragas.py --output-dir data/ablation_results
 
 Output:
     data/ablation_results/
-    ├── run_<timestamp>/
-    │   ├── config_<id>_<name>.json     # Per-configuration results
-    │   ├── ablation_summary.csv        # Summary table per configuration
-    │   ├── ablation_report.txt         # Human-readable report
-    │   ├── per_question_results.csv    # Per-question detailed results
-    │   └── ablation_full.json          # All results combined
-    └── ... (previous runs preserved)
+    └── run_<timestamp>/
+        ├── config_<id>_<name>.json     # Per-configuration results
+        ├── ablation_summary.csv        # Summary table per configuration
+        ├── ablation_report.txt         # Human-readable report
+        ├── per_question_results.csv    # Per-question detailed results
+        └── ablation_full.json          # All results combined
 """
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -54,388 +43,109 @@ import argparse
 import asyncio
 import csv
 import json
+import random
 import sys
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-# Ensure project root is in sys.path
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 # Benchmark Dataset — 50 questions across 5 categories
-# ─────────────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 
 BENCHMARK = [
-    # ═════════════════════════════════════════════════════════════════════════
-    # Category 1: Version Conflicts (10 questions)
-    # Tests CRAG's ability to detect contradictions between old (2025) and
-    # current (2026) policies. Both versions exist in Qdrant. Simple dense
-    # retrieval may grab the WRONG (superseded) version, causing low
-    # faithfulness. Full CSRAG detects the conflict and resolves it.
-    # ═════════════════════════════════════════════════════════════════════════
-    {
-        "question": "What is the standard refund window for retail products?",
-        "ground_truth": "Retail products are eligible for a full refund within 30 days of purchase with receipt.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "Are there any restocking fees for opened electronics?",
-        "ground_truth": "Opened electronics are subject to a 15% restocking fee if returned within the 30-day window.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "What is the international return shipping policy for customers?",
-        "ground_truth": "For international orders, customers must cover return shipping costs unless the product arrived damaged.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "Can clearance items be returned for a refund?",
-        "ground_truth": "All clearance items are marked as final sale and are strictly non-refundable.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "What is the employee referral bonus amount and how is it paid?",
-        "ground_truth": "The standard referral bonus is $2,000, paid in two installments after the new hire completes 90 and 180 days.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "How many weeks of parental leave are available for new parents?",
-        "ground_truth": "The platform provides 12 weeks of fully paid parental leave for primary and secondary caregivers after 1 year of service.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "Are contract workers eligible for dental insurance benefits?",
-        "ground_truth": "Contract workers are generally ineligible for corporate group dental benefits unless explicitly detailed in their agreement.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "What is the annual tuition reimbursement cap for employees?",
-        "ground_truth": "The company reimburses up to $5,250 annually for pre-approved, job-related graduate coursework with grade B or higher.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "How many consecutive sick days require a doctor's note?",
-        "ground_truth": "Consecutive sick leaves of 3 or more days require a valid medical certificate submitted to HR.",
-        "category": "Version Conflict",
-    },
-    {
-        "question": "Can customers exchange gift cards for cash or store credit?",
-        "ground_truth": "Gift cards cannot be returned, exchanged, or redeemed for cash refunds under any circumstances.",
-        "category": "Version Conflict",
-    },
-    # ═════════════════════════════════════════════════════════════════════════
-    # Category 2: Out-of-Document Knowledge (10 questions)
-    # Tests CRAG's INCORRECT detection + web search fallback. Questions are
-    # NOT fully answerable from any single internal document. Configs 1-4
-    # (no CRAG) hallucinate → low faithfulness. Config 5 (Full CSRAG)
-    # detects INCORRECT via CRAG → triggers web fallback → high faithfulness.
-    # ═════════════════════════════════════════════════════════════════════════
-    {
-        "question": "What is the refund policy for the new subscription box service?",
-        "ground_truth": "Customers may cancel within 14 days of the first billing date for a full refund; subsequent months are non-refundable but can be cancelled to stop future billing.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "How are refund disputes handled for items sold by third-party marketplace sellers?",
-        "ground_truth": "The refund policy is managed by the seller. Customers should contact the seller directly. If the seller is unresponsive for more than 7 days, IDOP may issue a courtesy credit of up to 50% of the purchase price.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What is the refund policy for IDOP Collectibles novelty items?",
-        "ground_truth": "Novelty items including collectible pins, limited-edition packaging, and event merchandise are final sale and non-refundable.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "Are novelty items non-refundable for EU customers too?",
-        "ground_truth": "Yes, novelty items are final sale and non-refundable for ALL markets including EU customers, overriding standard EU return policies for this specific category.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What benefits do contract workers lose in the 2026 policy transition?",
-        "ground_truth": "Contract workers lose access to dental benefits and the 401(k) match as of February 1, 2026 under the budget-driven 2026 policy changes.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What is the refund processing time for customers in Latin America?",
-        "ground_truth": "Refunds to LATAM customers may take up to 15 business days to process due to local banking regulations.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What is the mandatory legal warranty period for products sold in the European Union?",
-        "ground_truth": "All products sold to EU customers carry a mandatory 2-year legal warranty covering manufacturing defects, separate from the standard refund policy.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What employee discount is available on company products?",
-        "ground_truth": "No employee discount policy exists in the current documentation. There is no established employee discount on company products.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What is the data deletion policy for EU customers under GDPR?",
-        "ground_truth": "EU customers have the right to request complete deletion of their personal data under GDPR Article 17. Data deletion requests must be processed within 30 calendar days.",
-        "category": "Out-of-Document Knowledge",
-    },
-    {
-        "question": "What is the company's policy on cryptocurrency refunds?",
-        "ground_truth": "No cryptocurrency refund policy exists in the current documentation. There are no established policies for cryptocurrency-based transactions or refunds.",
-        "category": "Out-of-Document Knowledge",
-    },
-    # ═════════════════════════════════════════════════════════════════════════
-    # Category 3: Regional & Policy Variations (10 questions)
-    # Tests HyDE query expansion and reranking for precision. Questions
-    # require the regional_policy.txt document which contains EU, APAC, and
-    # LATAM exceptions. Standard retrieval struggles because regional terms
-    # (GDPR, APAC, LATAM) are absent from the main policy docs.
-    # ═════════════════════════════════════════════════════════════════════════
-    {
-        "question": "What return window do APAC customers have for electronics?",
-        "ground_truth": "APAC customers have a 7-day return window for electronics under local regulations.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "What restocking fee applies to EU customers returning opened electronics?",
-        "ground_truth": "No restocking fees of any kind may be applied to EU customer returns under EU consumer protection laws.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "What currency do LATAM customers receive refunds in?",
-        "ground_truth": "All refunds to LATAM customers are processed in local currency at the exchange rate prevailing on the date of refund approval.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "Which APAC markets receive free return shipping?",
-        "ground_truth": "Customers in Japan, South Korea, and Singapore receive free return shipping. All other APAC markets require customers to cover return shipping costs.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "Do EU customers have to pay for return shipping on international orders?",
-        "ground_truth": "No, the company bears all return shipping costs for EU customers within the return window, superseding the standard international shipping policy.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "What is the standard APAC return window for non-electronics?",
-        "ground_truth": "APAC customers have a 14-day return window for all products except electronics.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "What happens if an EU customer requests deletion of their personal data?",
-        "ground_truth": "EU customers can request complete deletion of their personal data under GDPR Article 17. Data deletion requests must be processed within 30 calendar days.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "What is the APAC restocking fee percentage on opened electronics?",
-        "ground_truth": "A 20% restocking fee applies to opened electronics in APAC markets, higher than the standard 15% due to local distributor requirements.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "Can LATAM customers receive refunds in US dollars?",
-        "ground_truth": "No, all refunds to LATAM customers are processed in local currency at the exchange rate prevailing on the date of refund approval. Currency conversion fees are borne by the company.",
-        "category": "Regional Policy",
-    },
-    {
-        "question": "What warranty do EU customers have in addition to the standard refund policy?",
-        "ground_truth": "EU customers have a mandatory 2-year legal warranty covering manufacturing defects, separate from and in addition to the standard refund policy.",
-        "category": "Regional Policy",
-    },
-    # ═════════════════════════════════════════════════════════════════════════
-    # Category 4: Multi-hop Synthesis (10 questions)
-    # Tests context enrichment and multi-document reasoning. Requires
-    # combining information from 3+ documents. Simple dense retrieval
-    # misses one or more required documents → incomplete answer.
-    # ═════════════════════════════════════════════════════════════════════════
-    {
-        "question": "If an EU customer returns opened electronics bought in January 2026 before the new policy took effect, what fees apply?",
-        "ground_truth": "No restocking fee applies because the order was placed under the 2025 policy (which had no restocking fee for electronics) and EU policies override standard fees. Additionally, the company bears all return shipping costs for EU customers.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "An employee hired in 2023 wants to know their tuition reimbursement cap under the current policy. What is it?",
-        "ground_truth": "Employees hired before January 1, 2024 are grandfathered under the 2024 benefit terms with a $6,000 annual tuition reimbursement cap, which persists indefinitely and is not affected by the standard $5,250 cap.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "A customer bought a clearance item in January 2026 but is returning it in February 2026. What refund policy applies?",
-        "ground_truth": "Orders placed before February 1, 2026 are governed by the 2025 policy terms. Under the 2025 policy, clearance items could be returned with a 25% restocking fee applied to the refund amount. The 2026 policy making clearance non-refundable does not apply.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "An employee hired in 2023 wants parental leave. How many weeks and at what pay?",
-        "ground_truth": "Employees hired before January 1, 2024 are grandfathered under the 2024 benefit terms providing 14 weeks of fully paid parental leave, which is not affected by the standard 12-week policy.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "A customer bought a subscription box service and wants to cancel after 3 months. What refund are they entitled to?",
-        "ground_truth": "The subscription box service is not yet covered by the standard refund policy. Customers may cancel within 14 days of the first billing date for a full refund. Subsequent months after the first billing are non-refundable but can be cancelled to stop future billing.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "What is the combined net effect of the 2026 benefit changes on an employee's total compensation package?",
-        "ground_truth": "Despite being labeled budget cuts, most benefits increased: wellness stipend increased from $300 to $500 (+$200), tuition reimbursement from $3,000 to $5,250 (+$2,250), parental leave from 8 to 12 weeks (+4 weeks), referral bonus from $1,500 to $2,000 (+$500). The only reduction was elimination of contract worker dental and 401(k) match.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "A contractor hired in 2025 submits a dental insurance claim in March 2026. Is it covered?",
-        "ground_truth": "No. While the 2025 policy made contract workers eligible for dental benefits after 6 months, the 2026 policy changes eliminated contract worker dental and 401(k) match benefits effective February 1, 2026.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "Can an EU customer return an IDOP Collectibles novelty item that they purchased?",
-        "ground_truth": "No. Novelty items including collectible pins, limited-edition packaging, and event merchandise are final sale and non-refundable for ALL markets including EU customers, overriding standard EU return policies for this specific category.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "An employee referred a new hire who starts March 1 and resigns after 100 days. What referral bonus is paid?",
-        "ground_truth": "Only the first installment of $1,000 is paid at 90 days. The second installment of $1,000 at 180 days is voided because the referred hire resigned before completing the full 180-day period.",
-        "category": "Multi-hop Synthesis",
-    },
-    {
-        "question": "A customer bought opened electronics internationally from Japan. What fees and shipping costs apply if returning?",
-        "ground_truth": "A 20% restocking fee applies (APAC rate, higher than the standard 15%), and the customer receives free return shipping because Japan is one of the APAC markets with free return shipping along with South Korea and Singapore.",
-        "category": "Multi-hop Synthesis",
-    },
-    # ═════════════════════════════════════════════════════════════════════════
-    # Category 5: Ambiguous Queries & Edge Cases (10 questions)
-    # Tests HyDE query expansion for disambiguation and SRAG verification.
-    # Questions are intentionally vague or leading — simple retrieval retrieves
-    # the wrong document or misses key context. HyDE expands the query to
-    # disambiguate. SRAG verifies factual correctness against retrieved docs.
-    # ═════════════════════════════════════════════════════════════════════════
-    {
-        "question": "What changed in the employee benefits this year compared to last year?",
-        "ground_truth": "Wellness stipend increased from $300 to $500, tuition reimbursement from $3,000 to $5,250, parental leave from 8 to 12 weeks, referral bonus from $1,500 to $2,000, and contract worker benefits were eliminated. Despite the budget cuts label, most benefits actually increased as part of a retention initiative.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "What is the return policy update from last year?",
-        "ground_truth": "The return window was reduced from 45 to 30 days, international shipping shifted from company-paid to customer-paid (except EU), a 15% restocking fee on opened electronics was introduced, and clearance items changed from returnable with 25% fee to strictly non-refundable.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "Can I get my money back if I change my mind after buying something?",
-        "ground_truth": "It depends on the product type. Standard retail products can be returned within 30 days for a full refund. Clearance items are final sale and non-refundable. Opened electronics are subject to a 15% restocking fee. Gift cards cannot be returned. Promotional bundles must be returned together.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "What benefits did the company cut this year?",
-        "ground_truth": "Despite the label 'budget cuts,' only contract worker dental benefits and 401(k) match were actually eliminated. All other benefits increased: wellness stipend, tuition reimbursement, parental leave, and referral bonus.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "Do I need a doctor's note if I call in sick?",
-        "ground_truth": "It depends on the duration. For 1-2 consecutive sick days, no doctor's note is needed. For 3 or more consecutive sick days, a valid medical certificate must be submitted to HR.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "What is the best way to return an expensive item I just bought?",
-        "ground_truth": "The return process depends on the item type (electronics vs non-electronics), region (EU/APAC/LATAM/standard), and purchase date (orders before February 1, 2026 are grandfathered under the 2025 policy). Electronics may incur restocking fees. Regional policies may override standard terms.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "Can executives and VPs fly business class on business trips?",
-        "ground_truth": "All business flights under 6 hours must be booked in economy class regardless of seniority. Business class on flights under 6 hours requires VP-level approval. Flights over 6 hours do not have class restrictions.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "What happens to my tuition reimbursement if I get a grade of C in a course?",
-        "ground_truth": "Under the current 2026 policy, a grade of C does not qualify for tuition reimbursement. Only grades of B or higher are eligible. Under the superseded 2025 policy, grade C or higher qualified but only up to a $3,000 annual cap.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "I am an EU customer and bought a laptop that arrived with a manufacturing defect. What are my rights and options?",
-        "ground_truth": "EU customers have a mandatory 2-year legal warranty covering manufacturing defects. You can also return the laptop within 30 days at no cost with no restocking fee. The company bears all return shipping costs for EU customers.",
-        "category": "Ambiguous Query",
-    },
-    {
-        "question": "What is the total monetary value of all employee benefit increases from 2025 to 2026?",
-        "ground_truth": "The total monetary increase is $2,950: wellness stipend +$200, tuition reimbursement +$2,250, and referral bonus +$500. Parental leave increased by 4 weeks which is non-monetary. These increases are part of a strategic retention program despite being labeled as budget cuts.",
-        "category": "Ambiguous Query",
-    },
+    # ── Category 1: Version Conflicts (10 questions) ─────────────────────
+    {"question": "What is the standard refund window for retail products?", "ground_truth": "Retail products are eligible for a full refund within 30 days of purchase with receipt.", "category": "Version Conflict"},
+    {"question": "Are there any restocking fees for opened electronics?", "ground_truth": "Opened electronics are subject to a 15% restocking fee if returned within the 30-day window.", "category": "Version Conflict"},
+    {"question": "What is the international return shipping policy for customers?", "ground_truth": "For international orders, customers must cover return shipping costs unless the product arrived damaged.", "category": "Version Conflict"},
+    {"question": "Can clearance items be returned for a refund?", "ground_truth": "All clearance items are marked as final sale and are strictly non-refundable.", "category": "Version Conflict"},
+    {"question": "What is the employee referral bonus amount and how is it paid?", "ground_truth": "The standard referral bonus is $2,000, paid in two installments after the new hire completes 90 and 180 days.", "category": "Version Conflict"},
+    {"question": "How many weeks of parental leave are available for new parents?", "ground_truth": "The platform provides 12 weeks of fully paid parental leave for primary and secondary caregivers after 1 year of service.", "category": "Version Conflict"},
+    {"question": "Are contract workers eligible for dental insurance benefits?", "ground_truth": "Contract workers are generally ineligible for corporate group dental benefits unless explicitly detailed in their agreement.", "category": "Version Conflict"},
+    {"question": "What is the annual tuition reimbursement cap for employees?", "ground_truth": "The company reimburses up to $5,250 annually for pre-approved, job-related graduate coursework with grade B or higher.", "category": "Version Conflict"},
+    {"question": "How many consecutive sick days require a doctor's note?", "ground_truth": "Consecutive sick leaves of 3 or more days require a valid medical certificate submitted to HR.", "category": "Version Conflict"},
+    {"question": "Can customers exchange gift cards for cash or store credit?", "ground_truth": "Gift cards cannot be returned, exchanged, or redeemed for cash refunds under any circumstances.", "category": "Version Conflict"},
+    # ── Category 2: Out-of-Document Knowledge (10 questions) ────────────
+    {"question": "What is the refund policy for the new subscription box service?", "ground_truth": "Customers may cancel within 14 days of the first billing date for a full refund; subsequent months are non-refundable but can be cancelled to stop future billing.", "category": "Out-of-Document Knowledge"},
+    {"question": "How are refund disputes handled for items sold by third-party marketplace sellers?", "ground_truth": "The refund policy is managed by the seller. If the seller is unresponsive for more than 7 days, IDOP may issue a courtesy credit of up to 50% of the purchase price.", "category": "Out-of-Document Knowledge"},
+    {"question": "What is the refund policy for IDOP Collectibles novelty items?", "ground_truth": "Novelty items including collectible pins, limited-edition packaging, and event merchandise are final sale and non-refundable.", "category": "Out-of-Document Knowledge"},
+    {"question": "Are novelty items non-refundable for EU customers too?", "ground_truth": "Yes, novelty items are final sale and non-refundable for ALL markets including EU customers.", "category": "Out-of-Document Knowledge"},
+    {"question": "What benefits do contract workers lose in the 2026 policy transition?", "ground_truth": "Contract workers lose access to dental benefits and the 401(k) match as of February 1, 2026.", "category": "Out-of-Document Knowledge"},
+    {"question": "What is the refund processing time for customers in Latin America?", "ground_truth": "Refunds to LATAM customers may take up to 15 business days to process due to local banking regulations.", "category": "Out-of-Document Knowledge"},
+    {"question": "What is the mandatory legal warranty period for products sold in the European Union?", "ground_truth": "All products sold to EU customers carry a mandatory 2-year legal warranty covering manufacturing defects.", "category": "Out-of-Document Knowledge"},
+    {"question": "What employee discount is available on company products?", "ground_truth": "No employee discount policy exists in the current documentation.", "category": "Out-of-Document Knowledge"},
+    {"question": "What is the data deletion policy for EU customers under GDPR?", "ground_truth": "EU customers have the right to request complete deletion of their personal data under GDPR Article 17. Requests must be processed within 30 calendar days.", "category": "Out-of-Document Knowledge"},
+    {"question": "What is the company's policy on cryptocurrency refunds?", "ground_truth": "No cryptocurrency refund policy exists in the current documentation.", "category": "Out-of-Document Knowledge"},
+    # ── Category 3: Regional & Policy Variations (10 questions) ─────────
+    {"question": "What return window do APAC customers have for electronics?", "ground_truth": "APAC customers have a 7-day return window for electronics under local regulations.", "category": "Regional Policy"},
+    {"question": "What restocking fee applies to EU customers returning opened electronics?", "ground_truth": "No restocking fees may be applied to EU customer returns under EU consumer protection laws.", "category": "Regional Policy"},
+    {"question": "What currency do LATAM customers receive refunds in?", "ground_truth": "Refunds to LATAM customers are processed in local currency at the exchange rate on the date of refund approval.", "category": "Regional Policy"},
+    {"question": "Which APAC markets receive free return shipping?", "ground_truth": "Customers in Japan, South Korea, and Singapore receive free return shipping.", "category": "Regional Policy"},
+    {"question": "Do EU customers have to pay for return shipping on international orders?", "ground_truth": "No, the company bears all return shipping costs for EU customers within the return window.", "category": "Regional Policy"},
+    {"question": "What is the standard APAC return window for non-electronics?", "ground_truth": "APAC customers have a 14-day return window for all products except electronics.", "category": "Regional Policy"},
+    {"question": "What happens if an EU customer requests deletion of their personal data?", "ground_truth": "EU data deletion requests must be processed within 30 calendar days under GDPR Article 17.", "category": "Regional Policy"},
+    {"question": "What is the APAC restocking fee percentage on opened electronics?", "ground_truth": "A 20% restocking fee applies to opened electronics in APAC markets.", "category": "Regional Policy"},
+    {"question": "Can LATAM customers receive refunds in US dollars?", "ground_truth": "No, refunds to LATAM customers are processed in local currency at the prevailing exchange rate.", "category": "Regional Policy"},
+    {"question": "What warranty do EU customers have in addition to the standard refund policy?", "ground_truth": "EU customers have a mandatory 2-year legal warranty covering manufacturing defects.", "category": "Regional Policy"},
+    # ── Category 4: Multi-hop Synthesis (10 questions) ──────────────────
+    {"question": "If an EU customer returns opened electronics bought in January 2026 before the new policy took effect, what fees apply?", "ground_truth": "No restocking fee applies because the order was under the 2025 policy (no restocking fee for electronics) and EU policies override standard fees.", "category": "Multi-hop Synthesis"},
+    {"question": "An employee hired in 2023 wants to know their tuition reimbursement cap under the current policy. What is it?", "ground_truth": "Employees hired before January 1, 2024 are grandfathered with a $6,000 annual tuition reimbursement cap.", "category": "Multi-hop Synthesis"},
+    {"question": "A customer bought a clearance item in January 2026 but is returning it in February 2026. What refund policy applies?", "ground_truth": "Orders before February 1, 2026 are governed by the 2025 policy. Clearance could be returned with 25% restocking fee under 2025 policy.", "category": "Multi-hop Synthesis"},
+    {"question": "An employee hired in 2023 wants parental leave. How many weeks and at what pay?", "ground_truth": "Employees hired before January 1, 2024 are grandfathered with 14 weeks of fully paid parental leave.", "category": "Multi-hop Synthesis"},
+    {"question": "A customer bought a subscription box service and wants to cancel after 3 months. What refund are they entitled to?", "ground_truth": "Customers may cancel within 14 days of the first billing date for a full refund. Subsequent months are non-refundable but can be cancelled.", "category": "Multi-hop Synthesis"},
+    {"question": "What is the combined net effect of the 2026 benefit changes on an employee's total compensation package?", "ground_truth": "Wellness +$200, tuition +$2,250, referral +$500, parental leave +4 weeks. Only contract worker dental/401(k) were reduced.", "category": "Multi-hop Synthesis"},
+    {"question": "A contractor hired in 2025 submits a dental insurance claim in March 2026. Is it covered?", "ground_truth": "No. Contract worker dental benefits were eliminated effective February 1, 2026.", "category": "Multi-hop Synthesis"},
+    {"question": "Can an EU customer return an IDOP Collectibles novelty item?", "ground_truth": "No. Novelty items are final sale for ALL markets including EU, overriding standard EU return policies.", "category": "Multi-hop Synthesis"},
+    {"question": "An employee referred a new hire who starts March 1 and resigns after 100 days. What referral bonus is paid?", "ground_truth": "Only the first $1,000 installment is paid at 90 days. The second $1,000 at 180 days is voided.", "category": "Multi-hop Synthesis"},
+    {"question": "A customer bought opened electronics internationally from Japan. What fees and shipping costs apply?", "ground_truth": "20% restocking fee (APAC rate) and free return shipping (Japan is one of the free-shipping APAC markets).", "category": "Multi-hop Synthesis"},
+    # ── Category 5: Ambiguous Queries & Edge Cases (10 questions) ───────
+    {"question": "What changed in the employee benefits this year compared to last year?", "ground_truth": "Wellness +$200, tuition +$2,250, parental leave +4 weeks, referral +$500. Contract worker benefits eliminated.", "category": "Ambiguous Query"},
+    {"question": "What is the return policy update from last year?", "ground_truth": "Return window reduced 45 to 30 days, international shipping shifted to customer, 15% restocking fee introduced, clearance became non-refundable.", "category": "Ambiguous Query"},
+    {"question": "Can I get my money back if I change my mind after buying something?", "ground_truth": "Standard retail: 30-day refund. Clearance: final sale. Electronics: 15% restocking fee. Gift cards: no. Bundles: must return together.", "category": "Ambiguous Query"},
+    {"question": "What benefits did the company cut this year?", "ground_truth": "Only contract worker dental and 401(k) match were eliminated. All other benefits increased despite the budget cuts label.", "category": "Ambiguous Query"},
+    {"question": "Do I need a doctor's note if I call in sick?", "ground_truth": "1-2 days: no. 3+ consecutive days: medical certificate required.", "category": "Ambiguous Query"},
+    {"question": "What is the best way to return an expensive item I just bought?", "ground_truth": "Depends on item type, region, and purchase date. Electronics may incur restocking fees. Regional policies may override.", "category": "Ambiguous Query"},
+    {"question": "Can executives and VPs fly business class on business trips?", "ground_truth": "Flights under 6 hours: economy class regardless of seniority. Flights over 6 hours: no restrictions.", "category": "Ambiguous Query"},
+    {"question": "What happens to my tuition reimbursement if I get a grade of C in a course?", "ground_truth": "Under 2026 policy: grade C does not qualify (minimum B). Under superseded 2025 policy: grade C qualified up to $3,000 cap.", "category": "Ambiguous Query"},
+    {"question": "I am an EU customer and bought a laptop that arrived with a manufacturing defect. What are my rights?", "ground_truth": "2-year legal warranty covers defects. Can return within 30 days at no cost with no restocking fee. Company pays return shipping.", "category": "Ambiguous Query"},
+    {"question": "What is the total monetary value of all employee benefit increases from 2025 to 2026?", "ground_truth": "$2,950 total: wellness +$200, tuition +$2,250, referral +$500.", "category": "Ambiguous Query"},
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Pipeline Configurations — Incremental ablation design
+# Pipeline Configurations
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ABLATION_CONFIGS: List[Dict[str, Any]] = [
-    {
-        "id": 1,
-        "name": "Dense Only",
-        "description": "Baseline — single dense vector similarity search (OpenAI text-embedding-3-small)",
-        "search_mode": "dense",
-        "enable_hyde": False,
-        "enable_reranking": False,
-        "top_k": 4,
-    },
-    {
-        "id": 2,
-        "name": "Hybrid (RRF)",
-        "description": "Dense + sparse hybrid search with Qdrant Reciprocal Rank Fusion (k=60)",
-        "search_mode": "hybrid",
-        "enable_hyde": False,
-        "enable_reranking": False,
-        "top_k": 4,
-    },
-    {
-        "id": 3,
-        "name": "Hybrid + HyDE",
-        "description": "Hybrid search + Hypothetical Document Embeddings query expansion (GPT-4o-mini, 3 hypotheses)",
-        "search_mode": "hybrid",
-        "enable_hyde": True,
-        "enable_reranking": False,
-        "top_k": 4,
-    },
-    {
-        "id": 4,
-        "name": "Hybrid + Reranking",
-        "description": "Hybrid search + Voyage AI Rerank-2.5 cross-encoder reranking",
-        "search_mode": "hybrid",
-        "enable_hyde": False,
-        "enable_reranking": True,
-        "top_k": 5,
-    },
-    {
-        "id": 5,
-        "name": "Full CSRAG",
-        "description": "All features: HyDE + hybrid search + reranking + CRAG evaluation + SRAG verification + context enrichment",
-        "search_mode": "hybrid",
-        "enable_hyde": True,
-        "enable_reranking": True,
-        "top_k": 5,
-    },
+    {"id": 1, "name": "Dense Only", "description": "Baseline - single dense vector similarity search", "search_mode": "dense", "enable_hyde": False, "enable_reranking": False, "top_k": 4},
+    {"id": 2, "name": "Hybrid (RRF)", "description": "Dense + sparse hybrid search with RRF fusion", "search_mode": "hybrid", "enable_hyde": False, "enable_reranking": False, "top_k": 4},
+    {"id": 3, "name": "Hybrid + HyDE", "description": "Hybrid search + HyDE query expansion", "search_mode": "hybrid", "enable_hyde": True, "enable_reranking": False, "top_k": 4},
+    {"id": 4, "name": "Hybrid + Reranking", "description": "Hybrid search + Voyage AI reranking", "search_mode": "hybrid", "enable_hyde": False, "enable_reranking": True, "top_k": 5},
+    {"id": 5, "name": "Full CSRAG", "description": "HyDE + hybrid + reranking + CRAG + SRAG + context enrichment", "search_mode": "hybrid", "enable_hyde": True, "enable_reranking": True, "top_k": 5},
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
 def _timestamp() -> str:
-    """Return a filesystem-safe UTC timestamp string."""
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-
 def _progress_bar(current: int, total: int, width: int = 40) -> str:
-    """Simple ASCII progress bar."""
     filled = int(width * current / total)
-    bar = "#" * filled + "." * (width - filled)
-    return f"[{bar}] {current}/{total}"
-
+    return f"[{'#' * filled}{'.' * (width - filled)}] {current}/{total}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Pipeline Execution
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_LAST_RESULTS_PATH: Optional[Path] = None  # set after a successful run
-
-
 def _collect_contexts(state: dict) -> List[str]:
     """Extract context texts from a pipeline result state dict."""
     from langchain_core.documents import Document
-
     contexts: List[str] = []
     for key in ("good_docs", "docs", "web_docs"):
         docs = state.get(key, []) or []
@@ -448,13 +158,7 @@ def _collect_contexts(state: dict) -> List[str]:
 
 
 async def _create_engine() -> tuple:
-    """Create a shared CSRAGEngine with Postgres resources.
-    
-    Returns (engine, store, checkpointer, store_cm, checkpointer_cm) for reuse
-    across multiple queries. The context managers (store_cm, checkpointer_cm)
-    MUST be held alive by the caller — if they are garbage collected, the
-    Postgres connection pools are closed prematurely.
-    """
+    """Create a shared CSRAGEngine with Postgres resources."""
     from app.core.csrag_engine import CSRAGEngine
     from app.core.vector_store import VectorStoreService
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -462,11 +166,8 @@ async def _create_engine() -> tuple:
     from app.config import get_settings
 
     settings = get_settings()
-
     vector_store = VectorStoreService()
 
-    # IMPORTANT: Keep references to the async context managers (cm_store, cm_checkpointer).
-    # If these are garbage collected, __aexit__ is called and the connection pool closes.
     cm_store = AsyncPostgresStore.from_conn_string(settings.database_url)
     store = await cm_store.__aenter__()
     try:
@@ -494,36 +195,15 @@ async def run_single_query(
     config_dir: Path,
     engine: Any,
 ) -> Dict[str, Any]:
-    """
-    Run one question through one pipeline configuration using a shared engine.
-
-    Forces need_retrieval=True so the ablation measures retrieval quality,
-    not the LLM's general knowledge. Without this, decide_retrieval_node
-    asks the LLM if it needs retrieval, and for common-knowledge questions
-    (refund policies, corporate rules), the LLM says No and answers from
-    memory — defeating the ablation's purpose.
-    """
+    """Run one question through one pipeline configuration."""
     from app.core.csrag_engine import CSRAGEngine
-    from app.config import get_settings
 
     thread_id = f"ablation-cfg{config['id']}-{config_dir.name}"
-    settings = get_settings()
-
-    # Build config for the graph
     graph_config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "user_id": "ablation-eval",
-        },
+        "configurable": {"thread_id": thread_id, "user_id": "ablation-eval"},
         "recursion_limit": 80,
     }
 
-    # Build initial state WITH need_retrieval=True to force document retrieval
-    # (bypassing decide_retrieval_node's LLM gate that skips retrieval for
-    #  common-knowledge questions)
-    # Use CSRAGEngine._initial_state() as the base — this keeps state
-    # construction in one place and ensures consistency if _initial_state()
-    # adds/removes fields. Then override the fields we need for ablation.
     init_state = CSRAGEngine._initial_state(
         question=question,
         search_mode=config["search_mode"],
@@ -532,8 +212,6 @@ async def run_single_query(
         enable_reranking=config["enable_reranking"],
         enable_ragas=False,
     )
-    # Override: force retrieval (bypasses decide_retrieval_node's LLM gate)
-    # and short-circuit LTM/memory steps for consistent measurement
     init_state["need_retrieval"] = True
     init_state["query_type"] = "RAG"
     init_state["retrieval_query"] = question
@@ -561,18 +239,8 @@ async def run_configuration(
     config: Dict[str, Any],
     benchmark: List[Dict[str, Any]],
     config_dir: Path,
-    output_dir: Path,
-    use_ragas: bool,
 ) -> Dict[str, Any]:
-    """
-    Run one ablation configuration against all benchmark questions.
-
-    Creates a shared CSRAGEngine once and reuses it for all questions
-    in this configuration to avoid Postgres connection lifecycle issues.
-
-    Returns aggregated results dict:
-        config_id, name, description, metrics {faithfulness, ...}, per-question list, timing
-    """
+    """Run pipeline queries (no evaluation). Returns raw pipeline outputs."""
     cfg_id = config["id"]
     cfg_name = config["name"]
     n_questions = len(benchmark)
@@ -580,18 +248,13 @@ async def run_configuration(
     print(f"\n{'=' * 70}")
     print(f"  Run {cfg_id}/5: {cfg_name}")
     print(f"  {config['description']}")
-    print(
-        f"  search_mode={config['search_mode']}, hyde={config['enable_hyde']}, "
-        f"rerank={config['enable_reranking']}, top_k={config['top_k']}"
-    )
+    print(f"  search_mode={config['search_mode']}, hyde={config['enable_hyde']}, rerank={config['enable_reranking']}, top_k={config['top_k']}")
     print(f"{'=' * 70}")
 
-    # ── Create shared engine for this configuration ────────────────────
     print("  [INIT] Creating CSRAGEngine...", end="", flush=True)
     engine, store, checkpointer, cm_store, cm_checkpointer = await _create_engine()
     print(" OK")
 
-    # ── 1. Execute all queries ──────────────────────────────────────────
     pipeline_outputs: List[Dict[str, Any]] = []
     start_time = time.monotonic()
 
@@ -610,155 +273,65 @@ async def run_configuration(
                 print(f"  OK ({out['pipeline_time_s']:.1f}s)")
             except Exception as exc:
                 print(f"  FAIL ERROR: {type(exc).__name__}: {exc}")
-                pipeline_outputs.append(
-                    {
-                        "question": item["question"],
-                        "ground_truth": item["ground_truth"],
-                        "category": item.get("category", ""),
-                        "config_id": cfg_id,
-                        "answer": f"[ERROR] {type(exc).__name__}: {exc}",
-                        "contexts": [],
-                        "pipeline_time_s": 0.0,
-                        "crag_verdict": "",
-                        "issup": "",
-                        "isuse": "",
-                    }
-                )
+                pipeline_outputs.append({
+                    "question": item["question"],
+                    "ground_truth": item["ground_truth"],
+                    "category": item.get("category", ""),
+                    "config_id": cfg_id,
+                    "answer": f"[ERROR] {type(exc).__name__}: {exc}",
+                    "contexts": [],
+                    "pipeline_time_s": 0.0,
+                    "crag_verdict": "", "issup": "", "isuse": "",
+                })
     finally:
-        # Clean up Postgres connections via the context managers
         await cm_checkpointer.__aexit__(None, None, None)
         await cm_store.__aexit__(None, None, None)
 
     total_time = time.monotonic() - start_time
     avg_time = round(total_time / n_questions, 3)
 
-    # ── 2. Evaluate with RAGAS ──────────────────────────────────────────
-    metrics: Dict[str, float] = {}
-    ragas_used = False
-
-    if use_ragas:
-        try:
-            from datasets import Dataset
-            from ragas import evaluate
-            from ragas.metrics import (
-                faithfulness,
-                answer_relevancy,
-                context_precision,
-                context_recall,
-            )
-
-            data = {
-                "question": [o["question"] for o in pipeline_outputs],
-                "answer": [o["answer"] for o in pipeline_outputs],
-                "contexts": [o["contexts"] for o in pipeline_outputs],
-                "ground_truth": [o["ground_truth"] for o in pipeline_outputs],
-            }
-            dataset = Dataset.from_dict(data)
-
-            score_res = evaluate(
-                dataset,
-                metrics=[
-                    faithfulness,
-                    answer_relevancy,
-                    context_precision,
-                    context_recall,
-                ],
-            )
-            # RAGAS 0.4.x EvaluationResult has .scores dict but not .get()
-            scores_dict = score_res.scores
-            metrics = {
-                "faithfulness": round(float(scores_dict.get("faithfulness", 0.0)), 4),
-                "answer_relevancy": round(
-                    float(scores_dict.get("answer_relevancy", 0.0)), 4
-                ),
-                "context_precision": round(
-                    float(scores_dict.get("context_precision", 0.0)), 4
-                ),
-                "context_recall": round(
-                    float(scores_dict.get("context_recall", 0.0)), 4
-                ),
-            }
-            ragas_used = True
-            print(
-                f"\n  [RAGAS] Evaluation complete — "
-                f"faith={metrics['faithfulness']:.3f}, "
-                f"relev={metrics['answer_relevancy']:.3f}, "
-                f"prec={metrics['context_precision']:.3f}, "
-                f"recall={metrics['context_recall']:.3f}"
-            )
-
-        except ImportError:
-            print(
-                "\n  [SKIP] RAGAS package not installed — will use in-house evaluator"
-            )
-        except Exception as exc:
-            print(f"\n  [RAGAS ERROR] {type(exc).__name__}: {exc} — falling back")
-
-    # ── 3. If RAGAS unavailable/failed, use in-house evaluator ───────────
-    if not ragas_used:
-        metrics = await _evaluate_in_house(pipeline_outputs)
-
-    # Ensure all 4 metrics are present (in-house evaluator may not compute recall)
-    metrics.setdefault("context_recall", 0.0)
-
-    # ── 4. Compute per-category breakdown ───────────────────────────────
-    cat_metrics = _compute_category_metrics(pipeline_outputs)
-
-    result = {
+    return {
         "config_id": cfg_id,
         "name": cfg_name,
         "description": config["description"],
-        "parameters": {
-            "search_mode": config["search_mode"],
-            "enable_hyde": config["enable_hyde"],
-            "enable_reranking": config["enable_reranking"],
-            "top_k": config["top_k"],
-        },
-        "metrics": metrics,
-        "category_metrics": cat_metrics,
-        "ragas_used": ragas_used,
-        "timing": {
-            "total_seconds": round(total_time, 3),
-            "avg_seconds_per_query": avg_time,
-        },
+        "parameters": {k: config[k] for k in ("search_mode", "enable_hyde", "enable_reranking", "top_k")},
+        "timing": {"total_seconds": round(total_time, 3), "avg_seconds_per_query": avg_time},
         "questions": pipeline_outputs,
     }
 
-    # ── 5. Save per-configuration results ───────────────────────────────
-    cfg_file = (
-        config_dir
-        / f"config_{cfg_id:02d}_{config['name'].replace(' ', '_').lower()}.json"
-    )
-    with open(cfg_file, "w", encoding="utf-8") as f:
-        # Strip bulky per-question data from the main file to keep it lightweight
-        summary = {k: v for k, v in result.items() if k != "questions"}
-        summary["question_count"] = len(pipeline_outputs)
-        json.dump(summary, f, indent=2, default=str)
-    print(f"  [SAVED] {cfg_file.name}")
 
-    return result
+# ═══════════════════════════════════════════════════════════════════════════════
+# Evaluation (in-house only - rate-limit-safe)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-
-async def _evaluate_in_house(
+async def evaluate_config(
     pipeline_outputs: List[Dict[str, Any]],
+    config_id: int,
+    config_name: str,
 ) -> Dict[str, float]:
-    """Use the in-house RagasEvaluator (LLM-based) as fallback."""
-    print("  [EVAL] Running in-house RagasEvaluator on all responses...")
+    """
+    Evaluate one config's pipeline outputs using the in-house evaluator.
+    Adds delays between LLM calls to respect rate limits.
+    
+    Each question makes 3 LLM calls (relevancy, faithfulness, precision).
+    With 50 questions x 3 calls = 150 calls per config.
+    """
+    print(f"\n  [EVAL] Evaluating {config_name} ({len(pipeline_outputs)} questions)...", flush=True)
     from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
 
     evaluator = get_ragas_evaluator()
     faith_scores: List[float] = []
     relev_scores: List[float] = []
     prec_scores: List[float] = []
-    # The in-house RagasScores model doesn't include context_recall,
-    # so compute it as a proxy: relevant_chunks / total_chunks averaged
-    # across all evaluated questions.
     recall_numer: List[float] = []
+    eval_errors = 0
 
-    for out in pipeline_outputs:
+    for q_idx, out in enumerate(pipeline_outputs, start=1):
         answer = out.get("answer", "")
         contexts = out.get("contexts", [])
+        
         if not answer or answer.startswith("[ERROR]"):
+            print(f"    [{q_idx}] SKIP (error or empty)", flush=True)
             continue
 
         try:
@@ -771,11 +344,18 @@ async def _evaluate_in_house(
                 faith_scores.append(scores.faithfulness)
                 relev_scores.append(scores.answer_relevancy)
                 prec_scores.append(scores.context_precision)
-                # Proxy recall: ratio of relevant chunks to total chunks
                 total = max(scores.context_total_count, 1)
                 recall_numer.append(scores.context_relevant_count / total)
-        except Exception:
-            pass
+                print(f"    [{q_idx}] f={scores.faithfulness:.3f} r={scores.answer_relevancy:.3f} p={scores.context_precision:.3f}", flush=True)
+            else:
+                eval_errors += 1
+                print(f"    [{q_idx}] NO SCORES returned", flush=True)
+        except Exception as e:
+            eval_errors += 1
+            print(f"    [{q_idx}] ERROR: {type(e).__name__}", flush=True)
+        
+        # Rate-limit delay between questions
+        await asyncio.sleep(2.0)
 
     n = len(faith_scores) or 1
     metrics = {
@@ -785,86 +365,58 @@ async def _evaluate_in_house(
         "context_recall": round(sum(recall_numer) / n, 4) if recall_numer else 0.0,
     }
     print(
-        f"  [EVAL] In-house complete — "
-        f"faith={metrics['faithfulness']:.3f}, "
-        f"relev={metrics['answer_relevancy']:.3f}, "
-        f"prec={metrics['context_precision']:.3f}, "
-        f"recall={metrics['context_recall']:.3f}"
+        f"  [EVAL] {config_name} complete - "
+        f"faith={metrics['faithfulness']:.3f} relev={metrics['answer_relevancy']:.3f} "
+        f"prec={metrics['context_precision']:.3f} recall={metrics['context_recall']:.3f} "
+        f"({len(faith_scores)} evaluated, {eval_errors} errors)",
+        flush=True
     )
     return metrics
 
 
-def _compute_category_metrics(
-    outputs: List[Dict[str, Any]],
-) -> Dict[str, Dict[str, float]]:
-    """Compute per-category success rates based on answer quality heuristics."""
+def _compute_category_metrics(outputs: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+    """Compute per-category success rates."""
     categories = defaultdict(list)
     for o in outputs:
         cat = o.get("category", "Unknown")
         answer = o.get("answer", "")
         has_error = answer.startswith("[ERROR]")
-        has_answer = (
-            bool(answer)
-            and not has_error
-            and answer != "I don't have enough information."
-        )
+        has_answer = bool(answer) and not has_error and answer != "I don't have enough information."
         categories[cat].append(has_answer)
 
-    cat_metrics = {}
-    for cat, results in categories.items():
-        total = len(results)
-        success = sum(results)
-        cat_metrics[cat] = {
-            "total": total,
-            "successful": success,
-            "success_rate": round(success / total, 4) if total > 0 else 0.0,
+    return {
+        cat: {
+            "total": len(results),
+            "successful": sum(results),
+            "success_rate": round(sum(results) / len(results), 4) if results else 0.0,
         }
-    return cat_metrics
+        for cat, results in categories.items()
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Report Generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
-def _build_report(
-    all_results: List[Dict[str, Any]],
-    benchmark_name: str,
-    total_elapsed: float,
-) -> str:
-    """Build a human-readable ablation report string."""
+def _build_report(all_results: List[Dict[str, Any]], benchmark_name: str, total_elapsed: float) -> str:
     lines: List[str] = []
     lines.append("=" * 72)
-    lines.append("  IDOP RAGAS ABLATION STUDY REPORT")
+    lines.append(f"  IDOP ABLATION STUDY REPORT")
     lines.append(f"  Benchmark: {benchmark_name} ({len(BENCHMARK)} questions)")
     lines.append(f"  Completed: {_timestamp()}")
     lines.append(f"  Total time: {total_elapsed:.1f}s")
     lines.append("=" * 72)
     lines.append("")
 
-    # ── Summary Table ───────────────────────────────────────────────────
-    header = (
-        f"{'Run':<5} {'Configuration':<30} {'Faith':<9} {'Relev':<9} "
-        f"{'Prec':<9} {'Recall':<9} {'Avg Q(s)':<9}"
-    )
+    header = f"{'Run':<5} {'Configuration':<30} {'Faith':<9} {'Relev':<9} {'Prec':<9} {'Recall':<9} {'Avg Q(s)':<9}"
     lines.append(header)
     lines.append("-" * len(header))
 
     base_metrics = None
     for r in all_results:
         m = r["metrics"]
-        imp_faith = ""
-        if base_metrics and base_metrics.get("faithfulness", 0) > 0:
-            delta = m["faithfulness"] - base_metrics["faithfulness"]
-            imp_faith = f" ({delta:+.1%})"
-        lines.append(
-            f"{r['config_id']:<5} {r['name']:<30} "
-            f"{m['faithfulness']:<9.4f}{imp_faith:<9} "
-            f"{m['answer_relevancy']:<9.4f} "
-            f"{m['context_precision']:<9.4f} "
-            f"{m['context_recall']:<9.4f} "
-            f"{r['timing']['avg_seconds_per_query']:<9.3f}"
-        )
+        imp = f" ({m['faithfulness'] - base_metrics['faithfulness']:+.1%})" if base_metrics and base_metrics.get("faithfulness", 0) > 0 else ""
+        lines.append(f"{r['config_id']:<5} {r['name']:<30} {m['faithfulness']:<9.4f}{imp:<9} {m['answer_relevancy']:<9.4f} {m['context_precision']:<9.4f} {m['context_recall']:<9.4f} {r['timing']['avg_seconds_per_query']:<9.3f}")
         if base_metrics is None:
             base_metrics = m
 
@@ -874,41 +426,26 @@ def _build_report(
         last = all_results[-1]["metrics"]
         lines.append("")
         lines.append("  Cumulative Improvements (Full CSRAG vs Dense Only):")
-        for key in (
-            "faithfulness",
-            "answer_relevancy",
-            "context_precision",
-            "context_recall",
-        ):
+        for key in ("faithfulness", "answer_relevancy", "context_precision", "context_recall"):
             delta = last[key] - first[key]
             pct = (delta / first[key] * 100) if first[key] > 0 else 0
-            lines.append(
-                f"    {key:<25} {first[key]:.4f} -> {last[key]:.4f}  ({pct:+.1f}%)"
-            )
-    lines.append("")
+            lines.append(f"    {key:<25} {first[key]:.4f} -> {last[key]:.4f}  ({pct:+.1f}%)")
 
-    # ── Per-Configuration Details ────────────────────────────────────────
     for r in all_results:
         lines.append(f"\n{'-' * 50}")
         lines.append(f"  Configuration {r['config_id']}: {r['name']}")
         lines.append(f"  {r['description']}")
         lines.append(f"  Parameters: {json.dumps(r['parameters'])}")
-        lines.append(f"  RAGAS used: {r.get('ragas_used', False)}")
         lines.append(f"  Avg query time: {r['timing']['avg_seconds_per_query']:.3f}s")
-        lines.append("")
         m = r["metrics"]
         lines.append(f"    faithfulness       = {m['faithfulness']:.4f}")
         lines.append(f"    answer_relevancy    = {m['answer_relevancy']:.4f}")
         lines.append(f"    context_precision   = {m['context_precision']:.4f}")
         lines.append(f"    context_recall      = {m['context_recall']:.4f}")
         if r.get("category_metrics"):
-            lines.append("")
             lines.append("    Per-Category Success Rates:")
             for cat, cm in sorted(r["category_metrics"].items()):
-                lines.append(
-                    f"      {cat:<25} {cm['successful']:>3}/{cm['total']:<3} "
-                    f"({cm['success_rate']:.1%})"
-                )
+                lines.append(f"      {cat:<25} {cm['successful']:>3}/{cm['total']:<3} ({cm['success_rate']:.1%})")
 
     lines.append("")
     lines.append("=" * 72)
@@ -918,77 +455,25 @@ def _build_report(
 
 
 def _save_csv(results_dir: Path, all_results: List[Dict[str, Any]]) -> Path:
-    """Save a CSV summary table."""
     csv_path = results_dir / "ablation_summary.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(
-            [
-                "config_id",
-                "name",
-                "faithfulness",
-                "answer_relevancy",
-                "context_precision",
-                "context_recall",
-                "avg_query_time_s",
-                "total_time_s",
-            ]
-        )
+        writer.writerow(["config_id", "name", "faithfulness", "answer_relevancy", "context_precision", "context_recall", "avg_query_time_s", "total_time_s"])
         for r in all_results:
             m = r["metrics"]
-            writer.writerow(
-                [
-                    r["config_id"],
-                    r["name"],
-                    m["faithfulness"],
-                    m["answer_relevancy"],
-                    m["context_precision"],
-                    m["context_recall"],
-                    r["timing"]["avg_seconds_per_query"],
-                    r["timing"]["total_seconds"],
-                ]
-            )
+            writer.writerow([r["config_id"], r["name"], m["faithfulness"], m["answer_relevancy"], m["context_precision"], m["context_recall"], r["timing"]["avg_seconds_per_query"], r["timing"]["total_seconds"]])
     return csv_path
 
 
-def _save_per_question_csv(
-    results_dir: Path, all_results: List[Dict[str, Any]]
-) -> Path:
-    """Save a detailed per-question × per-configuration CSV."""
+def _save_per_question_csv(results_dir: Path, all_results: List[Dict[str, Any]]) -> Path:
     csv_path = results_dir / "per_question_results.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(
-            [
-                "config_id",
-                "config_name",
-                "question",
-                "category",
-                "has_answer",
-                "has_error",
-                "pipeline_time_s",
-                "crag_verdict",
-                "issup",
-                "isuse",
-            ]
-        )
+        writer.writerow(["config_id", "config_name", "question", "category", "has_answer", "has_error", "pipeline_time_s", "crag_verdict", "issup", "isuse"])
         for r in all_results:
             for q in r.get("questions", []):
                 answer = q.get("answer", "")
-                writer.writerow(
-                    [
-                        r["config_id"],
-                        r["name"],
-                        q["question"],
-                        q.get("category", ""),
-                        1 if bool(answer) and not answer.startswith("[ERROR]") else 0,
-                        1 if answer.startswith("[ERROR]") else 0,
-                        q.get("pipeline_time_s", 0.0),
-                        q.get("crag_verdict", ""),
-                        q.get("issup", ""),
-                        q.get("isuse", ""),
-                    ]
-                )
+                writer.writerow([r["config_id"], r["name"], q["question"], q.get("category", ""), 1 if bool(answer) and not answer.startswith("[ERROR]") else 0, 1 if answer.startswith("[ERROR]") else 0, q.get("pipeline_time_s", 0.0), q.get("crag_verdict", ""), q.get("issup", ""), q.get("isuse", "")])
     return csv_path
 
 
@@ -996,164 +481,130 @@ def _save_per_question_csv(
 # Main Entrypoint
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="IDOP RAGAS Ablation Study — benchmark 5 pipeline configurations",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-    )
-    parser.add_argument(
-        "--subset",
-        "-n",
-        type=int,
-        default=None,
-        help="Run on a random subset of N questions (default: all 50)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        "-o",
-        type=str,
-        default="data/ablation_results",
-        help="Output directory for results (default: data/ablation_results)",
-    )
-    parser.add_argument(
-        "--reuse-last",
-        action="store_true",
-        help="Skip pipeline execution and re-report from the most recent results",
-    )
-    parser.add_argument(
-        "--no-ragas",
-        action="store_true",
-        help="Skip RAGAS library evaluation; use in-house LLM evaluator only",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for subset selection (default: 42)",
-    )
+    parser = argparse.ArgumentParser(description="IDOP Ablation Study - benchmark 5 pipeline configurations", formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
+    parser.add_argument("--subset", "-n", type=int, default=None, help="Run on a random subset of N questions")
+    parser.add_argument("--output-dir", "-o", type=str, default="data/ablation_results", help="Output directory")
+    parser.add_argument("--reuse-last", action="store_true", help="Skip pipeline execution, re-evaluate last run's results")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for subset selection")
     return parser.parse_args(argv)
 
 
 async def main_async() -> None:
-    """Async entry point."""
-    import asyncio
-
     args = parse_args()
-    use_ragas = not args.no_ragas
     benchmark = list(BENCHMARK)
 
-    # ── Subset logic ────────────────────────────────────────────────────
     if args.subset and 0 < args.subset < len(benchmark):
-        import random
-
         rng = random.Random(args.seed)
         rng.shuffle(benchmark)
-        benchmark = benchmark[: args.subset]
-        print(
-            f"  [SUBSET] Using {len(benchmark)} questions (--subset={args.subset}, seed={args.seed})"
-        )
+        benchmark = benchmark[:args.subset]
+        print(f"  [SUBSET] Using {len(benchmark)} questions (--subset={args.subset}, seed={args.seed})")
     else:
         print(f"  [FULL] Using all {len(benchmark)} benchmark questions")
 
-    # ── Output directory ────────────────────────────────────────────────
     base_dir = Path(args.output_dir)
     base_dir.mkdir(parents=True, exist_ok=True)
-
     run_ts = _timestamp()
     config_dir = base_dir / f"run_{run_ts}"
     config_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Reuse / fresh execution ─────────────────────────────────────────
+    # ── Phase 1: Run pipeline (or reuse last) ───────────────────────────
     if args.reuse_last:
-        print("\n  [REUSE] Skipping pipeline execution. Looking for last results...")
+        print("\n  [REUSE] Loading last run's pipeline outputs...")
         runs = sorted(base_dir.glob("run_*"), reverse=True)
         if len(runs) < 2:
-            print("  [ERROR] No previous run found for --reuse-last")
+            print("  [ERROR] No previous run found")
             sys.exit(1)
-        # The current empty config_dir is the latest — use the one before it
         prev = runs[1]
         print(f"  [REUSE] Loading from {prev.name}")
-        all_results = []
+        all_pipeline_results = []
         for cfg in ABLATION_CONFIGS:
-            cfg_file = (
-                prev
-                / f"config_{cfg['id']:02d}_{cfg['name'].replace(' ', '_').lower()}.json"
-            )
+            cfg_file = prev / f"config_{cfg['id']:02d}_{cfg['name'].replace(' ', '_').lower()}.json"
             if cfg_file.exists():
                 with open(cfg_file) as f:
-                    all_results.append(json.load(f))
+                    all_pipeline_results.append(json.load(f))
                 print(f"    Loaded {cfg_file.name}")
             else:
-                print(f"    [WARN] {cfg_file.name} not found - skipping")
-        total_elapsed = 0.0
+                print(f"    [WARN] {cfg_file.name} not found")
+        total_pipeline_elapsed = 0.0
     else:
         print(f"\n  {'=' * 50}")
-        print(f"  Starting ablation study — {len(ABLATION_CONFIGS)} configurations")
+        print(f"  Phase 1: Running pipeline for {len(ABLATION_CONFIGS)} configurations")
         print(f"  Output: {config_dir}")
-        print(f"  RAGAS: {'enabled' if use_ragas else 'disabled (in-house evaluator)'}")
         print(f"  {'=' * 50}")
 
-        all_results = []
+        all_pipeline_results = []
         t_start = time.monotonic()
         for cfg in ABLATION_CONFIGS:
-            result = await run_configuration(
-                cfg, benchmark, config_dir, base_dir, use_ragas
-            )
-            all_results.append(result)
-        total_elapsed = time.monotonic() - t_start
+            result = await run_configuration(cfg, benchmark, config_dir)
+            all_pipeline_results.append(result)
+        total_pipeline_elapsed = time.monotonic() - t_start
 
-    # ── Generate report ─────────────────────────────────────────────────
-    report = _build_report(
-        all_results, f"IDOP Benchmark ({len(benchmark)} questions)", total_elapsed
-    )
+        # Save raw pipeline outputs immediately (before evaluation)
+        for r in all_pipeline_results:
+            cfg_file = config_dir / f"config_{r['config_id']:02d}_{r['name'].replace(' ', '_').lower()}.json"
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                summary = {k: v for k, v in r.items() if k != "questions"}
+                summary["question_count"] = len(r.get("questions", []))
+                json.dump(summary, f, indent=2, default=str)
+        print(f"\n  [PHASE 1] Pipeline complete - {total_pipeline_elapsed:.1f}s")
+
+    # ── Phase 2: Evaluate each config separately with rate-limit delays ─
+    print(f"\n  {'=' * 50}")
+    print(f"  Phase 2: Evaluating {len(all_pipeline_results)} configurations")
+    print(f"  (2s delay between questions, 10s delay between configs)")
+    print(f"  {'=' * 50}")
+
+    for r in all_pipeline_results:
+        cfg_id = r["config_id"]
+        cfg_name = r["name"]
+        questions = r.get("questions", [])
+        print(f"\n  >>> Evaluating Config {cfg_id}/5: {cfg_name} ({len(questions)} questions)", flush=True)
+
+        metrics = await evaluate_config(questions, cfg_id, cfg_name)
+        r["metrics"] = metrics
+        r["category_metrics"] = _compute_category_metrics(questions)
+
+        # Save intermediate results (with metrics now included)
+        cfg_file = config_dir / f"config_{cfg_id:02d}_{cfg_name.replace(' ', '_').lower()}.json"
+        with open(cfg_file, "w", encoding="utf-8") as f:
+            summary = {k: v for k, v in r.items() if k != "questions"}
+            summary["question_count"] = len(questions)
+            json.dump(summary, f, indent=2, default=str)
+        print(f"    [SAVED] {cfg_file.name}", flush=True)
+
+        # 10s delay between configs to allow rate limits to reset
+        if cfg_id < len(ABLATION_CONFIGS):
+            print(f"    Waiting 10s before next config...", flush=True)
+            await asyncio.sleep(10)
+
+    total_elapsed = total_pipeline_elapsed + sum(
+        len(r.get("questions", [])) * 2.0 for r in all_pipeline_results
+    ) + (len(all_pipeline_results) - 1) * 10.0
+    # Build final report
+    report = _build_report(all_pipeline_results, f"IDOP Benchmark ({len(benchmark)} questions)", total_elapsed)
     report_path = config_dir / "ablation_report.txt"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report)
 
-    # ── Save CSVs ────────────────────────────────────────────────────────
-    _save_csv(config_dir, all_results)
-    _save_per_question_csv(config_dir, all_results)
+    _save_csv(config_dir, all_pipeline_results)
+    _save_per_question_csv(config_dir, all_pipeline_results)
 
-    # ── Save full JSON ──────────────────────────────────────────────────
     full_json = {
-        "report": {
-            "timestamp": run_ts,
-            "benchmark_size": len(benchmark),
-            "configurations": len(ABLATION_CONFIGS),
-            "elapsed_seconds": round(total_elapsed, 3),
-            "ragas_used": use_ragas,
-        },
-        "configurations": [
-            {k: v for k, v in r.items() if k != "questions"} for r in all_results
-        ],
+        "report": {"timestamp": run_ts, "benchmark_size": len(benchmark), "configurations": len(ABLATION_CONFIGS), "elapsed_seconds": round(total_elapsed, 3)},
+        "configurations": [{k: v for k, v in r.items() if k != "questions"} for r in all_pipeline_results],
     }
-    json_path = config_dir / "ablation_full.json"
-    with open(json_path, "w", encoding="utf-8") as f:
+    with open(config_dir / "ablation_full.json", "w", encoding="utf-8") as f:
         json.dump(full_json, f, indent=2, default=str)
 
-    # ── Print report ────────────────────────────────────────────────────
     print(f"\n{report}")
-
-    # ── Final summary ───────────────────────────────────────────────────
     print(f"\n{'=' * 50}")
-    print("  Ablation study complete!")
+    print(f"  Study complete!")
     print(f"  Results saved to: {config_dir}")
-    print("    Report:   ablation_report.txt")
-    print("    Summary:  ablation_summary.csv")
-    print("    Details:  per_question_results.csv")
-    print("    Full:     ablation_full.json")
-    print(f"  Total time: {total_elapsed:.1f}s")
     print(f"{'=' * 50}")
 
 
 def main() -> None:
-    """Synchronous entry point."""
-    # Windows compatibility: psycopg async requires SelectorEventLoop
-    # rather than the default ProactorEventLoop. This MUST be set BEFORE
-    # asyncio.run() creates the loop — setting it inside main_async() is
-    # too late because asyncio.run() has already created a ProactorEventLoop.
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main_async())
