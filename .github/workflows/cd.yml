@@ -310,6 +310,15 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           S3_CACHE_BUCKET: ${{ secrets.S3_CACHE_BUCKET }}
           DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          MEMORY_LLM_MODEL: ${{ secrets.MEMORY_LLM_MODEL }}
+          EMBEDDING_PROVIDER: ${{ secrets.EMBEDDING_PROVIDER }}
+          VOYAGE_EMBEDDING_MODEL: ${{ secrets.VOYAGE_EMBEDDING_MODEL }}
+          GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
           # Opik observability — hardcoded directly (no GitHub secret)
           OPIK_API_KEY: muDw2J5DzTHuSVKvpOWGWiAP3
           OPIK_PROJECT_NAME: idop-Project
@@ -328,7 +337,7 @@ jobs:
           # Do NOT use >- YAML folding — it inserts spaces between lines,
           # causing env var names like " OPENAI_API_KEY" (with leading space)
           # that won't match the actual env var names.
-          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,OPENAI_API_KEY,VOYAGE_API_KEY,TAVILY_API_KEY,QDRANT_URL,QDRANT_API_KEY,UPSTASH_REDIS_URL,UPSTASH_REDIS_TOKEN,SUPABASE_DB_URL,S3_CACHE_BUCKET,DOMAIN_NAME,OPIK_API_KEY,OPIK_PROJECT_NAME,OPIK_WORKSPACE,RESOLVED_ECR_REGISTRY,RESOLVED_ECR_REPOSITORY,EC2_PROJECT_PATH,AWS_REGION,GITHUB_SHA,IMAGE_DIGEST
+          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,OPENAI_API_KEY,VOYAGE_API_KEY,TAVILY_API_KEY,QDRANT_URL,QDRANT_API_KEY,UPSTASH_REDIS_URL,UPSTASH_REDIS_TOKEN,SUPABASE_DB_URL,S3_CACHE_BUCKET,DOMAIN_NAME,OPIK_API_KEY,OPIK_PROJECT_NAME,OPIK_WORKSPACE,RESOLVED_ECR_REGISTRY,RESOLVED_ECR_REPOSITORY,EC2_PROJECT_PATH,AWS_REGION,GITHUB_SHA,IMAGE_DIGEST,LLM_PROVIDER,LLM_MODEL,MEMORY_LLM_MODEL,EMBEDDING_PROVIDER,VOYAGE_EMBEDDING_MODEL,GROQ_API_KEY_1,GROQ_API_KEY_2,GROQ_API_KEY_3,GROQ_API_KEY_4
           script: |
             echo "=========================================="
             echo "📂 Step 11a: Preparing deployment directory"
@@ -556,6 +565,19 @@ jobs:
             OPIK_API_KEY=$OPIK_API_KEY
             OPIK_PROJECT_NAME=$OPIK_PROJECT_NAME
             OPIK_WORKSPACE=$OPIK_WORKSPACE
+
+            # Providers & Models Configuration
+            LLM_PROVIDER=${LLM_PROVIDER:-litellm}
+            LLM_MODEL=${LLM_MODEL:-llama-3.3-70b-versatile}
+            MEMORY_LLM_MODEL=${MEMORY_LLM_MODEL:-llama-3.1-8b-instant}
+            EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-voyage}
+            VOYAGE_EMBEDDING_MODEL=${VOYAGE_EMBEDDING_MODEL:-voyage-3}
+
+            # Groq API Keys for LiteLLM Router
+            GROQ_API_KEY_1=${GROQ_API_KEY_1:-"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"}
+            GROQ_API_KEY_2=${GROQ_API_KEY_2:-"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"}
+            GROQ_API_KEY_3=${GROQ_API_KEY_3:-"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"}
+            GROQ_API_KEY_4=${GROQ_API_KEY_4:-"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"}
 
             # Runtime state
             ENVIRONMENT=production
