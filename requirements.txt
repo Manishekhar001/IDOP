@@ -30,3 +30,4 @@ watchtower>=3.0.0
 # Note: langgraph.store.postgres.aio (AsyncPostgresStore) is bundled in core langgraph —
 # no separate langgraph-store-postgres package exists on PyPI.
 
+pytest-asyncio>=1.4.0
