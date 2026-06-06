@@ -39,12 +39,14 @@ _TEST_ENV = {
     "API_HOST": "127.0.0.1",
     "API_PORT": "8000",
     "ALLOWED_ORIGINS": "*",
-    # OpenAI
+    # LLM Provider
     "OPENAI_API_KEY": "sk-test-fake-key-for-unit-tests",
-    "LLM_MODEL": "gpt-4o",
+    "LLM_PROVIDER": "groq",
+    "LLM_MODEL": "llama-3.1-8b-instant",
     "LLM_TEMPERATURE": "0.0",
-    "MEMORY_LLM_MODEL": "gpt-4o-mini",
+    "MEMORY_LLM_MODEL": "llama-3.1-8b-instant",
     "MEMORY_LLM_TEMPERATURE": "0.0",
+    "GROQ_API_KEY_1": "gsk-test-fake-groq-key-for-unit-tests",
     # Qdrant
     "QDRANT_URL": "http://localhost:6333",
     "QDRANT_API_KEY": "test-qdrant-key",
