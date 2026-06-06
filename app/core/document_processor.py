@@ -92,7 +92,9 @@ class DocumentProcessor:
         docs = []
         for _, row in df.iterrows():
             content = " | ".join(f"{col}: {val}" for col, val in row.items())
-            docs.append(Document(page_content=content, metadata={"source": file_path.name}))
+            docs.append(
+                Document(page_content=content, metadata={"source": file_path.name})
+            )
         logger.info(f"Loaded {len(docs)} rows from {file_path.name}")
         return docs
 
