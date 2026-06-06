@@ -4,7 +4,6 @@ Unit tests for IDOP enhanced API responses and detail schemas.
 
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-import asyncio
 from fastapi.testclient import TestClient
 
 from app.api.schemas import ChatResponse, MutationResponse

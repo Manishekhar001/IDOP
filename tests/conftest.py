@@ -90,9 +90,9 @@ for _key, _val in _TEST_ENV.items():
     os.environ[_key] = _val
 
 # Clear the get_settings LRU cache so it picks up the test env vars on first call
-from app.config import (
+from app.config import (  # noqa: E402 — env vars must be set first
     get_settings as _get_settings,
-)  # noqa: E402 — env vars must be set first
+)
 
 _get_settings.cache_clear()
 
