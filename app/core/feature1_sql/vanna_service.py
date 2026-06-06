@@ -606,7 +606,7 @@ Do not include any additional text outside the code block.
                     f"Direct LLM SQL generation fallback succeeded! Generated SQL: {sql[:100]}..."
                 )
                 explanation = (
-                    "⚠️ Direct LLM Fallback: Generated directly using OpenAI GPT-4o as the core Vanna agent was unavailable."
+                    "⚠️ Direct LLM Fallback: Generated using the primary LLM (LiteLLM/Groq) as the core Vanna agent was unavailable."
                     if explain
                     else "Explanation omitted by request."
                 )
