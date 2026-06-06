@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     nomic_api_key: str | None = None
     nomic_embedding_model: str = "nomic-embed-text-v1.5"
     nomic_embedding_dimension: int = 768
+
     @property
     def embedding_dimension(self) -> int:
         """Return the correct embedding dimension based on the active provider."""

@@ -190,7 +190,9 @@ def get_chat_llm(
                     api_key=groq_keys[0],
                 )
             except ImportError:
-                logger.warning("langchain-groq not installed. No LLM provider available.")
+                logger.warning(
+                    "langchain-groq not installed. No LLM provider available."
+                )
         else:
             logger.warning("No Groq keys configured.")
 

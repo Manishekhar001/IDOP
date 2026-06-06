@@ -84,7 +84,9 @@ def _create_embedding_model() -> Any:
     Returns an object with .embed_query(text) and .embed_documents(texts) methods.
     """
     settings = get_settings()
-    provider = settings.embedding_provider.lower() if settings.embedding_provider else "voyage"
+    provider = (
+        settings.embedding_provider.lower() if settings.embedding_provider else "voyage"
+    )
 
     if provider == "voyage":
         voyage_api_key = settings.voyage_api_key
@@ -94,6 +96,7 @@ def _create_embedding_model() -> Any:
                 "Voyage AI is the active embedding provider."
             )
         from langchain_voyageai import VoyageAIEmbeddings
+
         model = settings.voyage_embedding_model or "voyage-3"
         logger.info(f"Initializing Voyage embeddings: model={model}")
         return VoyageAIEmbeddings(
@@ -104,13 +107,15 @@ def _create_embedding_model() -> Any:
         nomic_api_key = settings.nomic_api_key
         if not nomic_api_key:
             raise ValueError(
-                "NOMIC_API_KEY is not set. "
-                "Nomic is the active embedding provider."
+                "NOMIC_API_KEY is not set. " "Nomic is the active embedding provider."
             )
         from langchain_nomic import NomicEmbeddings
+
         model = settings.nomic_embedding_model or "nomic-embed-text-v1.5"
         dimensionality = settings.nomic_embedding_dimension or 768
-        logger.info(f"Initializing Nomic embeddings: model={model}, dimensionality={dimensionality}")
+        logger.info(
+            f"Initializing Nomic embeddings: model={model}, dimensionality={dimensionality}"
+        )
         return NomicEmbeddings(
             nomic_api_key=nomic_api_key,
             model=model,
@@ -146,4 +151,3 @@ class EmbeddingsService:
     def _embed_documents(self, docs: list[str]) -> list[list[float]]:
         logger.debug(f"Embedding {len(docs)} documents")
         return self.embeddings.embed_documents(docs)
-
