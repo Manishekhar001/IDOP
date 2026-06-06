@@ -83,7 +83,7 @@ class VannaAgentWrapper:
             class SimpleUserResolver(UserResolver):
                 """Minimal UserResolver that returns a default user."""
 
-                def resolve_user(self, request_context) -> User:
+                async def resolve_user(self, request_context) -> User:
                     return User(
                         id="default",
                         data={"user_id": "default", "name": "IDOP User"},

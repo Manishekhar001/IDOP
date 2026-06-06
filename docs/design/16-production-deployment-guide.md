@@ -235,6 +235,8 @@ echo "S3 Bucket: $S3_BUCKET_NAME"
 
 **Expected Monthly Cost:** ~$5-50/month depending on usage
 
+> **Vanna Text-to-SQL Model:** Vanna's internal `OpenAILlmService` uses `gpt-4o-mini` by default (configurable via `VANNA_LLM_MODEL` env var). This model must be an actual OpenAI model name since Vanna only supports OpenAI as its LLM backend. The Groq-based `get_chat_llm()` fallback is used if OpenAI is unavailable.
+
 ### 4.2 Qdrant Cloud Setup
 
 1. Go to https://cloud.qdrant.io/
@@ -840,9 +842,9 @@ AWS_REGION=us-east-1
 
 # POSTGRES_PASSWORD is hardcoded in cd.yml (idop_checkpoint_2026)
 # Do NOT change below — the CD pipeline will overwrite this on deploy
-POSTGRES_PASSWORD=idop_checkpoint_2026
-OPENAI_API_KEY=sk-proj-your-key-here
-NOMIC_API_KEY=your-nomic-api-key-here
+POSTGRES_PASSWORD=idop_checkpoint_2026  OPENAI_API_KEY=sk-proj-your-key-here
+  VANNA_LLM_MODEL=gpt-4o-mini
+  NOMIC_API_KEY=your-nomic-api-key-here
 VOYAGE_API_KEY=your-voyage-key-here
 TAVILY_API_KEY=tvly-your-key-here
 QDRANT_URL=https://your-cluster.aws.cloud.qdrant.io
