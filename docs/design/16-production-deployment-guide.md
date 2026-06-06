@@ -252,7 +252,7 @@ curl -X PUT "https://YOUR-CLUSTER.aws.cloud.qdrant.io/collections/idop_documents
   -d '{
     "vectors": {
       "dense": {
-        "size": 1536,
+        "size": 768,
         "distance": "Cosine"
       }
     },

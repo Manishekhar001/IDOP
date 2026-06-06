@@ -60,7 +60,7 @@ if not settings.OPENAI_API_KEY:
 
 ### Step 3: Vector Store Registration
 The `VectorStoreService` connects to the Qdrant instance. It checks if the primary collection `idop_documents` exists. If the collection is missing, it executes automated schema creation, applying:
-*   Dense named vector payload configuration (Cosine, 1536-dim).
+*   Dense named vector payload configuration (Cosine, 768-dim).
 *   Sparse named vector payload configuration (BM25 keyword vectors).
 
 ### Step 4: Long-Term Memory (LTM) Setup
