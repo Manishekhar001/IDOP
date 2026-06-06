@@ -12,7 +12,8 @@ class AuditResult(BaseModel):
         ..., description="Whether the mutation is approved for execution."
     )
     explanation: str = Field(
-        ..., description="Brief explanation of why it is approved or what the concern is."
+        ...,
+        description="Brief explanation of why it is approved or what the concern is.",
     )
 
 
@@ -58,7 +59,11 @@ class MutationLLMJudge:
         """
         try:
             result: AuditResult = await self._chain.ainvoke(
-                {"request_text": request_text, "table_name": table_name, "op_type": op_type}
+                {
+                    "request_text": request_text,
+                    "table_name": table_name,
+                    "op_type": op_type,
+                }
             )
             logger.info(
                 f"Mutation LLM Judge audit: is_approved={result.is_approved}, explanation={result.explanation}"

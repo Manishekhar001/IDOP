@@ -11,11 +11,10 @@ logger = logging.getLogger("idop_app.column_mapper")
 
 class MappingResult(BaseModel):
     mappings: Dict[str, str] = Field(
-        ..., description="Mapping from spreadsheet column names to database column names."
+        ...,
+        description="Mapping from spreadsheet column names to database column names.",
     )
-    confidence: float = Field(
-        ..., description="Confidence score between 0.0 and 1.0."
-    )
+    confidence: float = Field(..., description="Confidence score between 0.0 and 1.0.")
     requires_review: bool = Field(
         ..., description="Whether the mapping requires human review."
     )

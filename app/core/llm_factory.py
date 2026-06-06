@@ -213,9 +213,7 @@ def get_chat_llm(
                 api_key=openai_api_key,
             )
         except ImportError:
-            logger.warning(
-                "langchain-openai not installed. No LLM provider available."
-            )
+            logger.warning("langchain-openai not installed. No LLM provider available.")
         except Exception as e:
             logger.warning(f"OpenAI fallback failed: {e}")
 

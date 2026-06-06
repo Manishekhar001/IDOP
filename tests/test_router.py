@@ -10,7 +10,6 @@ from unittest.mock import patch, MagicMock, AsyncMock
 
 from app.core.graph.router import QueryRouter, RouteDecision
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Tests for QueryRouter
 # ═══════════════════════════════════════════════════════════════════════

@@ -9,7 +9,8 @@ logger = logging.getLogger("idop_app.llm_judge")
 
 class JudgeResult(BaseModel):
     is_correct: bool = Field(
-        ..., description="Whether the SQL query is semantically correct for the user's question."
+        ...,
+        description="Whether the SQL query is semantically correct for the user's question.",
     )
     explanation: str = Field(
         ..., description="Brief explanation of why it is correct or what is wrong."

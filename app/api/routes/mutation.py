@@ -216,7 +216,9 @@ async def upload_mutation(
             )
 
         # 5. LLM Judge Audit Check (async)
-        is_approved, explanation = await judge.audit_mutation(request_intent, table_name, op_type)
+        is_approved, explanation = await judge.audit_mutation(
+            request_intent, table_name, op_type
+        )
         if not is_approved:
             validation_errors.append(f"Audit Warning: {explanation}")
 
