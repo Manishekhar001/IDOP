@@ -59,10 +59,10 @@ def _validate_file_size(file_bytes: bytes) -> None:
 @track(name="upload_document")
 async def upload_document(
     file: UploadFile = File(..., description="Document to upload (PDF, TXT, CSV)"),
-    chunk_size: Optional[str] = Form(
+    chunk_size: Optional[int] = Form(
         None, description="Custom target chunk size for parsing"
     ),
-    chunk_overlap: Optional[str] = Form(None, description="Custom chunk overlap"),
+    chunk_overlap: Optional[int] = Form(None, description="Custom chunk overlap"),
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> DocumentUploadResponse:
     """
@@ -99,29 +99,9 @@ async def upload_document(
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Safely parse chunk_size
-    parsed_chunk_size = None
-    if chunk_size is not None:
-        val = str(chunk_size).strip()
-        if val:
-            try:
-                parsed_chunk_size = int(val)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400, detail="chunk_size must be an integer."
-                )
-
-    # Safely parse chunk_overlap
-    parsed_chunk_overlap = None
-    if chunk_overlap is not None:
-        val = str(chunk_overlap).strip()
-        if val:
-            try:
-                parsed_chunk_overlap = int(val)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400, detail="chunk_overlap must be an integer."
-                )
+    # FastAPI handles int parsing and validation via the Optional[int] type hint
+    parsed_chunk_size = chunk_size
+    parsed_chunk_overlap = chunk_overlap
 
     try:
         file_bytes = await file.read()
@@ -155,33 +135,45 @@ async def upload_document(
             except Exception as e:
                 logger.warning(f"Cache load failed: {e}")
             if cached is not None:
-                # Reconstruct Document objects from cached chunks
-                chunks = [
-                    DocumentProcessor._dict_to_document(chunk)
-                    for chunk in cached["chunks"]
-                ]
                 embeddings = cached["embeddings"]
+                # Validate cached embedding dimension matches current config
+                # Prevents dimension mismatch (e.g., old OpenAI 1536-dim vs Nomic 768-dim)
+                expected_dim = vector_store.embedding_dimension
+                if embeddings and len(embeddings) > 0 and len(embeddings[0]) != expected_dim:
+                    logger.warning(
+                        f"Cached embedding dimension ({len(embeddings[0])}) doesn't match "
+                        f"expected ({expected_dim}). Ignoring cache and re-embedding..."
+                    )
+                else:
+                    # Reconstruct Document objects from cached chunks
+                    chunks = [
+                        DocumentProcessor._dict_to_document(chunk)
+                        for chunk in cached["chunks"]
+                    ]
 
-                document_ids = await loop.run_in_executor(
-                    None, vector_store.add_documents_with_embeddings, chunks, embeddings
-                )
+                    document_ids = await loop.run_in_executor(
+                        None,
+                        vector_store.add_documents_with_embeddings,
+                        chunks,
+                        embeddings,
+                    )
 
-                logger.info(
-                    f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs"
-                )
-                return DocumentUploadResponse(
-                    message="Document uploaded and indexed successfully (from cache)",
-                    filename=filename,
-                    chunks_created=len(chunks),
-                    document_ids=document_ids,
-                    chunk_size_applied=cached["metadata"].get(
-                        "chunk_size", parsed_chunk_size
-                    ),
-                    chunk_overlap_applied=cached["metadata"].get(
-                        "chunk_overlap", parsed_chunk_overlap
-                    ),
-                    cache_hit=True,
-                )
+                    logger.info(
+                        f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs"
+                    )
+                    return DocumentUploadResponse(
+                        message="Document uploaded and indexed successfully (from cache)",
+                        filename=filename,
+                        chunks_created=len(chunks),
+                        document_ids=document_ids,
+                        chunk_size_applied=cached["metadata"].get(
+                            "chunk_size", parsed_chunk_size
+                        ),
+                        chunk_overlap_applied=cached["metadata"].get(
+                            "chunk_overlap", parsed_chunk_overlap
+                        ),
+                        cache_hit=True,
+                    )
             else:
                 logger.warning(
                     f"Cache load returned None for doc_id={doc_id[:12]}... despite cache_exists=True — re-processing"
@@ -211,7 +203,7 @@ async def upload_document(
             )
 
         logger.info(
-            f"Embedding {len(chunks)} chunks ({sum(len(t) for t in texts)} chars) via OpenAI..."
+            f"Embedding {len(chunks)} chunks ({sum(len(t) for t in texts)} chars)..."
         )
         embeddings = await loop.run_in_executor(
             None, vector_store.embeddings.embed_documents, texts
