@@ -45,9 +45,7 @@ class VannaAgentWrapper:
 
             settings = get_settings()
             vanna_model = settings.vanna_llm_model
-            self.llm = OpenAILlmService(
-                api_key=openai_api_key, model=vanna_model
-            )
+            self.llm = OpenAILlmService(api_key=openai_api_key, model=vanna_model)
             logger.info(f"Vanna OpenAILlmService using model: {vanna_model}")
 
             logger.info(

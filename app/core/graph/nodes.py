@@ -164,7 +164,9 @@ async def sql_generation_node(state: CSRAGState) -> dict:
                     df = pd.DataFrame(results)
                     result_context = f"SQL Query Executed:\n{sql}\n\nQuery Results (CSV Format):\n{df.to_csv(index=False)}"
                 else:
-                    result_context = f"SQL Query Executed:\n{sql}\n\nQuery returned 0 rows."
+                    result_context = (
+                        f"SQL Query Executed:\n{sql}\n\nQuery returned 0 rows."
+                    )
 
                 answer_prompt = (
                     f"You are a database analyst. The following SQL query was executed against a database.\n\n"
@@ -173,12 +175,16 @@ async def sql_generation_node(state: CSRAGState) -> dict:
                     f"Provide a concise, natural language answer based on the query results. "
                     f"Cite specific numbers from the results."
                 )
-                response = await llm.ainvoke([
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=answer_prompt),
-                ])
+                response = await llm.ainvoke(
+                    [
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=answer_prompt),
+                    ]
+                )
 
-                logger.info(f"Auto-executed SELECT: '{question[:60]}' -> {len(results)} rows")
+                logger.info(
+                    f"Auto-executed SELECT: '{question[:60]}' -> {len(results)} rows"
+                )
                 return {
                     "sql_query": sql,
                     "sql_query_id": query_id,
@@ -188,7 +194,9 @@ async def sql_generation_node(state: CSRAGState) -> dict:
                     "answer": response.content,
                 }
             except Exception as exec_err:
-                logger.error(f"SQL auto-execute failed: {exec_err} — falling back to approval flow")
+                logger.error(
+                    f"SQL auto-execute failed: {exec_err} — falling back to approval flow"
+                )
                 # Fall through to pending_approval flow below
 
         # Non-SELECT or auto-execute failed — store for human approval
