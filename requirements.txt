@@ -27,6 +27,7 @@ langchain-litellm==0.6.6
 openai>=1.0.0  # Direct dependency for LLM judges (feature1_sql, feature2_mutation)
 litellm==1.87.1
 tavily-python>=0.3.0
+langchain-tavily>=0.2.0  # Standalone Tavily integration (replaces langchain-community.tavily)
 docling>=2.96.1  # py3-none-any wheel — Python 3.13 classifier confirmed
 opik>=2.0.54    # py3-none-any wheel — Python 3.13 classifier confirmed
 moto[s3]>=5.0.0  # S3 storage backend mocking for tests

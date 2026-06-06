@@ -1,8 +1,7 @@
 import asyncio
 from functools import lru_cache
 
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
+from langchain_tavily import TavilySearch
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
@@ -43,9 +42,8 @@ class WebSearchService:
         llm = get_memory_llm()
         self._rewrite_chain = _REWRITE_PROMPT | llm.with_structured_output(WebQuery)
 
-        api_wrapper = TavilySearchAPIWrapper(tavily_api_key=settings.tavily_api_key)
-        self._tavily = TavilySearchResults(
-            api_wrapper=api_wrapper,
+        self._tavily = TavilySearch(
+            tavily_api_key=settings.tavily_api_key,
             max_results=settings.tavily_max_results,
         )
         logger.info(

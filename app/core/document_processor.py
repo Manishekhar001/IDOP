@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 from typing import BinaryIO
 
-from langchain_community.document_loaders import CSVLoader, TextLoader
+import pandas as pd
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -81,13 +81,18 @@ class DocumentProcessor:
 
     def _load_text(self, file_path: Path) -> list[Document]:
         logger.info(f"Loading text: {file_path.name}")
-        docs = TextLoader(str(file_path), encoding="utf-8").load()
+        text = file_path.read_text(encoding="utf-8")
+        docs = [Document(page_content=text, metadata={"source": file_path.name})]
         logger.info(f"Loaded {file_path.name}")
         return docs
 
     def _load_csv(self, file_path: Path) -> list[Document]:
         logger.info(f"Loading CSV: {file_path.name}")
-        docs = CSVLoader(str(file_path), encoding="utf-8").load()
+        df = pd.read_csv(file_path, encoding="utf-8")
+        docs = []
+        for _, row in df.iterrows():
+            content = " | ".join(f"{col}: {val}" for col, val in row.items())
+            docs.append(Document(page_content=content, metadata={"source": file_path.name}))
         logger.info(f"Loaded {len(docs)} rows from {file_path.name}")
         return docs
 
