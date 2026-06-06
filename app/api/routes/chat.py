@@ -88,10 +88,11 @@ async def chat(
             for s in result.get("sources", [])
         ]
 
-    # Support NL-to-SQL or Mutation response interception:
-    # If the router directed to SQL, return status info (token intentionally excluded — use /sql/pending)
+    # Support SQL auto-execute vs pending approval:
+    # - If SQL was auto-executed (SELECT), show the natural language answer directly
+    # - If SQL is pending approval (non-SELECT or auto-execute failed), show approval instructions
     answer_text = result["answer"]
-    if result.get("query_type") == "SQL":
+    if result.get("sql_status") == "pending_approval":
         answer_text = f"Generated approved SQL Session: {result.get('sql_query_id')}\nQuery: {result.get('sql_query')}\nStatus: {result.get('sql_status')}\n\nTo approve this SQL, use POST /sql/approve with the approval token from POST /sql/generate or GET /sql/pending."
 
     return ChatResponse(
