@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     memory_llm_model: str = "llama-3.3-70b-versatile"
     memory_llm_temperature: float = 0.0
+    vanna_llm_model: str = "gpt-4o-mini"
 
     # Embedding Provider Configuration
     embedding_provider: str = "nomic"  # "nomic" or "voyage"
