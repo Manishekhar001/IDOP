@@ -139,7 +139,11 @@ async def upload_document(
                 # Validate cached embedding dimension matches current config
                 # Prevents dimension mismatch (e.g., old OpenAI 1536-dim vs Nomic 768-dim)
                 expected_dim = vector_store.embedding_dimension
-                if embeddings and len(embeddings) > 0 and len(embeddings[0]) != expected_dim:
+                if (
+                    embeddings
+                    and len(embeddings) > 0
+                    and len(embeddings[0]) != expected_dim
+                ):
                     logger.warning(
                         f"Cached embedding dimension ({len(embeddings[0])}) doesn't match "
                         f"expected ({expected_dim}). Ignoring cache and re-embedding..."
