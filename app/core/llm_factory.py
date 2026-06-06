@@ -196,10 +196,34 @@ def get_chat_llm(
         else:
             logger.warning("No Groq keys configured.")
 
+    # ── Option 3: OpenAI fallback ───────────────────────────────────────
+    openai_api_key = settings.openai_api_key
+    if openai_api_key and str(openai_api_key).strip():
+        openai_model = "gpt-4o-mini"  # Cost-effective fallback model
+        try:
+            from langchain_openai import ChatOpenAI
+
+            logger.info(
+                f"Creating ChatOpenAI: model={openai_model}, "
+                f"temperature={resolved_temp} (final fallback)"
+            )
+            return ChatOpenAI(
+                model=openai_model,
+                temperature=resolved_temp,
+                api_key=openai_api_key,
+            )
+        except ImportError:
+            logger.warning(
+                "langchain-openai not installed. No LLM provider available."
+            )
+        except Exception as e:
+            logger.warning(f"OpenAI fallback failed: {e}")
+
     # ── No provider available ───────────────────────────────────────────
     raise ValueError(
         f"No LLM provider available. Check LLM_PROVIDER={provider} and ensure "
-        f"the required API keys are configured in .env"
+        f"the required API keys are configured in .env. Tried: LiteLLM Router, "
+        f"ChatGroq, and ChatOpenAI fallback."
     )
 
 
