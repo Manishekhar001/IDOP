@@ -113,10 +113,12 @@ Before starting, ensure you have:
 
 **External Service Accounts (obtain before starting):**
 - [ ] **OpenAI API Key** — https://platform.openai.com/api-keys
+- [ ] **Nomic AI API Key** — https://atlas.nomic.ai/ (required for default embeddings)
 - [ ] **Qdrant Cloud Account + API Key** — https://cloud.qdrant.io/
 - [ ] **Voyage AI API Key** — https://dash.voyageai.com/
 - [ ] **Tavily Search API Key** — https://tavily.com/
 - [ ] **Supabase Account + PostgreSQL Database** — https://supabase.com/
+- [ ] (Optional) **Groq API Keys** (1–4) — https://console.groq.com/keys (for LLM provider)
 - [ ] (Optional) **Upstash Redis** for query caching — https://console.upstash.com/
 - [ ] (Optional) **AWS S3 Bucket** for document caching
 
@@ -317,6 +319,18 @@ postgresql+psycopg://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-us-east-1.pool
 
 **Expected Monthly Cost:** Free tier (10K requests/day) or $0.20 per 100K requests
 
+### 4.7 Nomic AI API Key
+
+Nomic is the **default embedding provider**. You must obtain an API key even if you plan to use Voyage AI.
+
+1. Go to https://atlas.nomic.ai/
+2. Sign up / Log in
+3. Navigate to **Settings** → **API Keys**
+4. Click **Create API Key**
+5. Copy the key and add it as `NOMIC_API_KEY` in your GitHub secrets
+
+**Expected Monthly Cost:** Free tier (rate-limited) or pay-per-use
+
 ---
 
 ## 5. GitHub Repository & Secrets Setup
@@ -425,6 +439,7 @@ These secrets are injected as environment variables into the production `.env` f
 | Secret Name | Example Value | Where to Get It | Used By |
 |:---|:---|:---|:---|
 | `OPENAI_API_KEY` | `sk-proj-abc123...` | https://platform.openai.com/api-keys (Section 4.1) | `cd.yml` |
+| `NOMIC_API_KEY` | `your-nomic-api-key` | https://atlas.nomic.ai/ → API Keys (Section 4.7) | `cd.yml` |
 | `VOYAGE_API_KEY` | `pa-abc123...` | https://dash.voyageai.com/ → API Keys (Section 4.3) | `cd.yml` |
 | `TAVILY_API_KEY` | `tvly-abc123...` | https://tavily.com/ → API Keys (Section 4.4) | `cd.yml` |
 | `QDRANT_URL` | `https://xyz-abc.aws.cloud.qdrant.io` | Qdrant Cloud Dashboard → Cluster URL (Section 4.2) | `cd.yml` |
@@ -450,7 +465,7 @@ These are optional. If not set, the application will run without caching (slight
 After adding all secrets, your GitHub **Settings → Secrets → Actions** page should look like this:
 
 ```
-✅ Required Secrets (11 total):
+✅ Required Secrets (12 total):
 ┌─────────────────────────────┬──────────────────────────────────────┐
 │ Secret Name                 │ Status                               │
 ├─────────────────────────────┼──────────────────────────────────────┤
@@ -460,6 +475,7 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ EC2_HOST                    │ ● Added                              │
 │ EC2_SSH_KEY                 │ ● Added                              │
 │ OPENAI_API_KEY              │ ● Added                              │
+│ NOMIC_API_KEY               │ ● Added                              │
 │ VOYAGE_API_KEY              │ ● Added                              │
 │ TAVILY_API_KEY              │ ● Added                              │
 │ QDRANT_URL                  │ ● Added                              │
@@ -525,10 +541,10 @@ GitHub Repository Secrets
 │   │   idop_checkpoint_2026       │
 │   ├── DATABASE_URL=            │
 │   │   postgresql://postgres:    │
-│   │   idop_checkpoint_2026@...  │
-│   ├── OPENAI_API_KEY=...        │
-│   ├── VOYAGE_API_KEY=...        │
-│   ├── TAVILY_API_KEY=...        │
+│   │   idop_checkpoint_2026@...  │   │   ├── OPENAI_API_KEY=...        │
+   │   ├── NOMIC_API_KEY=...        │
+   │   ├── VOYAGE_API_KEY=...        │
+   │   ├── TAVILY_API_KEY=...        │
 │   ├── QDRANT_URL=...            │
 │   ├── QDRANT_API_KEY=...        │
 │   ├── UPSTASH_REDIS_URL=...     │
@@ -785,6 +801,7 @@ AWS_REGION=us-east-1
 # Do NOT change below — the CD pipeline will overwrite this on deploy
 POSTGRES_PASSWORD=idop_checkpoint_2026
 OPENAI_API_KEY=sk-proj-your-key-here
+NOMIC_API_KEY=your-nomic-api-key-here
 VOYAGE_API_KEY=your-voyage-key-here
 TAVILY_API_KEY=tvly-your-key-here
 QDRANT_URL=https://your-cluster.aws.cloud.qdrant.io

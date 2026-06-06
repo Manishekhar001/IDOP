@@ -105,6 +105,7 @@ Production configurations must be maintained as secrets. A templates file (`.env
 | :--- | :--- | :--- |
 | **ENV_STATE** | Yes | `production` |
 | **OPENAI_API_KEY** | Yes | Production Enterprise OpenAI Key |
+| **NOMIC_API_KEY** | Yes | Nomic API key for default embeddings |
 | **VOYAGE_API_KEY** | Yes | Voyage API key for reranking |
 | **TAVILY_API_KEY** | Yes | Tavily key for web fallback checks |
 | **QDRANT_URL** / **API_KEY** | Yes | Managed Qdrant Cloud Cluster details |
