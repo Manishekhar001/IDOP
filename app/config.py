@@ -71,14 +71,14 @@ class Settings(BaseSettings):
     groq_api_key_3: str | None = None
     groq_api_key_4: str | None = None
 
-    llm_provider: str = "openai"  # "openai" or "groq" or "litellm"
-    llm_model: str = "gpt-4o"
+    llm_provider: str = "litellm"  # "litellm" or "groq"
+    llm_model: str = "llama-3.3-70b-versatile"
     llm_temperature: float = 0.0
-    memory_llm_model: str = "gpt-4o-mini"
+    memory_llm_model: str = "llama-3.3-70b-versatile"
     memory_llm_temperature: float = 0.0
 
     # Embedding Provider Configuration
-    embedding_provider: str = "voyage"  # "voyage" or "nomic" or "openai"
+    embedding_provider: str = "nomic"  # "nomic" or "voyage"
     voyage_api_key: str | None = (
         None  # Voyage API key (used for both embeddings and reranking)
     )
@@ -87,8 +87,6 @@ class Settings(BaseSettings):
     nomic_api_key: str | None = None
     nomic_embedding_model: str = "nomic-embed-text-v1.5"
     nomic_embedding_dimension: int = 768
-    openai_embedding_dimension: int = 1536
-
     @property
     def embedding_dimension(self) -> int:
         """Return the correct embedding dimension based on the active provider."""
@@ -96,7 +94,9 @@ class Settings(BaseSettings):
             return self.voyage_embedding_dimension
         elif self.embedding_provider == "nomic":
             return self.nomic_embedding_dimension
-        return self.openai_embedding_dimension
+        raise ValueError(
+            f"Unsupported embedding provider '{self.embedding_provider}'. Supported: voyage, nomic"
+        )
 
     @property
     def groq_api_keys(self) -> list[str]:

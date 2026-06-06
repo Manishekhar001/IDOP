@@ -49,8 +49,8 @@ _TEST_ENV = {
     "QDRANT_URL": "http://localhost:6333",
     "QDRANT_API_KEY": "test-qdrant-key",
     "COLLECTION_NAME": "idop_test_documents",
-    "EMBEDDING_PROVIDER": "openai",
-    "EMBEDDING_DIMENSION": "1536",
+    "EMBEDDING_PROVIDER": "nomic",
+    "EMBEDDING_DIMENSION": "768",
     # Database
     "DATABASE_URL": "postgresql://test:test@localhost:5432/idop_test",
     "SUPABASE_DB_URL": "",
@@ -88,9 +88,7 @@ for _key, _val in _TEST_ENV.items():
     os.environ[_key] = _val
 
 # Clear the get_settings LRU cache so it picks up the test env vars on first call
-from app.config import (
-    get_settings as _get_settings,
-)  # noqa: E402 — intentional: env vars must be set first
+from app.config import get_settings as _get_settings  # noqa: E402 — env vars must be set first
 
 _get_settings.cache_clear()
 

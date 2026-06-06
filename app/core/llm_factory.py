@@ -2,12 +2,11 @@
 Shared LLM Factory — uses LiteLLM Router for multi-provider, multi-key load balancing.
 
 Supports:
-  - Multiple Groq API keys with automatic failover (primary key hits rate limit → next key)
-  - Multiple providers (OpenAI, Groq, Together, etc.) via LiteLLM Router
-  - Fallback to direct ChatOpenAI / ChatGroq if LiteLLM is not installed
+  - Multiple Groq API keys with automatic failover via LiteLLM Router
+  - Direct Groq connection for single-key setups
 
 All components (CRAG, SRAG, HyDE, RAGAS, graph nodes, memory services) import
-`get_chat_llm()` from this module instead of instantiating ChatOpenAI directly.
+`get_chat_llm()` from this module for centralized LLM access.
 
 Usage:
     from app.core.llm_factory import get_chat_llm
@@ -19,8 +18,8 @@ Usage:
     chain = prompt | llm.with_structured_output(MyModel)
 
 Configuration (in .env):
-    LLM_PROVIDER=litellm       # "litellm", "groq", or "openai" (default: "openai")
-    LLM_MODEL=gpt-4o            # Model name (for OpenAI) or model group (for LiteLLM)
+    LLM_PROVIDER=litellm       # "litellm" or "groq" (default: "openai")
+    LLM_MODEL=gpt-4o            # Model name or model group (for LiteLLM)
     LLM_TEMPERATURE=0.0
 
     # For LiteLLM with multiple Groq keys:
@@ -35,10 +34,6 @@ Configuration (in .env):
     GROQ_API_KEY=gsk_abc...
     LLM_MODEL=llama-3.3-70b-versatile
 
-    # For OpenAI:
-    LLM_PROVIDER=openai
-    OPENAI_API_KEY=sk-...
-    LLM_MODEL=gpt-4o
 """
 
 import logging
@@ -75,9 +70,7 @@ def _resolve_groq_model(model: str) -> str:
 def _build_litellm_router() -> Any:
     """Build a LiteLLM Router with all configured API keys and providers.
 
-    Creates:
-      - One deployment per Groq API key (groq/llama-3.3-70b-versatile)
-      - One OpenAI fallback deployment (openai/gpt-4o) as last resort
+    Creates one deployment per Groq API key (groq/<model>).
 
     The Router automatically load-balances, detects 429 rate limits,
     cools down failed deployments, and falls back to healthy ones.
@@ -95,7 +88,7 @@ def _build_litellm_router() -> Any:
         logger.warning("No Groq API keys configured for LiteLLM Router — falling back")
         return None
 
-    # Build model_list — Groq keys first (primary), OpenAI last (fallback)
+    # Build model_list — all Groq keys with individual rate limits
     # RPM goes at the model_list entry level (NOT inside litellm_params)
     model_list = []
     for i, key in enumerate(groq_keys):
@@ -111,21 +104,6 @@ def _build_litellm_router() -> Any:
         )
         logger.info(f"  Groq deployment {i+1}: groq/{model}")
 
-    # Add OpenAI as the final fallback
-    openai_key = settings.openai_api_key
-    if openai_key and openai_key.strip():
-        model_list.append(
-            {
-                "model_name": model_group,
-                "litellm_params": {
-                    "model": "openai/gpt-4o",
-                    "api_key": openai_key.strip(),
-                },
-                "rpm": 500,  # Higher RPM since it's the final fallback
-            }
-        )
-        logger.info("  OpenAI fallback: openai/gpt-4o")
-
     # Configure the Router with cooldown and retry settings
     router = Router(
         model_list=model_list,
@@ -137,8 +115,7 @@ def _build_litellm_router() -> Any:
     )
 
     logger.info(
-        f"LiteLLM Router initialized with {len(model_list)} total deployments "
-        f"({len(groq_keys)} Groq + {1 if openai_key else 0} OpenAI) "
+        f"LiteLLM Router initialized with {len(model_list)} Groq deployments "
         f"for model group '{model_group}'"
     )
     return router
@@ -155,7 +132,7 @@ def get_chat_llm(
     Priority:
       1. If LLM_PROVIDER=litellm → use ChatLiteLLMRouter (multi-key load balancing)
       2. If LLM_PROVIDER=groq → use ChatGroq (single key)
-      3. Default → use ChatOpenAI
+      3. Raise ValueError if neither is available
 
     The result is cached via @lru_cache so the same LLM instance is reused.
     """
@@ -213,20 +190,14 @@ def get_chat_llm(
                     api_key=groq_keys[0],
                 )
             except ImportError:
-                logger.warning("langchain-groq not installed. Falling back to OpenAI.")
+                logger.warning("langchain-groq not installed. No LLM provider available.")
         else:
             logger.warning("No Groq keys configured.")
 
-    # ── Option 3: OpenAI (default fallback) ─────────────────────────────
-    from langchain_openai import ChatOpenAI
-
-    logger.info(
-        f"Creating OpenAI LLM: model={resolved_model}, temperature={resolved_temp}"
-    )
-    return ChatOpenAI(
-        model=resolved_model,
-        temperature=resolved_temp,
-        api_key=settings.openai_api_key,
+    # ── No provider available ───────────────────────────────────────────
+    raise ValueError(
+        f"No LLM provider available. Check LLM_PROVIDER={provider} and ensure "
+        f"the required API keys are configured in .env"
     )
 
 

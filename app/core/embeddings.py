@@ -1,9 +1,12 @@
 """
-Embedding Service — Voyage AI only (voyage-3).
+Embedding Service — Provider-agnostic (Voyage AI or Nomic).
 
 Configuration (in .env):
-    VOYAGE_API_KEY=pa-...                    # Required
+    EMBEDDING_PROVIDER=voyage                # "voyage" or "nomic"
+    VOYAGE_API_KEY=pa-...                    # Required if provider is voyage
     VOYAGE_EMBEDDING_MODEL=voyage-3          # Optional, defaults to voyage-3
+    NOMIC_API_KEY=...                        # Required if provider is nomic
+    NOMIC_EMBEDDING_MODEL=nomic-embed-text-v1.5
 """
 
 import time
@@ -114,15 +117,9 @@ def _create_embedding_model() -> Any:
             dimensionality=dimensionality,
         )
     else:
-        # Fallback to OpenAI if configured
-        openai_api_key = settings.openai_api_key
-        if not openai_api_key:
-            raise ValueError(
-                f"Unsupported embedding provider '{provider}' and OPENAI_API_KEY is not set."
-            )
-        from langchain_openai import OpenAIEmbeddings
-        logger.info("Initializing OpenAI embeddings fallback")
-        return OpenAIEmbeddings(openai_api_key=openai_api_key)
+        raise ValueError(
+            f"Unsupported embedding provider '{provider}'. Supported providers: voyage, nomic"
+        )
 
 
 @lru_cache
