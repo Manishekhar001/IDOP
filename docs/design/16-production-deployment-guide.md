@@ -448,6 +448,25 @@ These secrets are injected as environment variables into the production `.env` f
 
 ---
 
+#### 🔐 Category 5: LLM Provider Keys
+
+These keys configure the LLM router for query processing. The LiteLLM Router load-balances across up to 4 Groq API keys for automatic failover on rate limits.
+
+| Secret Name | Example Value | Where to Get It | Used By |
+|:---|:---|:---|:---|
+| `GROQ_API_KEY_1` | `gsk_rSN16mFI...` | https://console.groq.com/keys (primary key) | `cd.yml` |
+| `GROQ_API_KEY_2` | `gsk_bVzJKuEj...` | https://console.groq.com/keys (additional key) | `cd.yml` |
+| `GROQ_API_KEY_3` | `gsk_TCgPCblU...` | https://console.groq.com/keys (additional key) | `cd.yml` |
+| `GROQ_API_KEY_4` | `gsk_54AMKJ14...` | https://console.groq.com/keys (additional key) | `cd.yml` |
+
+ℹ️ At least one Groq API key is **required** for LLM functionality. Multiple keys enable automatic load balancing and rate-limit failover. If not set, the app will still run but LLM features will fail.
+
+---
+
+#### 🔐 Category 6: Optional Caching Secrets
+
+---
+
 #### 🔐 Category 5: Optional Caching Secrets
 
 These are optional. If not set, the application will run without caching (slightly slower on repeated queries).
@@ -481,6 +500,28 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ QDRANT_URL                  │ ● Added                              │
 │ QDRANT_API_KEY              │ ● Added                              │
 │ SUPABASE_DB_URL             │ ● Added                              │
+└─────────────────────────────┴──────────────────────────────────────┘
+
+⬜ Required Secrets (16 total):
+┌─────────────────────────────┬──────────────────────────────────────┐
+│ Secret Name                 │ Status                               │
+├─────────────────────────────┼──────────────────────────────────────┤
+│ AWS_ACCESS_KEY_ID           │ ● Added                              │
+│ AWS_SECRET_ACCESS_KEY       │ ● Added                              │
+│ ECR_REGISTRY                │ ● Added                              │
+│ EC2_HOST                    │ ● Added                              │
+│ EC2_SSH_KEY                 │ ● Added                              │
+│ OPENAI_API_KEY              │ ● Added                              │
+│ NOMIC_API_KEY               │ ● Added                              │
+│ VOYAGE_API_KEY              │ ● Added                              │
+│ TAVILY_API_KEY              │ ● Added                              │
+│ QDRANT_URL                  │ ● Added                              │
+│ QDRANT_API_KEY              │ ● Added                              │
+│ SUPABASE_DB_URL             │ ● Added                              │
+│ GROQ_API_KEY_1              │ ● Added (at least one required)      │
+│ GROQ_API_KEY_2              │ ○ Optional (load balancing)          │
+│ GROQ_API_KEY_3              │ ○ Optional (load balancing)          │
+│ GROQ_API_KEY_4              │ ○ Optional (load balancing)          │
 └─────────────────────────────┴──────────────────────────────────────┘
 
 ⬜ Optional Secrets (3 total):

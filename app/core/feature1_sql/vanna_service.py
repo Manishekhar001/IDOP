@@ -574,9 +574,10 @@ class TextToSQLService:
                 logger.warning(
                     f"Vanna SQL generation failed: {vanna_err}. Falling back to direct LLM SQL generation..."
                 )
-                from openai import OpenAI
+                from langchain_core.messages import HumanMessage
+                from app.core.llm_factory import get_chat_llm
 
-                client = OpenAI(api_key=self.openai_api_key)
+                llm = get_chat_llm()
                 prompt = f"""
 You are a senior database administrator.
 Generate a PostgreSQL SQL query to answer the user question.
@@ -589,16 +590,8 @@ Question: {question}
 Respond strictly with the SQL query in a markdown code block starting with ```sql and ending with ```.
 Do not include any additional text outside the code block.
 """
-                response = client.chat.completions.create(
-                    model=settings.llm_model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=(
-                        vanna_temperature if vanna_temperature is not None else 0.0
-                    ),
-                    seed=vanna_seed if vanna_seed is not None else 42,
-                    top_p=vanna_top_p if vanna_top_p is not None else 0.1,
-                )
-                content = response.choices[0].message.content
+                response = await llm.ainvoke([HumanMessage(content=prompt)])
+                content = response.content
                 # Extract SQL
                 sql = None
                 if "```sql" in content.lower():

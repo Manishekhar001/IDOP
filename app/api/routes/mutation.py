@@ -172,12 +172,10 @@ async def upload_mutation(
                 detail=f"Spreadsheet contains {len(rows)} rows, which exceeds the allowed maximum of {limit} rows.",
             )
 
-        # 2. Column Mapping (synchronous OpenAI — offload to thread)
+        # 2. Column Mapping (semantic LLM matching)
         headers = list(rows[0].keys())
         if parsed_auto_map:
-            col_mappings = await asyncio.to_thread(
-                mapper.get_semantic_mapping, table_name, headers
-            )
+            col_mappings = await mapper.get_semantic_mapping(table_name, headers)
         else:
             col_mappings = {h: h for h in headers}
 
@@ -199,7 +197,7 @@ async def upload_mutation(
 
         # 4. Classify Mutation Type (INSERT, UPDATE, DELETE)
         classifier = OpClassifier()
-        op_type = await asyncio.to_thread(classifier.classify_operation, request_intent)
+        op_type = await classifier.classify_operation(request_intent)
 
         # Generate SQL
         sql = ""
@@ -217,10 +215,8 @@ async def upload_mutation(
                 table_name, mapped_rows, primary_key=pk
             )
 
-        # 5. LLM Judge Audit Check (synchronous OpenAI — offload to thread)
-        is_approved, explanation = await asyncio.to_thread(
-            judge.audit_mutation, request_intent, table_name, op_type
-        )
+        # 5. LLM Judge Audit Check (async)
+        is_approved, explanation = await judge.audit_mutation(request_intent, table_name, op_type)
         if not is_approved:
             validation_errors.append(f"Audit Warning: {explanation}")
 

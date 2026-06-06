@@ -583,10 +583,13 @@ jobs:
             EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-768}
 
             # Groq API Keys for LiteLLM Router
-            GROQ_API_KEY_1=${GROQ_API_KEY_1:-"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"}
-            GROQ_API_KEY_2=${GROQ_API_KEY_2:-"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"}
-            GROQ_API_KEY_3=${GROQ_API_KEY_3:-"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"}
-            GROQ_API_KEY_4=${GROQ_API_KEY_4:-"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"}
+            # Set as GitHub secrets (GROQ_API_KEY_1 through GROQ_API_KEY_4) to provide keys.
+            # If not set, these will be empty — the app will still run using the first
+            # available configuration path in llm_factory.py.
+            GROQ_API_KEY_1=${GROQ_API_KEY_1:-}
+            GROQ_API_KEY_2=${GROQ_API_KEY_2:-}
+            GROQ_API_KEY_3=${GROQ_API_KEY_3:-}
+            GROQ_API_KEY_4=${GROQ_API_KEY_4:-}
 
             # Runtime state
             ENVIRONMENT=production

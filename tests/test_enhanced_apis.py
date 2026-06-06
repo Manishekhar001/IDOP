@@ -4,6 +4,7 @@ Unit tests for IDOP enhanced API responses and detail schemas.
 
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
+import asyncio
 from fastapi.testclient import TestClient
 
 from app.api.schemas import ChatResponse, MutationResponse
@@ -237,7 +238,7 @@ class TestEnhancedApiEndpoints:
         mock_mapper.get_semantic_mapping.return_value = {"id": "id", "name": "name"}
         mock_validator.validate_rows.return_value = (True, [])
         mock_generator.generate_insert.return_value = ("INSERT INTO products", [])
-        mock_judge.audit_mutation.return_value = (True, "Approved")
+        mock_judge.audit_mutation = AsyncMock(return_value=(True, "Approved"))
         mock_gate.generate_session.return_value = "gate-token-xyz"
 
         file_data = {"file": ("mut.csv", b"id,name\n1,Prod1", "text/csv")}

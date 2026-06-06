@@ -75,7 +75,7 @@ async def router_node(state: CSRAGState) -> dict:
     )
     question = last_human.content if last_human else ""
     router = QueryRouter()
-    query_type = await asyncio.to_thread(router.route_query, question)
+    query_type = await router.route_query(question)
     return {"query_type": query_type, "question": question}
 
 
@@ -121,9 +121,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             }
 
         # Run semantic audit judge
-        is_correct, explanation = await asyncio.to_thread(
-            judge.judge_sql, question, sql
-        )
+        is_correct, explanation = await judge.judge_sql(question, sql)
         if not is_correct:
             logger.warning(f"SQL semantic failure: {explanation}")
             # Still offer with warning or mark rejected
@@ -203,7 +201,7 @@ async def mutation_node(state: CSRAGState) -> dict:
         # Classify operation if not pre-set (runs synchronously — offload to thread)
         if not op_type and question:
             classifier = OpClassifier()
-            op_type = await asyncio.to_thread(classifier.classify_operation, question)
+            op_type = await classifier.classify_operation(question)
 
         # Guide user for bulk operations that need file upload
         if not table_name or not rows:
@@ -244,8 +242,8 @@ async def mutation_node(state: CSRAGState) -> dict:
             sql, ids = generator.generate_delete(table_name, rows, primary_key=pk)
 
         # LLM Judge audit (synchronous OpenAI call — offload to thread)
-        is_approved, explanation = await asyncio.to_thread(
-            judge.audit_mutation, question, table_name, op_type
+        is_approved, explanation = await judge.audit_mutation(
+            question, table_name, op_type
         )
         if not is_approved:
             validation_errors.append(f"Audit Warning: {explanation}")

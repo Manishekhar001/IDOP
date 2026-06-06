@@ -1,12 +1,45 @@
-import json
 import logging
-from openai import OpenAI
 from typing import Dict, List
+from pydantic import BaseModel, Field
+from langchain_core.prompts import ChatPromptTemplate
+from app.core.llm_factory import get_memory_llm
 from app.opik import track
-from app.config import get_settings
 from app.core.schema_registry import TABLE_SCHEMAS
 
 logger = logging.getLogger("idop_app.column_mapper")
+
+
+class MappingResult(BaseModel):
+    mappings: Dict[str, str] = Field(
+        ..., description="Mapping from spreadsheet column names to database column names."
+    )
+    confidence: float = Field(
+        ..., description="Confidence score between 0.0 and 1.0."
+    )
+    requires_review: bool = Field(
+        ..., description="Whether the mapping requires human review."
+    )
+
+
+_COLUMN_MAP_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are an expert data migration specialist.\n"
+            "Map the following user-supplied spreadsheet column headers to target database columns.\n"
+            "Establish matches using semantic meaning (e.g. 'Unit Price (USD)' maps to 'price', "
+            "'Stock Qty' maps to 'stock_quantity').\n"
+            "Do not match if there is no sensible mapping.",
+        ),
+        (
+            "human",
+            "Target DB Table: {table_name}\n"
+            "Target DB Columns: {db_columns}\n"
+            "\n"
+            "Spreadsheet Columns: {file_headers}",
+        ),
+    ]
+)
 
 
 class ColumnMapper:
@@ -15,12 +48,13 @@ class ColumnMapper:
     """
 
     def __init__(self):
-        settings = get_settings()
-        self.client = OpenAI(api_key=settings.openai_api_key)
-        self.model = settings.memory_llm_model
+        self.llm = get_memory_llm()
+        self._chain = _COLUMN_MAP_PROMPT | self.llm.with_structured_output(
+            MappingResult
+        )
 
     @track(name="column_mapper_map")
-    def get_semantic_mapping(
+    async def get_semantic_mapping(
         self, table_name: str, file_headers: List[str]
     ) -> Dict[str, str]:
         """
@@ -33,41 +67,18 @@ class ColumnMapper:
                 f"Target table '{table_name}' is not supported for mutations."
             )
 
-        prompt = f"""
-You are an expert data migration specialist.
-Map the following user-supplied spreadsheet column headers to target database columns.
-
-Target DB Table: {table_name}
-Target DB Columns: {db_columns}
-
-Spreadsheet Columns: {file_headers}
-
-Establish matches using semantic meaning (e.g. "Unit Price (USD)" maps to "price", "Stock Qty" maps to "stock_quantity", "Segment" maps to "segment", etc.).
-Do not match if there is no sensible mapping.
-
-Respond strictly in this JSON format:
-{{
-  "mappings": {{
-    "spreadsheet_column_name_1": "db_column_name_1",
-    "spreadsheet_column_name_2": "db_column_name_2"
-  }},
-  "confidence": 0.0 to 1.0,
-  "requires_review": true/false
-}}
-"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-                response_format={"type": "json_object"},
+            result: MappingResult = await self._chain.ainvoke(
+                {
+                    "table_name": table_name,
+                    "db_columns": db_columns,
+                    "file_headers": file_headers,
+                }
             )
-            result = json.loads(response.choices[0].message.content)
-            mappings = result.get("mappings", {})
             logger.info(
-                f"Generated semantic column mapping for {table_name}: {mappings}"
+                f"Generated semantic column mapping for {table_name}: {result.mappings}"
             )
-            return mappings
+            return result.mappings
         except Exception as e:
             logger.error(f"Failed to generate semantic column mapping: {e}")
             # Fallback to direct casing / basic strip matching
