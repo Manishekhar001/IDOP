@@ -16,13 +16,18 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    # Strip torch test suite (~1.5GB on Linux) — not needed at runtime
+    rm -rf /opt/venv/lib/python3.12/site-packages/torch/test/ && \
+    # Remove pip cache and __pycache__ to further reduce image size
+    find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Notes:
 # - CPU-only PyTorch: torch and torchvision installed FIRST from the CPU-only index.
 #   This prevents PyPI from pulling in CUDA-compiled torchvision (~1.5-2GB CUDA
 #   runtime) which is incompatible with CPU-only torch (torchvision::nms error).
-# - EC2 t2.micro has no GPU — CPU-only is sufficient for docling PDF parsing.
+# - EC2 t2.micro has no GPU (6.7GB disk) — CPU-only is sufficient for docling PDF parsing.
+# - torch test/ dir removed to keep image under EC2 disk constraints.
 # - torch/torchvision removed from requirements.txt to prevent PyPI override.
 
 
