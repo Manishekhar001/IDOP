@@ -38,63 +38,55 @@ class DocumentProcessor:
 
     def _load_pdf(self, file_path: Path) -> list[Document]:
         """
-        Load and chunk a PDF using Docling with structure-preserving HybridChunker.
+        Extract text from a PDF using pypdf.
 
-        Uses docling.document_converter for high-fidelity document parsing, then
-        docling.chunking.HybridChunker to split into semantically meaningful chunks
-        that preserve headings, tables, and lists — unlike RecursiveCharacterTextSplitter
-        which splits blindly by character count.
+        Uses pypdf.PdfReader for lightweight text extraction from born-digital
+        (text-based) PDFs. Does NOT use torch, OCR, or ML models — eliminates
+        OOM kills on t2.micro (1 GB RAM) which occurred with docling's torch-
+        based layout detection models.
+
+        NOTE: pypdf extracts raw text in reading order. Tables with visible
+        borders are extracted row-by-row but column alignment is not preserved.
+        For structured table extraction, consider replacing with pdfplumber.
+
+        DOCLING CODE DELETED (2026-06-07): The previous implementation used
+        docling's DocumentConverter + HybridChunker for ML-powered layout
+        analysis. It was removed because torch + docling consumed ~1 GB RAM
+        causing OOM kills on t2.micro (1 GB). See git history for the
+        original implementation.
         """
-        logger.info(f"Loading PDF with Docling: {file_path.name}")
+        logger.info(f"Loading PDF with pypdf: {file_path.name}")
         try:
-            from docling.document_converter import DocumentConverter
-            from docling.chunking import HybridChunker
+            import pypdf
         except ImportError as e:
             raise ImportError(
-                f"Docling PDF processing dependencies not available: {e}. "
-                "Ensure 'docling' and 'transformers>=4.42.0,<4.57.0' are installed. "
-                "In Docker, also install: apt-get install -y libgl1 libglib2.0-0"
+                f"pypdf not available: {e}. Install with: pip install pypdf>=3.0.0"
             ) from e
 
-        try:
-            converter = DocumentConverter()
-            result = converter.convert(str(file_path))
-        except Exception as e:
-            err_msg = str(e)
-            if "AutoProcessor" in err_msg or "Could not import" in err_msg:
-                raise RuntimeError(
-                    f"Docling PDF conversion failed due to missing system dependencies: {e}. "
-                    "In Docker, ensure 'libgl1' and 'libglib2.0-0' are installed. "
-                    "Also verify transformers>=4.42.0,<4.57.0 is installed."
-                ) from e
-            raise
-        docling_doc = result.document
+        reader = pypdf.PdfReader(str(file_path))
+        all_text: list[str] = []
+        for page_num, page in enumerate(reader.pages):
+            text = page.extract_text() or ""
+            if text.strip():
+                all_text.append(text)
 
-        # Use Docling's HybridChunker for structure-preserving chunking
-        chunker = HybridChunker(
-            max_tokens=self.chunk_size,
-            overlap_tokens=self.chunk_overlap,
+        if not all_text:
+            logger.warning(f"No text extracted from {file_path.name} — may be a scanned PDF")
+            return []
+
+        full_text = "\n\n".join(all_text)
+        doc = Document(
+            page_content=full_text,
+            metadata={
+                "source": file_path.name,
+                "pages": len(reader.pages),
+            },
         )
-        chunk_iter = chunker.chunk(docling_doc)
-
-        docs = []
-        for i, chunk in enumerate(chunk_iter):
-            text = chunk.text if hasattr(chunk, "text") else str(chunk)
-            doc = Document(
-                page_content=text,
-                metadata={
-                    "source": file_path.name,
-                    "index": i,
-                    "chunk_type": "structure_preserving",
-                },
-            )
-            docs.append(doc)
-
         logger.info(
-            f"Loaded and chunked {file_path.name} into {len(docs)} structure-preserving chunks "
-            f"using Docling HybridChunker"
+            f"Loaded {file_path.name}: {len(reader.pages)} pages, "
+            f"{len(full_text)} chars extracted"
         )
-        return docs
+        return [doc]
 
     def _load_text(self, file_path: Path) -> list[Document]:
         logger.info(f"Loading text: {file_path.name}")
@@ -181,14 +173,11 @@ class DocumentProcessor:
     def process_upload(self, file: BinaryIO, filename: str) -> list[Document]:
         """Process a file upload from a BinaryIO stream.
 
-        For PDFs loaded via Docling HybridChunker, the documents are
-        returned already structure-preserving chunked, so we skip the
-        generic split_documents step to avoid double-chunking.
-        For TXT and CSV files, we split using the text splitter as before.
+        All file types (PDF, TXT, CSV) are split using the text splitter.
+        PDFs are no longer pre-chunked by docling's HybridChunker — pypdf
+        returns raw full-page text, so splitting is required for all types.
         """
         docs = self.load_from_upload(file, filename)
-        if Path(filename).suffix.lower() == ".pdf":
-            return docs  # Already chunked by Docling HybridChunker
         return self.split_documents(docs)
 
     @track(name="document_processor_process")
@@ -197,9 +186,9 @@ class DocumentProcessor:
         Process a file upload from raw bytes, avoiding redundant BytesIO wrapping.
         Writes to a single temp file for the underlying loader to read.
 
-        For PDFs loaded via Docling HybridChunker, the documents are
-        returned already structure-preserving chunked, so we skip the
-        generic split_documents step to avoid double-chunking.
+        All file types (PDF, TXT, CSV) are split using the text splitter.
+        PDFs are no longer pre-chunked by docling's HybridChunker — pypdf
+        returns raw full-page text, so splitting is required for all types.
         """
         ext = Path(filename).suffix.lower()
         if ext not in self.SUPPORTED_EXTENSIONS:
@@ -215,8 +204,6 @@ class DocumentProcessor:
             docs = self.load_file(tmp_path)
             for doc in docs:
                 doc.metadata["source"] = filename
-            if ext == ".pdf":
-                return docs  # Already chunked by Docling HybridChunker
             return self.split_documents(docs)
         finally:
             Path(tmp_path).unlink(missing_ok=True)

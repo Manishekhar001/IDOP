@@ -6,8 +6,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
-    libgl1-mesa-dev \
-    libglib2.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -15,12 +13,7 @@ COPY requirements.txt .
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt && \
-    # Strip torch test suite (~1.5GB on Linux) — not needed at runtime
-    rm -rf /opt/venv/lib/python3.12/site-packages/torch/test/ && \
-    # Strip torchvision test suite as well
-    rm -rf /opt/venv/lib/python3.12/site-packages/torchvision/test/ 2>/dev/null || true && \
     # Remove .pyc bytecode files and __pycache__ directories
     find /opt/venv -name '*.pyc' -delete && \
     find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
@@ -28,12 +21,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
     rm -rf /root/.cache/pip 2>/dev/null || true
 
 # Notes:
-# - CPU-only PyTorch: torch and torchvision installed FIRST from the CPU-only index.
-#   This prevents PyPI from pulling in CUDA-compiled torchvision (~1.5-2GB CUDA
-#   runtime) which is incompatible with CPU-only torch (torchvision::nms error).
-# - EC2 t2.micro has no GPU (6.7GB disk) — CPU-only is sufficient for docling PDF parsing.
-# - torch test/ dir removed to keep image under EC2 disk constraints.
-# - torch/torchvision removed from requirements.txt to prevent PyPI override.
+# - docling + torch/torchvision REMOVED (2026-06-07): The previous implementation
+#   used docling + torch for ML-powered PDF layout analysis and OCR, which consumed
+#   ~1 GB RAM and caused OOM kills on t2.micro (1 GB). Replaced with pypdf for
+#   lightweight text-only extraction — no ML models, no torch, no OpenCV deps.
+#   See git history for the original implementation.
 
 
 # Production stage
@@ -50,8 +42,6 @@ ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     libmagic1 \
-    libgl1 \
-    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appgroup && useradd -r -m -g appgroup appuser

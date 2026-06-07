@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDOP — Complete Documentation</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1c25;
+    --bg3: #242736;
+    --text: #e1e4eb;
+    --text2: #9498a8;
+    --accent: #6c8aff;
+    --accent2: #4ade80;
+    --accent3: #f59e0b;
+    --accent4: #f472b6;
+    --accent5: #a78bfa;
+    --border: #2e3144;
+    --sql: #6c8aff;
+    --mut: #f472b6;
+    --rag: #4ade80;
+    --chat: #f59e0b;
+    --hyb: #a78bfa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    display: flex;
+  }
+  nav {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 280px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 100;
+  }
+  nav .logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  nav .logo h1 { font-size: 18px; color: var(--accent); }
+  nav .logo p { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  nav a {
+    display: block;
+    padding: 8px 20px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 14px;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+  }
+  nav a:hover, nav a.active { color: var(--text); background: var(--bg3); }
+  nav a.section { font-weight: 600; color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; }
+  nav a.section:hover { color: var(--accent); background: transparent; }
+  main {
+    margin-left: 280px;
+    padding: 40px 60px;
+    max-width: 1000px;
+  }
+  h1 { font-size: 36px; margin-bottom: 8px; color: var(--accent); }
+  h2 { font-size: 26px; margin: 48px 0 16px; color: var(--text); border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 20px; margin: 32px 0 12px; color: var(--accent); }
+  h4 { font-size: 17px; margin: 24px 0 8px; color: var(--text); }
+  p { margin: 12px 0; color: var(--text2); }
+  code {
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+  }
+  th {
+    background: var(--bg3);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  td { color: var(--text2); }
+  tr:hover td { background: var(--bg2); }
+  ul, ol { margin: 12px 0; padding-left: 24px; color: var(--text2); }
+  li { margin: 6px 0; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-sql { background: rgba(108,138,255,0.2); color: var(--sql); }
+  .badge-mut { background: rgba(244,114,182,0.2); color: var(--mut); }
+  .badge-rag { background: rgba(74,222,128,0.2); color: var(--rag); }
+  .badge-chat { background: rgba(245,158,11,0.2); color: var(--chat); }
+  .badge-hyb { background: rgba(167,139,250,0.2); color: var(--hyb); }
+  .info {
+    background: rgba(108,138,255,0.1);
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 16px 0;
+    color: var(--text2);
+  }
+  .warning {
+    background: rgba(245,158,11,0.1);
+    border-left: 4px solid var(--accent3);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 16px 0;
+    color: var(--text2);
+  }
+  .flow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 16px 0;
+  }
+  .flow-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text);
+    text-align: center;
+  }
+  .flow-arrow { color: var(--text2); font-size: 18px; }
+  .flow-item.sql { border-color: var(--sql); }
+  .flow-item.mut { border-color: var(--mut); }
+  .flow-item.rag { border-color: var(--rag); }
+  .flow-item.chat { border-color: var(--chat); }
+  .flow-item.hyb { border-color: var(--hyb); }
+  .timeline {
+    position: relative;
+    padding-left: 30px;
+    margin: 16px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 10px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .tl-item {
+    position: relative;
+    padding: 10px 0;
+    color: var(--text2);
+    font-size: 14px;
+  }
+  .tl-item::before {
+    content: attr(data-num);
+    position: absolute;
+    left: -24px;
+    width: 22px; height: 22px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .tl-item.sql::before { background: var(--sql); }
+  .tl-item.mut::before { background: var(--mut); }
+  .tl-item.rag::before { background: var(--rag); }
+  .tl-item.chat::before { background: var(--chat); }
+  .tl-item.hyb::before { background: var(--hyb); }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card h4 { margin-top: 0; color: var(--accent); }
+  .card p { font-size: 14px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px; }
+  .tag-groq { background: rgba(74,222,128,0.2); color: #4ade80; }
+  .tag-openai { background: rgba(108,138,255,0.2); color: #6c8aff; }
+  .tag-redis { background: rgba(245,158,11,0.2); color: #f59e0b; }
+  .tag-s3 { background: rgba(167,139,250,0.2); color: #a78bfa; }
+  .tag-pg { background: rgba(59,130,246,0.2); color: #3b82f6; }
+  .tag-qdrant { background: rgba(244,114,182,0.2); color: #f472b6; }
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .compare > div { padding: 12px 16px; }
+  .compare-header { background: var(--bg3); font-weight: 600; color: var(--text); }
+  .compare-l { border-right: 1px solid var(--border); }
+  .compare:nth-child(odd) > div { background: var(--bg2); }
+  .example-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .example-box .q { color: var(--accent3); font-weight: 600; }
+  .example-box .a { color: var(--rag); }
+  .example-box .step { color: var(--text2); font-size: 14px; margin: 4px 0; }
+  /* Search Bar */
+  .search-container {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    padding: 16px 0 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-input {
+    width: 100%;
+    padding: 12px 16px 12px 44px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(108,138,255,0.15);
+  }
+  .search-input::placeholder { color: var(--text2); }
+  .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text2);
+    font-size: 18px;
+    pointer-events: none;
+  }
+  .search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 18px;
+    cursor: pointer;
+    display: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .search-clear:hover { color: var(--text); }
+  .search-clear.visible { display: block; }
+  .search-count {
+    font-size: 13px;
+    color: var(--text2);
+    padding: 8px 0 0;
+    display: none;
+  }
+  .search-count.visible { display: block; }
+  section { scroll-margin-top: 80px; }
+  .search-hidden { display: none !important; }
+
+  @media (max-width: 768px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 20px; }
+    .grid2 { grid-template-columns: 1fr; }
+    .compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<nav id="sidebar">
+  <div class="logo">
+    <h1>IDOP Docs</h1>
+    <p>Intelligent Data Operations Platform</p>
+  </div>
+  <a href="#overview" class="section">Overview</a>
+  <a href="#overview">Introduction</a>
+  <a href="#tech-stack">Tech Stack</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#architecture">System Architecture</a>
+  <a href="#router" class="section">5-Path Router</a>
+  <a href="#router">Router Overview</a>
+  <a href="#path-sql">SQL Path</a>
+  <a href="#path-mutation">Mutation Path</a>
+  <a href="#path-rag">RAG Path</a>
+  <a href="#path-chat">CHAT Path</a>
+  <a href="#path-hybrid">HYBRID Path</a>
+  <a href="#feature1" class="section">Feature 1: Text-to-SQL</a>
+  <a href="#feature2" class="section">Feature 2: Mutations</a>
+  <a href="#feature3" class="section">Feature 3: RAG</a>
+  <a href="#memory">Memory System</a>
+  <a href="#caching">Caching System</a>
+  <a href="#embeddings">Embeddings</a>
+  <a href="#llm">LLM Chain</a>
+  <a href="#external">External Services</a>
+  <a href="#api">API Reference</a>
+  <a href="#config">Configuration</a>
+  <a href="#schema">Database Schema</a>
+  <a href="#testing">Testing & Dev</a>
+  <a href="#errors">Error Handling</a>
+  <a href="#security">Security Model</a>
+  <a href="#performance">Performance</a>
+  <a href="#vanna">Vanna vs Fallback</a>
+  <a href="#examples">Real Examples</a>
+</nav>
+
+<main>
+
+<!-- Search Bar -->
+<div class="search-container">
+  <span class="search-icon">🔍</span>
+  <input class="search-input" id="searchInput" type="text" placeholder="Search documentation... (e.g., SQL, mutation, Vanna, CRAG, approval...)" autocomplete="off">
+  <button class="search-clear" id="searchClear">✕</button>
+  <div class="search-count" id="searchCount"></div>
+</div>
+
+<!-- ═══════ OVERVIEW ═══════ -->
+<h1 id="top">IDOP — Intelligent Data Operations Platform</h1>
+<p style="font-size:18px;color:var(--text);margin-bottom:32px;">
+A complete enterprise platform that lets you ask questions in plain English and get answers from your database, documents, or both — with built-in safeguards for data mutations.
+</p>
+
+<h2 id="overview">What is IDOP?</h2>
+<p>
+IDOP is a FastAPI-based backend that combines three major capabilities into one unified system:
+</p>
+<ul>
+  <li><strong>Text-to-SQL</strong> — Ask "How many customers are there?" and get the answer directly from your database</li>
+  <li><strong>Spreadsheet Mutations</strong> — Upload an Excel file to insert, update, or delete rows with business rule validation and human approval</li>
+  <li><strong>Advanced RAG</strong> — Upload PDFs and ask questions about them, with automatic web search fallback when documents don't have the answer</li>
+</ul>
+<p>
+All three are connected through a <strong>smart 5-path router</strong> that automatically decides which pipeline to use based on your question.
+</p>
+
+<h3>Why was IDOP built?</h3>
+<p>
+Most business data lives in two places: <strong>structured databases</strong> (PostgreSQL tables with rows and columns) and <strong>unstructured documents</strong> (PDFs, TXTs, CSVs with policies and guidelines). Typically you need SQL knowledge for the first and manual searching for the second.
+</p>
+<p>
+IDOP bridges both worlds by using LLMs to understand natural language, generate the right queries, search the right documents, and synthesize answers — all with human-in-the-loop safeguards for data-modifying operations.
+</p>
+
+<h3 id="tech-stack">Technology Stack</h3>
+<table>
+  <tr><th>Category</th><th>Technology</th><th>Purpose</th></tr>
+  <tr><td>Backend Framework</td><td>FastAPI + Uvicorn</td><td>ASGI web server for API endpoints</td></tr>
+  <tr><td>State Machine</td><td>LangGraph</td><td>5-path graph-based pipeline execution</td></tr>
+  <tr><td>LLM Orchestration</td><td>LiteLLM Router</td><td>Multi-key load balancing across Groq</td></tr>
+  <tr><td>Primary LLM</td><td>Groq (llama-3.3-70b-versatile)</td><td>Heavy tasks: routing, answering, SQL generation</td></tr>
+  <tr><td>Light LLM</td><td>Groq (llama-3.3-70b-versatile)</td><td>Light tasks: judging, classification, summaries</td></tr>
+  <tr><td>SQL Engine</td><td>Vanna AI (gpt-4o-mini) + Groq fallback</td><td>Natural language to SQL generation</td></tr>
+  <tr><td>Vector Database</td><td>Qdrant Cloud</td><td>Hybrid dense + sparse vector search</td></tr>
+  <tr><td>Main Database</td><td>PostgreSQL (Supabase)</td><td>Company data + checkpointer + store</td></tr>
+  <tr><td>Query Cache</td><td>Upstash Redis</td><td>Fast key-value caching with local fallback</td></tr>
+  <tr><td>Document Cache</td><td>AWS S3 / Local filesystem</td><td>Persist chunked document embeddings</td></tr>
+  <tr><td>Embeddings</td><td>Nomic / Voyage AI</td><td>Convert text to vector embeddings</td></tr>
+  <tr><td>Web Search</td><td>Tavily AI</td><td>Real-time web search for RAG fallback</td></tr>
+  <tr><td>Container</td><td>Docker + Docker Compose</td><td>Containerized deployment</td></tr>
+  <tr><td>CI/CD</td><td>GitHub Actions</td><td>Automated testing + deployment</td></tr>
+  <tr><td>Monitoring</td><td>Opik (optional)</td><td>LLM observability and tracing</td></tr>
+</table>
+
+<!-- ═══════ ARCHITECTURE ═══════ -->
+<h2 id="architecture">System Architecture</h2>
+<p>
+When you send a request to <code>POST /chat</code>, here's the journey it takes through the system:
+</p>
+
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item">User Query</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">LTM Recall</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item sql">Router<br><small>(LLM Classifier)</small></div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:none;padding:4px;">
+    <div class="flow-item sql" style="font-size:12px;padding:4px 10px;">SQL Path</div>
+    <div class="flow-item mut" style="font-size:12px;padding:4px 10px;">Mutation Path</div>
+    <div class="flow-item rag" style="font-size:12px;padding:4px 10px;">RAG Path</div>
+    <div class="flow-item chat" style="font-size:12px;padding:4px 10px;">CHAT Path</div>
+    <div class="flow-item hyb" style="font-size:12px;padding:4px 10px;">HYBRID Path</div>
+  </div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">STM Save</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Response</div>
+</div>
+
+<h3>Request Lifecycle (Step by Step)</h3>
+<div class="timeline">
+  <div class="tl-item" data-num="1"><strong>User sends query</strong> — <code>POST /chat</code> with question, thread_id, user_id</div>
+  <div class="tl-item" data-num="2"><strong>Router node</strong> — LLM classifies the query into SQL, MUTATION, RAG, CHAT, or HYBRID</div>
+  <div class="tl-item" data-num="3"><strong>LTM Recall</strong> — For RAG path: loads user's long-term memories from Postgres</div>
+  <div class="tl-item" data-num="4"><strong>Pipeline execution</strong> — The classified path runs its full pipeline</div>
+  <div class="tl-item" data-num="5"><strong>STM Save</strong> — Conversation is summarized and stored for next turn</div>
+  <div class="tl-item" data-num="6"><strong>Response returned</strong> — Natural language answer with sources, SQL, and metrics</div>
+</div>
+
+<!-- ═══════ 5-PATH ROUTER ═══════ -->
+<h2 id="router">The 5-Path Semantic Router</h2>
+<p>
+The router is the brain of IDOP. It uses an LLM to classify every incoming question into one of five paths. Here's how it decides:
+</p>
+
+<div class="grid2">
+  <div class="card">
+    <span class="badge badge-sql">SQL</span>
+    <h4>Data Query</h4>
+    <p>Questions about data in database tables (customers, products, orders). E.g. "How many customers are in Canada?"</p>
+  </div>
+  <div class="card">
+    <span class="badge badge-mut">MUTATION</span>
+    <h4>Data Modification</h4>
+    <p>Requests to insert, update, or delete data. E.g. "Update prices for all products in category X"</p>
+  </div>
+  <div class="card">
+    <span class="badge badge-rag">RAG</span>
+    <h4>Document Search</h4>
+    <p>Questions about uploaded documents (PDFs, TXTs). E.g. "What does the refund policy say?"</p>
+  </div>
+  <div class="card">
+    <span class="badge badge-chat">CHAT</span>
+    <h4>General Chat</h4>
+    <p>Greetings, help questions, or anything not needing DB or documents. E.g. "Hello! Who are you?"</p>
+  </div>
+  <div class="card" style="grid-column:1/-1;">
+    <span class="badge badge-hyb">HYBRID</span>
+    <h4>Combined SQL + RAG</h4>
+    <p>Questions needing BOTH database data AND document context. E.g. "Are our sales numbers following the discount policy?"</p>
+  </div>
+</div>
+
+<h3>Router Prompt (Exact)</h3>
+<p>The router uses a specific prompt to classify queries. It analyzes the question and returns one of: SQL, MUTATION, RAG, CHAT, or HYBRID.</p>
+<pre><code>Route decisions:
+1. SQL: Fetching, querying, summarizing, or analyzing transactional data
+   from database tables (products, customers, orders).
+2. MUTATION: Performing modifications like inserting, updating, loading or
+   deleting rows from tables, especially triggered by spreadsheets.
+3. RAG: Searching for knowledge, policies, guidelines, or non-tabular
+   instructions in PDFs or TXT documents.
+4. CHAT: General conversational phrases, greetings, help questions, system
+   status, or other miscellaneous queries.
+5. HYBRID: Queries that require BOTH querying transactional database tables
+   and searching for knowledge/guidelines in documents.</code></pre>
+
+<!-- ═══════ PATH: SQL ═══════ -->
+<h2 id="path-sql">Path 1: SQL — Querying Data</h2>
+<span class="badge badge-sql">SQL</span>
+<p>When the router detects a data question, it sends the query through the SQL pipeline.</p>
+
+<h3>Trigger Examples</h3>
+<ul>
+  <li>"How many customers are there?"</li>
+  <li>"Show me all products priced above $100"</li>
+  <li>"What's the total revenue by customer segment?"</li>
+  <li>"List orders from last month"</li>
+</ul>
+
+<h3>Pipeline Flow</h3>
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item sql">Router→SQL</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Schema<br>Context</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Vanna<br>Generator</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--accent3);">Fallback<br>Groq LLM</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">SQL<br>Validator</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">LLM<br>Judge</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Auto-Execute<br>SELECT</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">NL Answer</div>
+</div>
+
+<h3>Step-by-Step Timeline</h3>
+<div class="timeline">
+  <div class="tl-item sql" data-num="1"><strong>Router classifies</strong> as SQL → sends to <code>sql_generation_node</code></div>
+  <div class="tl-item sql" data-num="2"><strong>Schema context built</strong> — <code>VannaService</code> connects to PostgreSQL, queries <code>information_schema</code> for all tables, columns, types, and foreign keys. Builds a text description of the database.</div>
+  <div class="tl-item sql" data-num="3"><strong>SQL generation</strong> — Tries Vanna first (<code>gpt-4o-mini</code> via OpenAI). If Vanna fails (no credits, network error), falls back to <code>get_chat_llm()</code> (Groq) with the same schema context prompt.</div>
+  <div class="tl-item sql" data-num="4"><strong>Safety validation</strong> — <code>SQLValidator</code> checks: only SELECT allowed, no DROP/ALTER/DELETE/INSERT, no COMMIT/ROLLBACK</div>
+  <div class="tl-item sql" data-num="5"><strong>LLM Judge audit</strong> — <code>LLMJudge</code> checks if the generated SQL semantically matches the user's question (correct tables, columns, joins, filters)</div>
+  <div class="tl-item sql" data-num="6"><strong>Auto-execute SELECT</strong> — If SELECT + Judge approved: automatically runs the SQL against PostgreSQL, converts results to CSV, asks the LLM to generate a natural language answer citing specific numbers</div>
+  <div class="tl-item sql" data-num="7"><strong>Fallback for non-SELECT</strong> — INSERT/UPDATE/DELETE or failed auto-execute: stores in pending queue with cryptographic approval token, requires manual <code>POST /sql/approve</code></div>
+</div>
+
+<h3>Real Example</h3>
+<div class="example-box">
+  <div class="q">Question: "How many customers are in Canada?"</div>
+  <div class="step">1. Router classifies → SQL</div>
+  <div class="step">2. Vanna tries → fails (no OpenAI credits)</div>
+  <div class="step">3. Fallback Groq LLM generates: <code>SELECT COUNT(*) FROM customers WHERE country = 'Canada';</code></div>
+  <div class="step">4. SQLValidator: ✅ SELECT-only, safe</div>
+  <div class="step">5. LLM Judge: ✅ Correct semantic match</div>
+  <div class="step">6. Auto-execute: Query runs → returns 42</div>
+  <div class="a">Answer: "There are 42 customers located in Canada."</div>
+</div>
+
+<!-- ═══════ PATH: MUTATION ═══════ -->
+<h2 id="path-mutation">Path 2: MUTATION — Modifying Data</h2>
+<span class="badge badge-mut">MUTATION</span>
+<p>When the router detects a data modification request, it sends through the mutation pipeline. This always requires a file upload (Excel/CSV) and human approval.</p>
+
+<h3>Trigger Examples</h3>
+<ul>
+  <li>"Add these new products to the database" (with Excel file)</li>
+  <li>"Update customer segments" (with CSV file)</li>
+  <li>"Delete outdated orders" (with list of order IDs)</li>
+</ul>
+
+<h3>Pipeline Flow</h3>
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item mut">Upload<br>File</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">File<br>Parser</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Column<br>Mapper</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Rule<br>Validator</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Op<br>Classifier</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">LLM<br>Judge</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">SQL<br>Generator</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Pending<br>Approval</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Execute<br>Transaction</div>
+</div>
+
+<h3>Step-by-Step Timeline</h3>
+<div class="timeline">
+  <div class="tl-item mut" data-num="1"><strong>Router classifies</strong> as MUTATION → guides user to <code>POST /mutation/upload</code></div>
+  <div class="tl-item mut" data-num="2"><strong>File upload</strong> — User uploads Excel (.xlsx/.xls) or CSV file with target table name and intent description</div>
+  <div class="tl-item mut" data-num="3"><strong>File parser</strong> — <code>FileParser</code> reads the file using pandas, converts to list of dict rows, validates size limits (max 1000 rows by default)</div>
+  <div class="tl-item mut" data-num="4"><strong>Column mapping</strong> — <code>ColumnMapper</code> uses LLM to semantically match spreadsheet column headers to database columns (e.g. "Unit Price (USD)" → "price")</div>
+  <div class="tl-item mut" data-num="5"><strong>Rule validation</strong> — <code>RuleValidator</code> checks each row against business rules in <code>business_rules/rules.json</code> (price > 0, valid email format, allowed enum values)</div>
+  <div class="tl-item mut" data-num="6"><strong>Operation classification</strong> — <code>OpClassifier</code> uses LLM to determine if the intent is INSERT, UPDATE, or DELETE</div>
+  <div class="tl-item mut" data-num="7"><strong>SQL generation</strong> — <code>MutationGenerator</code> creates parameterized SQL statements (INSERT bulk, UPDATE per-row, DELETE bulk)</div>
+  <div class="tl-item mut" data-num="8"><strong>LLM Judge audit</strong> — <code>MutationLLMJudge</code> reviews the planned mutation for safety and business alignment</div>
+  <div class="tl-item mut" data-num="9"><strong>Approval token</strong> — Cryptographic single-use token generated, mutation stored in pending queue</div>
+  <div class="tl-item mut" data-num="10"><strong>Human approves</strong> — <code>POST /mutation/approve</code> with token executes inside an all-or-nothing database transaction</div>
+</div>
+
+<h3>Business Rules (business_rules/rules.json)</h3>
+<pre><code>{
+  "max_bulk_rows": 1000,
+  "allowed_mutation_tables": ["products", "customers", "orders"],
+  "require_confirmation_ops": ["DELETE"],
+  "field_validation_rules": {
+    "products": {
+      "price": { "type": "numeric", "min": 0.01 },
+      "stock_quantity": { "type": "integer", "min": 0 }
+    },
+    "customers": {
+      "email": { "type": "regex", "pattern": "^[a-zA-Z0-9_.+-]+@..." },
+      "segment": { "type": "enum", "allowed": ["SMB","Enterprise","Individual"] }
+    },
+    "orders": {
+      "total_amount": { "type": "numeric", "min": 0.0 },
+      "status": { "type": "enum", "allowed": ["Pending","Delivered","Cancelled","Processing"] }
+    }
+  }
+}</code></pre>
+
+<h3>Real Example</h3>
+<div class="example-box">
+  <div class="q">Upload: "products" table, intent "Add new products", with Excel file</div>
+  <div class="step">1. File parsed: 5 rows, columns [Product Name, Category, Price, Stock]</div>
+  <div class="step">2. Column Mapper: "Product Name"→"name", "Category"→"category", "Price"→"price", "Stock"→"stock_quantity"</div>
+  <div class="step">3. Rule Validator: ✅ All prices > $0, all stock >= 0</div>
+  <div class="step">4. Op Classifier: "Add new products" → INSERT</div>
+  <div class="step">5. SQL generated: <code>INSERT INTO products (name, category, price, stock_quantity) VALUES (%s, %s, %s, %s)</code></div>
+  <div class="step">6. Token generated. User calls POST /mutation/approve with token</div>
+  <div class="a">Result: "5 rows inserted successfully into products"</div>
+</div>
+
+<!-- ═══════ PATH: RAG ═══════ -->
+<h2 id="path-rag">Path 3: RAG — Document Search</h2>
+<span class="badge badge-rag">RAG</span>
+<p>When the router detects a question about documents, it goes through the full Corrective Self-Reflective RAG pipeline — the most sophisticated path.</p>
+
+<h3>Trigger Examples</h3>
+<ul>
+  <li>"What does the refund policy say?"</li>
+  <li>"What are the Q2 sales guidelines?"</li>
+  <li>"Summarize the marketing rules PDF"</li>
+</ul>
+
+<h3>Pipeline Flow</h3>
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item rag">LTM<br>Recall</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Decide<br>Retrieval</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">HyDE<br>Expand</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Hybrid<br>Search</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Rerank</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Context<br>Enrich</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">CRAG<br>Eval</div>
+</div>
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item rag" style="border-color:var(--accent3);">Web Search<br>(if needed)</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Refine<br>Context</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Generate<br>Answer</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">SRAG<br>Verify</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Revise<br>(if needed)</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Usefulness<br>Check</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Rewrite<br>(if needed)</div>
+</div>
+
+<h3>Step-by-Step Timeline</h3>
+<div class="timeline">
+  <div class="tl-item rag" data-num="1"><strong>LTM Recall</strong> — Loads user's long-term memories from Postgres for personalized context</div>
+  <div class="tl-item rag" data-num="2"><strong>Decide Retrieval</strong> — LLM decides if the question actually needs document search. Pure knowledge questions skip retrieval</div>
+  <div class="tl-item rag" data-num="3"><strong>HyDE Expansion</strong> (optional) — Generates 3 hypothetical document passages that would answer the question, uses the best one for search</div>
+  <div class="tl-item rag" data-num="4"><strong>Hybrid Search</strong> — Searches Qdrant vector DB using BOTH dense semantic vectors (embeddings) AND sparse keyword vectors (BM25), combined via RRF (Reciprocal Rank Fusion)</div>
+  <div class="tl-item rag" data-num="5"><strong>Reranking</strong> (optional) — Voyage AI reranker re-scores retrieved chunks for precision</div>
+  <div class="tl-item rag" data-num="6"><strong>Context Enrichment</strong> — Fetches neighboring chunks to expand context window around each retrieved chunk</div>
+  <div class="tl-item rag" data-num="7"><strong>CRAG Evaluation</strong> — <code>CRAGEvaluator</code> scores each chunk's relevance: CORRECT (≥0.7) → use docs, AMBIGUOUS (mixed) → supplement with web search, INCORRECT (&lt;0.3) → discard docs, use web search only</div>
+  <div class="tl-item rag" data-num="8"><strong>Context Refinement</strong> — Decomposes text into sentences, uses LLM to filter relevant ones, removes noise</div>
+  <div class="tl-item rag" data-num="9"><strong>Answer Generation</strong> — LLM generates answer using ONLY the refined context</div>
+  <div class="tl-item rag" data-num="10"><strong>SRAG Verification</strong> — <code>SRAGVerifier</code> checks: Is every claim supported by context? If not, revises the answer (up to 2 retries)</div>
+  <div class="tl-item rag" data-num="11"><strong>Usefulness Check</strong> — <code>SRAGVerifier</code> checks: Is the answer actually useful? If not, rewrites the query and loops back to retrieval (up to 2 retries)</div>
+</div>
+
+<h3>Corrective RAG (CRAG) Thresholds</h3>
+<table>
+  <tr><th>Score</th><th>Verdict</th><th>Action</th></tr>
+  <tr><td>≥ 0.7</td><td><span class="badge badge-rag">CORRECT</span></td><td>Use retrieved documents directly</td></tr>
+  <tr><td>0.3 – 0.7</td><td><span class="badge badge-chat">AMBIGUOUS</span></td><td>Supplement retrieved docs with web search</td></tr>
+  <tr><td>&lt; 0.3</td><td><span class="badge badge-mut">INCORRECT</span></td><td>Discard docs, use web search exclusively</td></tr>
+</table>
+
+<h3>Real Example</h3>
+<div class="example-box">
+  <div class="q">Question: "What is the refund policy for delivered orders?"</div>
+  <div class="step">1. LTM: "User is a customer support agent"</div>
+  <div class="step">2. Decider: ✅ Needs document search</div>
+  <div class="step">3. HySE: Generates hypothetical refund policy passage</div>
+  <div class="step">4. Qdrant hybrid search: Finds 4 relevant chunks from refund_policy.pdf</div>
+  <div class="step">5. CRAG: Max score 0.89 → CORRECT</div>
+  <div class="step">6. Context refined, answer generated</div>
+  <div class="step">7. SRAG: fully_supported ✅, useful ✅</div>
+  <div class="a">Answer: "According to the refund policy (page 3), delivered orders can be returned within 30 days for a full refund, which is processed back to the original payment method within 5 business days." with citations</div>
+</div>
+
+<!-- ═══════ PATH: CHAT ═══════ -->
+<h2 id="path-chat">Path 4: CHAT — Direct Conversation</h2>
+<span class="badge badge-chat">CHAT</span>
+<p>The simplest path. No database queries, no document search — just the LLM responding with conversation memory.</p>
+
+<h3>Trigger Examples</h3>
+<ul>
+  <li>"Hello! How are you?"</li>
+  <li>"What can you do?"</li>
+  <li>"Tell me a joke"</li>
+  <li>"What's the weather like?" (general knowledge)</li>
+</ul>
+
+<h3>Pipeline Flow</h3>
+<div class="flow">
+  <div class="flow-item chat">Router→CHAT</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Build Prompt<br>(LTM + STM)</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">LLM<br>Responds</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">STM Save</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Response</div>
+</div>
+
+<h3>Step-by-Step</h3>
+<div class="timeline">
+  <div class="tl-item chat" data-num="1"><strong>Router classifies</strong> as CHAT → sends to <code>generate_direct_node</code></div>
+  <div class="tl-item chat" data-num="2"><strong>System prompt built</strong> with LTM context (user facts) and STM summary (conversation history)</div>
+  <div class="tl-item chat" data-num="3"><strong>LLM responds</strong> directly using its training data — no database or document search</div>
+  <div class="tl-item chat" data-num="4"><strong>STM summarizes</strong> if conversation exceeds 6 messages</div>
+</div>
+
+<!-- ═══════ PATH: HYBRID ═══════ -->
+<h2 id="path-hybrid">Path 5: HYBRID — SQL + RAG Combined</h2>
+<span class="badge badge-hyb">HYBRID</span>
+<p>The most powerful path. Runs SQL query AND document search IN PARALLEL, then synthesizes a unified answer from both sources.</p>
+
+<h3>Trigger Examples</h3>
+<ul>
+  <li>"Are our current sales numbers compliant with the discount policy?" (needs data + policy doc)</li>
+  <li>"Show SMB customers in Canada and check if their segment aligns with our strategy PDF"</li>
+  <li>"Do our stock levels meet the minimum requirements in the inventory guidelines?"</li>
+</ul>
+
+<h3>Pipeline Flow</h3>
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item hyb">Router→HYBRID</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="display:flex;flex-direction:column;gap:2px;border:none;background:var(--bg);padding:2px;">
+    <div class="flow-item sql" style="font-size:12px;padding:4px 10px;">SQL: Generate + Execute</div>
+    <div class="flow-item rag" style="font-size:12px;padding:4px 10px;">RAG: Search + CRAG + Web</div>
+  </div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item hyb">Synthesize<br>Answer</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">SRAG<br>Verify</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item">Response</div>
+</div>
+
+<h3>Step-by-Step Timeline</h3>
+<div class="timeline">
+  <div class="tl-item hyb" data-num="1"><strong>Router classifies</strong> as HYBRID → sends to <code>hybrid_generation_node</code></div>
+  <div class="tl-item hyb" data-num="2"><strong>Parallel execution:</strong>
+    <br>← <strong>SQL path:</strong> Generate → validate → auto-execute SELECT (same as Path 1)
+    <br>← <strong>RAG path:</strong> HyDE → hybrid search → CRAG evaluation → web search if needed → context refinement
+  </div>
+  <div class="tl-item hyb" data-num="3"><strong>Synthesis prompt</strong> combines database results (as CSV) and document context, asks LLM to write a unified business report citing specific numbers from SQL and guidelines from docs</div>
+  <div class="tl-item hyb" data-num="4"><strong>SRAG verification</strong> — Same as RAG path: support check + usefulness check</div>
+</div>
+
+<h3>Real Example</h3>
+<div class="example-box">
+  <div class="q">Question: "Are our current sales numbers compliant with the discount policy?"</div>
+  <div class="step">1. Router → HYBRID</div>
+  <div class="step">2. SQL path: <code>SELECT SUM(total_amount), COUNT(*) FROM orders WHERE status = 'Delivered' AND order_date >= '2026-01-01';</code></div>
+  <div class="step">3. RAG path: Searches discount_policy.pdf → "Promotional discount must not exceed 15% for SMB segment"</div>
+  <div class="step">4. LLM synthesizes both sources</div>
+  <div class="a">Answer: "Sales are $150,000 this month (42 orders). The discount policy states that SMB discounts cannot exceed 15%. Current average discount is 8.2%, so we are compliant." with SQL results + document citations</div>
+</div>
+
+<!-- ═══════ FEATURE 1: TEXT-TO-SQL ═══════ -->
+<h2 id="feature1">Feature 1: Text-to-SQL — Deep Dive</h2>
+<p>Every component in the SQL pipeline, explained in detail.</p>
+
+<h3>1. VannaService — The SQL Generator</h3>
+<p>
+<strong>Purpose:</strong> Converts natural language questions into PostgreSQL SQL queries.
+</p>
+<p>
+<strong>How it works:</strong> At startup, <code>VannaService.complete_training()</code> connects to the live database and queries <code>information_schema</code> to build a complete text description of the database schema (all tables, columns, types, foreign keys, constraints). This schema context is stored and used for every query.
+</p>
+<p>
+<strong>Dual-path fallback:</strong>
+</p>
+<div class="flow">
+  <div class="flow-item">Question</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--sql);">Vanna Agent<br>gpt-4o-mini</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--accent3);">Fail?</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--rag);">Fallback LLM<br>Groq llama-3.3</div>
+</div>
+<ul>
+  <li><strong>Primary (Vanna):</strong> Uses OpenAI's API with <code>gpt-4o-mini</code>. Vanna 2.0.2's built-in <code>OpenAILlmService</code> only supports OpenAI. However, Vanna's <code>LlmService</code> is an abstract base class — in theory, a custom adapter (e.g., <code>GroqLlmService</code>) could be written to use any provider.</li>
+  <li><strong>Fallback (Groq):</strong> If Vanna fails for any reason, sends the <strong>same schema context</strong> to <code>get_chat_llm()</code> (Groq's llama-3.3-70b-versatile) with a prompt asking it to generate SQL.</li>
+</ul>
+<p>
+<strong>Why Vanna?</strong> Vanna provides multi-turn SQL refinement (can have a back-and-forth conversation about SQL), automatic self-correction on errors, and tool execution capabilities. In practice, the Groq fallback generates equally good SQL for single-shot queries.
+</p>
+
+<h3>2. SQLValidator — Safety Guard</h3>
+<p>
+<strong>Purpose:</strong> Prevents execution of dangerous SQL commands.
+</p>
+<p><strong>Forbidden commands (blocked):</strong></p>
+<table>
+  <tr><th>Command</th><th>Why Blocked</th></tr>
+  <tr><td>DROP, TRUNCATE, ALTER</td><td>Schema modification — could delete entire tables</td></tr>
+  <tr><td>GRANT, REVOKE</td><td>Permission changes — security risk</td></tr>
+  <tr><td>CREATE, REPLACE</td><td>Object creation — could overwrite existing objects</td></tr>
+  <tr><td>DELETE, UPDATE, INSERT</td><td>Data modification — Feature 2 (Mutations) handles these</td></tr>
+  <tr><td>EXECUTE, EXEC</td><td>Dynamic execution — SQL injection risk</td></tr>
+  <tr><td>COMMIT, ROLLBACK</td><td>Transaction control — could break database state</td></tr>
+</table>
+<p>
+<strong>Enforcement:</strong> Only SELECT queries are permitted in Feature 1. The validator uses word-boundary regex to prevent false positives (e.g., "updated_at" column name won't trigger the UPDATE block).
+</p>
+
+<h3>3. LLMJudge — Semantic Auditor</h3>
+<p>
+<strong>Purpose:</strong> An LLM-as-Judge that checks if the generated SQL semantically matches the user's question.
+</p>
+<p><strong>Evaluation criteria:</strong></p>
+<ol>
+  <li>Are the correct tables joined using correct keys?</li>
+  <li>Are filters applied on correct columns/segments?</li>
+  <li>Does it prevent hallucinations (correct column field names)?</li>
+</ol>
+<p>
+Uses <code>get_memory_llm()</code> (lighter model) for cost efficiency. If the judge fails (API error), it defaults to <code>is_correct=True</code> to avoid blocking valid queries.
+</p>
+
+<h3>4. ApprovalGate — Cryptographic Tokens</h3>
+<p>
+<strong>Purpose:</strong> Provides secure single-use tokens for human-in-the-loop approval.
+</p>
+<p>
+Uses Python's <code>secrets.token_hex(32)</code> (64-character hex string). Tokens are:
+</p>
+<ul>
+  <li>Persisted in PostgreSQL table <code>idop_approval_tokens</code></li>
+  <li>Also stored in-memory as fallback (for tests / database outages)</li>
+  <li>Verified using <code>secrets.compare_digest()</code> (timing-safe comparison)</li>
+  <li>Deleted after use — strictly single-use</li>
+</ul>
+
+<h3>5. SQLExecutor — Query Runner</h3>
+<p>
+<strong>Purpose:</strong> Executes approved SQL against PostgreSQL and logs to audit table.
+</p>
+<p>
+Every execution is logged to <code>idop_audit_logs</code> with: query_id, original question, SQL text, status (SUCCESS/FAILED), and timestamp. Both successful and failed executions are recorded.
+</p>
+
+<!-- ═══════ FEATURE 2: MUTATIONS ═══════ -->
+<h2 id="feature2">Feature 2: Spreadsheet Mutations — Deep Dive</h2>
+<p>Every component in the mutation pipeline, explained in detail.</p>
+
+<h3>1. FileParser — Spreadsheet Reader</h3>
+<p>
+<strong>Purpose:</strong> Reads Excel (.xlsx/.xls) and CSV files into Python dictionaries.
+</p>
+<p>
+Uses <code>pandas.read_csv()</code> and <code>pandas.read_excel()</code>. Converts NaN/None values to standard Python <code>None</code>. Warns if file exceeds 50MB. Max row count: 1000 (configurable via API parameter or <code>business_rules/rules.json</code>).
+</p>
+
+<h3>2. ColumnMapper — Semantic Column Matching</h3>
+<p>
+<strong>Purpose:</strong> Uses LLM to map messy spreadsheet column headers to formal database column names.
+</p>
+<p>
+<strong>Example:</strong> A spreadsheet column "Unit Price (USD)" is semantically mapped to the database column "price". The LLM receives both the file headers and the target DB columns (from <code>TABLE_SCHEMAS</code> in <code>schema_registry.py</code>) and returns a JSON mapping.
+</p>
+<p>
+If the LLM fails, it falls back to basic string normalization (lowercase, underscores).
+</p>
+
+<h3>3. OpClassifier — Operation Type Classifier</h3>
+<p>
+<strong>Purpose:</strong> Classifies the user's intent as INSERT, UPDATE, or DELETE.
+</p>
+<p>
+Uses an LLM with a simple prompt: "Analyze the user's intent to determine if they want to insert new rows, update existing rows, or delete rows." Default fallback: INSERT.
+</p>
+
+<h3>4. RuleValidator — Business Rules Engine</h3>
+<p>
+<strong>Purpose:</strong> Validates each row against configurable business rules.
+</p>
+<p>
+Rules are defined in <code>business_rules/rules.json</code> and support:
+</p>
+<table>
+  <tr><th>Rule Type</th><th>Description</th><th>Example</th></tr>
+  <tr><td><code>numeric</code></td><td>Numeric range check (min/max)</td><td>price > 0</td></tr>
+  <tr><td><code>integer</code></td><td>Integer range check (min/max)</td><td>stock_quantity >= 0</td></tr>
+  <tr><td><code>regex</code></td><td>Pattern match</td><td>email format validation</td></tr>
+  <tr><td><code>enum</code></td><td>Allowed values check</td><td>segment in [SMB, Enterprise, Individual]</td></tr>
+</table>
+
+<h3>5. MutationGenerator — SQL Builder</h3>
+<p>
+<strong>Purpose:</strong> Generates parameterized SQL statements for bulk operations.
+</p>
+<ul>
+  <li><strong>INSERT:</strong> Single bulk statement with all rows as parameters — <code>INSERT INTO table (col1, col2) VALUES (%s, %s)</code></li>
+  <li><strong>UPDATE:</strong> Individual statements per row — <code>UPDATE table SET col1 = %s WHERE id = %s</code></li>
+  <li><strong>DELETE:</strong> Single bulk statement — <code>DELETE FROM table WHERE id IN (%s, %s, ...)</code></li>
+</ul>
+<p>
+All SQL is parameterized to prevent SQL injection.
+</p>
+
+<h3>6. MutationExecutor — Atomic Transaction Runner</h3>
+<p>
+<strong>Purpose:</strong> Executes mutations inside an all-or-nothing database transaction.
+</p>
+<p>
+<strong>Critical safety guarantee:</strong> If ANY row fails, ALL changes are rolled back. The database remains in its original state. Uses <code>conn.autocommit = False</code> and explicit <code>conn.commit()</code> / <code>conn.rollback()</code>.
+</p>
+
+<!-- ═══════ FEATURE 3: RAG ═══════ -->
+<h2 id="feature3">Feature 3: Advanced RAG — Deep Dive</h2>
+<p>Every component in the RAG pipeline, explained in detail.</p>
+
+<h3>1. RetrievalService — Document Finder</h3>
+<p>
+<strong>Purpose:</strong> Searches Qdrant vector database for relevant document chunks.
+</p>
+<p>Three search modes:</p>
+<table>
+  <tr><th>Mode</th><th>Method</th><th>Best For</th></tr>
+  <tr><td><code>dense</code></td><td>Semantic vector similarity (embeddings)</td><td>Conceptual matches, synonyms</td></tr>
+  <tr><td><code>sparse</code></td><td>Keyword BM25 via SparseVector</td><td>Exact term matches, proper nouns</td></tr>
+  <tr><td><code>hybrid</code></td><td>RRF fusion of dense + sparse results</td><td>Best overall recall</td></tr>
+</table>
+
+<h3>2. HyDE — Hypothetical Document Embeddings</h3>
+<p>
+<strong>Purpose:</strong> Improves retrieval by first generating a hypothetical document that would answer the question, then searching with that instead of the original query.
+</p>
+<p>
+<strong>Example:</strong> For "What is the refund policy?", HyDE generates: "The refund policy states that customers can return products within 30 days for a full refund. For delivered orders, refunds are processed back to the original payment method within 5 business days." This hypothetical passage is more similar to real documents than the short question, leading to better search results.
+</p>
+
+<h3>3. SparseVectorService — BM25 Keyword Search</h3>
+<p>
+<strong>Purpose:</strong> Generates sparse vectors for keyword-based search, complementing dense semantic search.
+</p>
+<p>
+Tokenizes text (lowercase, removes stop words), counts term frequencies, hashes each token to a 32-bit integer index. Creates Qdrant <code>SparseVector</code> with (indices, values) format. The stop word list includes 59 common English words.
+</p>
+
+<h3>4. RerankingService — Precision Booster</h3>
+<p>
+<strong>Purpose:</strong> Uses Voyage AI's cross-encoder reranker to re-score retrieved chunks for higher precision.
+</p>
+<p>
+Unlike bi-encoders (which encode query and document separately), cross-encoders process query+document pairs together, producing more accurate relevance scores. Uses <code>rerank-2.5</code> model from Voyage AI.
+</p>
+
+<h3>5. ContextEnrichment — Window Expansion</h3>
+<p>
+<strong>Purpose:</strong> Fetches neighboring chunks (before and after) each retrieved chunk to provide surrounding context.
+</p>
+<p>
+For each retrieved chunk at index X, it fetches chunks at X-1 and X+1 (configurable neighbor count), concatenates them with overlap handling, creating a wider context window. This helps the LLM understand the full context rather than isolated snippets.
+</p>
+
+<h3>6. CRAGEvaluator — Corrective RAG</h3>
+<p>
+<strong>Purpose:</strong> Prevents the LLM from using irrelevant documents by scoring each chunk's relevance.
+</p>
+<p>
+Each chunk is scored by an LLM on a 0.0–1.0 scale. Based on thresholds (upper: 0.7, lower: 0.3), the system decides whether to use docs, supplement with web search, or use web search exclusively.
+</p>
+
+<h3>7. WebSearchService — Tavily Web Search</h3>
+<p>
+<strong>Purpose:</strong> Fetches real-time information from the web when documents don't have the answer.
+</p>
+<p>
+Uses Tavily AI API (purpose-built for LLM web search). The query is first rewritten by an LLM into a focused 6–14 keyword search query. Results include title, URL, and content snippet.
+</p>
+
+<h3>8. ContextRefinement — Sentence Filtering</h3>
+<p>
+<strong>Purpose:</strong> Removes irrelevant sentences from the retrieved context before sending to the LLM.
+</p>
+<p>
+Decomposes all retrieved text into sentences, sends them to an LLM with the question, asks which sentences directly help answer the question. Only kept sentences are included in the final context.
+</p>
+
+<h3>9. SRAGVerifier — Self-Reflective RAG</h3>
+<p>
+<strong>Purpose:</strong> Prevents hallucination by verifying the answer against the context.
+</p>
+<p>Three-stage verification:</p>
+<ol>
+  <li><strong>Support check:</strong> Is every claim in the answer backed by the context? (fully_supported / partially_supported / no_support). If not fully supported, revises the answer (up to 2 retries).</li>
+  <li><strong>Revise:</strong> Rewrites the answer to remove unsupported claims, keeping only what's backed by context.</li>
+  <li><strong>Usefulness check:</strong> Is the answer actually useful to the user? If not useful, rewrites the search query and retries (up to 2 retries).</li>
+</ol>
+
+<h3>10. RAGASEvaluator — Quality Metrics</h3>
+<p>
+<strong>Purpose:</strong> Computes RAGAS-style evaluation metrics without external libraries.
+</p>
+<p>Three metrics computed by LLM:</p>
+<table>
+  <tr><th>Metric</th><th>What It Measures</th></tr>
+  <tr><td>Answer Relevancy</td><td>Does the answer directly address the question? (0.0–1.0)</td></tr>
+  <tr><td>Faithfulness</td><td>Are all claims in the answer supported by context? (0.0–1.0)</td></tr>
+  <tr><td>Context Precision</td><td>How many retrieved chunks are actually relevant? (0.0–1.0)</td></tr>
+</table>
+
+<!-- ═══════ MEMORY ═══════ -->
+<h2 id="memory">Memory System</h2>
+<p>IDOP uses a dual memory system for personalized conversations.</p>
+
+<div class="grid2">
+  <div class="card">
+    <span class="badge badge-chat">STM</span>
+    <h4>Short-Term Memory</h4>
+    <p><strong>What it stores:</strong> Conversation history within a thread</p>
+    <p><strong>Storage:</strong> Postgres via AsyncPostgresSaver (LangGraph checkpointer)</p>
+    <p><strong>Summarization:</strong> When a thread exceeds 6 messages (configurable), the LLM summarizes older messages and deletes them, keeping only the summary + last 2 messages</p>
+  </div>
+  <div class="card">
+    <span class="badge badge-rag">LTM</span>
+    <h4>Long-Term Memory</h4>
+    <p><strong>What it stores:</strong> User profile facts that persist across sessions</p>
+    <p><strong>Storage:</strong> Postgres via AsyncPostgresStore (LangGraph store)</p>
+    <p><strong>Extraction:</strong> After every message, LTMService uses an LLM to extract new facts (identity, preferences, projects, tools). Only genuinely NEW facts are stored (deduplication against existing memories)</p>
+    <p><strong>Example fact:</strong> "User is a Sales Manager specializing in SMB segments"</p>
+  </div>
+</div>
+
+<h3>Memory Namespace Structure (LangGraph AsyncPostgresStore)</h3>
+<p>LangGraph's <code>AsyncPostgresStore</code> organizes data by namespace tuples <code>(prefix, user_id, kind)</code>. IDOP uses:</p>
+<pre><code>LTM namespace: ("user", "{user_id}", "details")
+Each item key: UUID v4
+Each item value: {"data": "User prefers CSV files reports"}</code></pre>
+
+<!-- ═══════ CACHING ═══════ -->
+<h2 id="caching">Caching System</h2>
+<p>Two-tier caching for performance and cost savings.</p>
+
+<h3>Tier 1: Document Cache (S3 / Local)</h3>
+<table>
+  <tr><th>Detail</th><th>Value</th></tr>
+  <tr><td>Purpose</td><td>Cache processed document chunks and embeddings</td></tr>
+  <tr><td>Backend</td><td>AWS S3 (production) or local filesystem (development)</td></tr>
+  <tr><td>Cache Key</td><td>SHA-256 hash of file content + file extension</td></tr>
+  <tr><td>Stored Data</td><td>chunks.json, embeddings.npy, metadata.json</td></tr>
+  <tr><td>Deduplication</td><td>If same file uploaded again, chunks/embeddings loaded from cache</td></tr>
+  <tr><td>Dimension Check</td><td>Cached embeddings validated against current provider dimension (prevents mismatch when switching from OpenAI to Nomic)</td></tr>
+</table>
+
+<h3>Tier 2: Query Cache (Redis / Local)</h3>
+<table>
+  <tr><th>Cache Type</th><th>TTL</th><th>Cost Saved Per Hit</th></tr>
+  <tr><td>Embedding</td><td>7 days</td><td>$0.0001</td></tr>
+  <tr><td>RAG</td><td>1 hour</td><td>$0.05</td></tr>
+  <tr><td>SQL Generation</td><td>24 hours</td><td>$0.08</td></tr>
+  <tr><td>SQL Results</td><td>15 minutes</td><td>$0.01</td></tr>
+</table>
+<p>
+Backend: Upstash Redis (production) or in-memory dict (fallback). Stats tracked per cache type with hit rates and estimated cost savings.
+</p>
+
+<!-- ═══════ EMBEDDINGS ═══════ -->
+<h2 id="embeddings">Embeddings Service</h2>
+<p>Provider-agnostic embedding service supporting two providers.</p>
+
+<table>
+  <tr><th>Provider</th><th>Model</th><th>Dimensions</th><th>API Key</th></tr>
+  <tr><td>Nomic AI</td><td>nomic-embed-text-v1.5</td><td>768</td><td>NOMIC_API_KEY</td></tr>
+  <tr><td>Voyage AI</td><td>voyage-3</td><td>1024</td><td>VOYAGE_API_KEY</td></tr>
+</table>
+
+<h3>Retry Logic</h3>
+<p>
+Both <code>embed_query</code> and <code>embed_documents</code> are wrapped with exponential backoff retry for HTTP 429 (rate limit / quota) errors:
+</p>
+<ul>
+  <li>Max retries: 3</li>
+  <li>Base delay: 2 seconds</li>
+  <li>Backoff multiplier: 4x (2s → 8s → 32s)</li>
+  <li>After all retries: raises <code>EmbeddingQuotaError</code></li>
+</ul>
+
+<!-- ═══════ LLM CHAIN ═══════ -->
+<h2 id="llm">LLM Chain — 3-Tier Fallback</h2>
+<p>The LLM provider system has three tiers, tried in order:</p>
+
+<div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+  <div class="flow-item" style="border-color:var(--rag);">Tier 1<br>LiteLLM Router<br>Multi-Key Groq</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--accent3);">Fail?</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--sql);">Tier 2<br>ChatGroq Direct<br>Single Key</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--accent3);">Fail?</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--chat);">Tier 3<br>ChatOpenAI<br>Final Fallback</div>
+</div>
+
+<table>
+  <tr><th>Tier</th><th>Provider</th><th>When</th><th>Key Feature</th></tr>
+  <tr><td>1</td><td>LiteLLM Router</td><td>LLM_PROVIDER=litellm</td><td>Load-balances across 4 Groq keys, auto-cooldown on 429, retry logic</td></tr>
+  <tr><td>2</td><td>ChatGroq</td><td>LiteLLM fails or LLM_PROVIDER=groq</td><td>Single-key direct Groq connection</td></tr>
+  <tr><td>3</td><td>ChatOpenAI (gpt-4o-mini)</td><td>Both Groq paths fail</td><td>Fallback with cost-effective model</td></tr>
+</table>
+
+<h3>Why Groq?</h3>
+<p>
+Groq offers free-tier access to Llama 3.3 70B at 30 requests/minute per API key. By using 4 keys with LiteLLM Router, IDOP effectively gets 120 requests/minute of free high-quality LLM inference — ideal for a production system without incurring per-token costs.
+</p>
+
+<h3>Two LLM Instances</h3>
+<table>
+  <tr><th>Instance</th><th>Model</th><th>Temperature</th><th>Used By</th></tr>
+  <tr><td><code>get_chat_llm()</code></td><td>llama-3.3-70b-versatile</td><td>0.0</td><td>Router, answer generation, SQL fallback, hybrid synthesis</td></tr>
+  <tr><td><code>get_memory_llm()</code></td><td>llama-3.3-70b-versatile</td><td>0.0</td><td>SQL judge, mutation judge, CRAG scoring, SRAG verification, HyDE, STM summary, LTM extraction, classification</td></tr>
+</table>
+
+<!-- ═══════ EXTERNAL SERVICES ═══════ -->
+<h2 id="external">External Services — Selection Rationale</h2>
+<p>Every external service chosen for IDOP, with detailed reasoning about why it was selected over alternatives.</p>
+
+<table>
+  <tr><th>Service</th><th>Purpose</th><th>Why Chosen</th><th>Alternatives Considered</th></tr>
+  <tr>
+    <td><span class="tag tag-groq">Groq</span></td>
+    <td>Primary LLM inference</td>
+    <td><strong>Fastest inference speed</strong> (LPU hardware), generous <strong>free tier</strong> (30 req/min per key), supports Llama 3.3 70B which matches GPT-4 quality. Using 4 keys via LiteLLM Router gives 120 req/min free.</td>
+    <td>OpenAI (paid), Anthropic (paid), Together AI (paid), Replicate (paid)</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-openai">OpenAI</span></td>
+    <td>Vanna SQL generation + Final LLM fallback</td>
+    <td>Vanna's OpenAILlmService only supports OpenAI natively. Also serves as tier-3 fallback when all Groq keys fail. gpt-4o-mini is cost-effective.</td>
+    <td>— (Vanna requirement)</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-qdrant">Qdrant Cloud</span></td>
+    <td>Vector database</td>
+    <td><strong>Native hybrid search</strong> (dense + sparse vectors in one query), built-in RRF fusion, managed cloud service (no ops overhead), Pay-as-you-go free tier, Python client with type hints.</td>
+    <td>Pinecone (no sparse/BM25 support), Weaviate (more complex), Milvus (self-hosted overhead)</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-pg">Supabase (PostgreSQL)</span></td>
+    <td>Application database + LangGraph state</td>
+    <td>PostgreSQL is the most reliable relational database. Supabase provides managed hosting with generous free tier (500MB). LangGraph's AsyncPostgresSaver and AsyncPostgresStore require PostgreSQL.</td>
+    <td>Neon (serverless PG, less mature), AWS RDS (overkill for this scale), SQLite (no concurrent access)</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-redis">Upstash Redis</span></td>
+    <td>Query/SQL result cache</td>
+    <td><strong>Serverless Redis</strong> (no connection pool management), generous free tier (10MB), REST API support, instant provisioning via HTTP API. Pay-per-request pricing ideal for variable workloads.</td>
+    <td>Redis Cloud (fixed pricing), ElastiCache (AWS-only, complex setup), Local memory (no persistence)</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-s3">AWS S3</span></td>
+    <td>Document chunk/embedding cache</td>
+    <td><strong>Industry standard</strong> object storage, dirt cheap ($0.023/GB/month), 99.999999999% durability, server-side encryption (AES256) built-in, works with any AWS region.</td>
+    <td>Cloudflare R2 (no AWS integration), GCP Cloud Storage, MinIO (self-hosted overhead)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">Tavily AI</span></td>
+    <td>Web search for RAG fallback</td>
+    <td><strong>Built specifically for LLMs</strong> — returns clean, structured results (title, URL, content) instead of raw HTML. Designed for RAG use cases. 1000 free API calls/month.</td>
+    <td>Google Custom Search (complex setup, returns HTML), Bing Search API (more expensive), SerpAPI (SEO-focused)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">Voyage AI</span></td>
+    <td>Embeddings + Reranking</td>
+    <td><strong>One API key for both</strong> embeddings and reranking. voyage-3 (1024-dim) offers excellent quality. rerank-2.5 is one of the best cross-encoders available. Simple API with Python client.</td>
+    <td>OpenAI embeddings (no reranking), Cohere (separate APIs for embed/rerank), Jina AI (lower quality)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">Nomic AI</span></td>
+    <td>Embeddings (default provider)</td>
+    <td><strong>Free API key</strong> with 768-dim embeddings that work well for semantic search. nomic-embed-text-v1.5 performs comparably to OpenAI's text-embedding-3-small but is completely free.</td>
+    <td>OpenAI (paid), Voyage (paid), Cohere (paid)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">Docling</span></td>
+    <td>PDF parsing and chunking</td>
+    <td><strong>Structure-preserving chunking</strong> — HybridChunker understands headings, tables, lists, and doesn't split mid-table. Maintains document hierarchy far better than naive text splitter.</td>
+    <td>PyMuPDF (no chunking), Unstructured.io (slower), LlamaParse (paid)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">OpenAI (Vanna)</span></td>
+    <td>SQL generation via Vanna</td>
+    <td>Vanna's OpenAILlmService only supports OpenAI. gpt-4o-mini is fast and cheap ($0.15/1M input tokens) for SQL generation tasks.</td>
+    <td>— (Vanna requirement)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">Opik (Comet)</span></td>
+    <td>LLM observability</td>
+    <td>Free open-source LLM tracing with @track decorators. Provides latency, cost, and token usage per LLM call. Optional — only enabled when OPIK_API_KEY is set.</td>
+    <td>LangSmith (expensive), Weights & Biases (ML-focused), MLflow (complex setup)</td>
+  </tr>
+  <tr>
+    <td><span class="tag">LiteLLM</span></td>
+    <td>Multi-key LLM routing</td>
+    <td>Open-source Python library that provides Router with automatic failover, cooldown on 429, latency-based routing, and unified interface across providers. Essential for managing 4 Groq keys.</td>
+    <td>Direct API calls (no routing), LangChain (routing less mature)</td>
+  </tr>
+</table>
+
+<!-- ═══════ API REFERENCE ═══════ -->
+<h2 id="api">Complete API Reference</h2>
+<p>Every endpoint in the IDOP platform, with parameters and response formats.</p>
+
+<h3>System & Health</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Parameters</th></tr>
+  <tr><td>GET</td><td>/</td><td>Welcome message with service info and docs links</td><td>None</td></tr>
+  <tr><td>GET</td><td>/health</td><td>Detailed per-service health check (Qdrant, Postgres, Supabase, Redis, S3)</td><td>None</td></tr>
+  <tr><td>GET</td><td>/health/ready</td><td>Readiness probe (all DB connections)</td><td>None</td></tr>
+  <tr><td>GET</td><td>/info</td><td>System layout, phases, endpoint documentation</td><td>None</td></tr>
+  <tr><td>GET</td><td>/stats</td><td>Platform statistics, cache hit rates, cost savings</td><td>None</td></tr>
+</table>
+
+<h3>Chat (Main Entry Point)</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Key Parameters</th></tr>
+  <tr><td>POST</td><td>/chat</td><td>Ask a question — automatic 5-path routing</td><td>question, thread_id, user_id, search_mode, top_k, enable_hyde, enable_reranking, enable_ragas, vanna_temperature, vanna_seed, vanna_top_p, include_sources, explain</td></tr>
+  <tr><td>POST</td><td>/chat/stream</td><td>Stream response token-by-token (text/plain chunks)</td><td>Same as POST /chat</td></tr>
+  <tr><td>GET</td><td>/chat/history/{thread_id}</td><td>Get conversation history for a thread</td><td>thread_id (path)</td></tr>
+</table>
+
+<h3>Documents (RAG Ingestion)</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Key Parameters</th></tr>
+  <tr><td>POST</td><td>/documents/upload</td><td>Upload PDF/TXT/CSV for processing and indexing</td><td>file, chunk_size, chunk_overlap</td></tr>
+  <tr><td>GET</td><td>/documents/info</td><td>Get Qdrant collection metadata (document count, status)</td><td>None</td></tr>
+  <tr><td>DELETE</td><td>/documents/collection</td><td>⚠️ Delete entire Qdrant collection (irreversible)</td><td>None</td></tr>
+</table>
+
+<h3>SQL Operations</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Key Parameters</th></tr>
+  <tr><td>POST</td><td>/sql/generate</td><td>Convert NL question to SQL → returns approval token</td><td>question, explain, vanna_temperature, vanna_seed, vanna_top_p</td></tr>
+  <tr><td>POST</td><td>/sql/approve</td><td>Approve/reject pending SQL with cryptographic token</td><td>query_id, approved, token</td></tr>
+  <tr><td>GET</td><td>/sql/pending</td><td>List all SQL queries awaiting approval</td><td>None</td></tr>
+</table>
+
+<h3>Mutation Operations</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Key Parameters</th></tr>
+  <tr><td>POST</td><td>/mutation/upload</td><td>Upload Excel/CSV for mutation → returns approval token</td><td>file, table_name, request_intent, primary_key, auto_map, skip_validation, max_bulk_rows</td></tr>
+  <tr><td>POST</td><td>/mutation/approve</td><td>Approve/reject pending mutation with cryptographic token</td><td>mutation_id, approved, token</td></tr>
+  <tr><td>GET</td><td>/mutation/pending</td><td>List all mutations awaiting approval</td><td>None</td></tr>
+</table>
+
+<h3>Cache Management</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Key Parameters</th></tr>
+  <tr><td>GET</td><td>/cache/stats</td><td>Stats for both document + query caches</td><td>None</td></tr>
+  <tr><td>GET</td><td>/cache/health</td><td>Health check for both cache layers</td><td>None</td></tr>
+  <tr><td>POST</td><td>/cache/test</td><td>Write-read-delete round-trip test</td><td>None</td></tr>
+  <tr><td>DELETE</td><td>/cache/clear</td><td>Clear cache (specific doc or all)</td><td>doc_id (optional), file_extension (optional), clear_query_cache</td></tr>
+</table>
+
+<h3>Memory</h3>
+<table>
+  <tr><th>Method</th><th>Path</th><th>Description</th><th>Key Parameters</th></tr>
+  <tr><td>GET</td><td>/memory/{user_id}</td><td>List all LTM facts for user</td><td>user_id (path)</td></tr>
+  <tr><td>DELETE</td><td>/memory/{user_id}</td><td>Clear all LTM facts for user</td><td>user_id (path)</td></tr>
+</table>
+
+<!-- ═══════ CONFIGURATION ═══════ -->
+<h2 id="config">Configuration Reference</h2>
+<p>Every environment variable used by IDOP.</p>
+
+<table>
+  <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+  <tr><td>OPENAI_API_KEY</td><td>Yes</td><td>—</td><td>OpenAI API key (Vanna SQL gen + LLM fallback)</td></tr>
+  <tr><td>GROQ_API_KEY_1</td><td>Yes (at least one)</td><td>—</td><td>Primary Groq key</td></tr>
+  <tr><td>GROQ_API_KEY_2</td><td>Optional</td><td>—</td><td>Additional Groq key for load balancing</td></tr>
+  <tr><td>GROQ_API_KEY_3</td><td>Optional</td><td>—</td><td>Additional Groq key for load balancing</td></tr>
+  <tr><td>GROQ_API_KEY_4</td><td>Optional</td><td>—</td><td>Additional Groq key for load balancing</td></tr>
+  <tr><td>VANNA_LLM_MODEL</td><td>Optional</td><td>gpt-4o-mini</td><td>OpenAI model for Vanna's SQL generation</td></tr>
+  <tr><td>LLM_PROVIDER</td><td>Optional</td><td>litellm</td><td>LLM provider: litellm or groq</td></tr>
+  <tr><td>LLM_MODEL</td><td>Optional</td><td>llama-3.3-70b-versatile</td><td>Primary LLM model name</td></tr>
+  <tr><td>MEMORY_LLM_MODEL</td><td>Optional</td><td>llama-3.3-70b-versatile</td><td>Light LLM for judging/classification</td></tr>
+  <tr><td>MEMORY_LLM_TEMPERATURE</td><td>Optional</td><td>0.0</td><td>Temperature for memory/classification LLM</td></tr>
+  <tr><td>EMBEDDING_PROVIDER</td><td>Optional</td><td>nomic</td><td>Embedding provider: nomic or voyage</td></tr>
+  <tr><td>NOMIC_API_KEY</td><td>If Nomic</td><td>—</td><td>Nomic API key for embeddings</td></tr>
+  <tr><td>VOYAGE_API_KEY</td><td>If Voyage</td><td>—</td><td>Voyage API key for embeddings + reranking</td></tr>
+  <tr><td>QDRANT_URL</td><td>Yes</td><td>—</td><td>Qdrant cluster URL</td></tr>
+  <tr><td>QDRANT_API_KEY</td><td>Yes</td><td>—</td><td>Qdrant API key</td></tr>
+  <tr><td>DATABASE_URL</td><td>Yes</td><td>—</td><td>PostgreSQL connection string</td></tr>
+  <tr><td>SUPABASE_DB_URL</td><td>Optional</td><td>= DATABASE_URL</td><td>Supabase URL (company data)</td></tr>
+  <tr><td>TAVILY_API_KEY</td><td>Yes</td><td>—</td><td>Tavily web search API key</td></tr>
+  <tr><td>UPSTASH_REDIS_URL</td><td>Optional</td><td>—</td><td>Redis URL for query cache</td></tr>
+  <tr><td>UPSTASH_REDIS_TOKEN</td><td>Optional</td><td>—</td><td>Redis token for query cache</td></tr>
+  <tr><td>STORAGE_BACKEND</td><td>Optional</td><td>s3</td><td>Document cache: s3 or local</td></tr>
+  <tr><td>S3_CACHE_BUCKET</td><td>If S3</td><td>idop-cache-docs</td><td>S3 bucket for cached documents</td></tr>
+  <tr><td>AWS_ACCESS_KEY_ID</td><td>If S3</td><td>—</td><td>AWS access key</td></tr>
+  <tr><td>AWS_SECRET_ACCESS_KEY</td><td>If S3</td><td>—</td><td>AWS secret key</td></tr>
+  <tr><td>OPIK_API_KEY</td><td>Optional</td><td>—</td><td>Opik observability API key</td></tr>
+</table>
+
+<!-- ═══════ DATABASE SCHEMA ═══════ -->
+<h2 id="schema">Database Schema</h2>
+<p>Tables IDOP creates in PostgreSQL.</p>
+
+<h3>idop_approval_tokens</h3>
+<pre><code>CREATE TABLE idop_approval_tokens (
+    query_id    VARCHAR(100) PRIMARY KEY,
+    token       VARCHAR(100) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+
+<h3>idop_mutation_approval_tokens</h3>
+<pre><code>CREATE TABLE idop_mutation_approval_tokens (
+    mutation_id VARCHAR(100) PRIMARY KEY,
+    token       VARCHAR(100) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+
+<h3>idop_audit_logs</h3>
+<pre><code>CREATE TABLE idop_audit_logs (
+    id          SERIAL PRIMARY KEY,
+    query_id    VARCHAR(100),
+    question    TEXT,
+    sql_query   TEXT,
+    status      VARCHAR(50),
+    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+
+<h3>idop_pending_queries / idop_pending_mutations</h3>
+<pre><code>CREATE TABLE idop_pending_queries (
+    id          VARCHAR(100) PRIMARY KEY,
+    payload     JSONB NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE idop_pending_mutations (
+    id          VARCHAR(100) PRIMARY KEY,
+    payload     JSONB NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+
+<h3>LangGraph Internal Tables</h3>
+<ul>
+  <li><strong>checkpoints:</strong> Stores conversation state at each step (messages, answers, metadata)</li>
+  <li><strong>writes:</strong> Tracks incremental state writes between checkpoints</li>
+  <li><strong>store:</strong> Stores LTM (user, user_id, details) namespace items</li>
+</ul>
+
+<h3>Qdrant Collection: idop_documents</h3>
+<ul>
+  <li><strong>Dense vector:</strong> Named "dense", 768-dim (Nomic) or 1024-dim (Voyage), COSINE distance</li>
+  <li><strong>Sparse vector:</strong> Named "sparse", BM25-style keyword vectors</li>
+  <li><strong>Payload indexes:</strong> content_hash (keyword), source (keyword), index (integer)</li>
+</ul>
+
+<!-- ═══════ TESTING ═══════ -->
+<h2 id="testing">Testing & Development Setup</h2>
+
+<h3>Running Tests</h3>
+<pre><code># Full test suite (233 tests)
+.venv/Scripts/python.exe -m pytest tests/
+
+# Specific test files
+.venv/Scripts/python.exe -m pytest tests/test_graph.py tests/test_router.py
+
+# With verbose output
+.venv/Scripts/python.exe -m pytest tests/ --no-header -v
+
+# Fast: specific module tests
+.venv/Scripts/python.exe -m pytest tests/test_vanna_fallback.py tests/test_sql_api.py</code></pre>
+
+<h3>Setting Up Local Development</h3>
+<pre><code># 1. Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# 4. Run the server
+python -m app.main</code></pre>
+
+<h3>Code Quality</h3>
+<pre><code># Formatting
+.venv/Scripts/python.exe -m black .
+
+# Linting
+.venv/Scripts/python.exe -m ruff check .
+
+# Type checking
+.venv/Scripts/python.exe -m mypy app/</code></pre>
+
+<h3>Test Structure</h3>
+<table>
+  <tr><th>Test File</th><th>What It Tests</th></tr>
+  <tr><td>test_graph.py</td><td>LangGraph state machine, node execution, routing</td></tr>
+  <tr><td>test_router.py</td><td>5-path LLM router classification</td></tr>
+  <tr><td>test_features.py</td><td>SQL generation, mutation pipeline, RAG retrieval</td></tr>
+  <tr><td>test_sql_api.py</td><td>SQL API endpoints (generate, approve, pending)</td></tr>
+  <tr><td>test_mutation_node.py</td><td>Mutation graph node</td></tr>
+  <tr><td>test_hybrid_node.py</td><td>Hybrid SQL+RAG node</td></tr>
+  <tr><td>test_vanna_fallback.py</td><td>Vanna → Groq fallback logic</td></tr>
+  <tr><td>test_caching.py</td><td>In-memory cache operations</td></tr>
+  <tr><td>test_cache_integration.py</td><td>Full cache integration tests</td></tr>
+  <tr><td>test_storage_backends.py</td><td>S3 and local storage backends</td></tr>
+  <tr><td>test_enhanced_apis.py</td><td>Chat, streaming, and enhanced API endpoints</td></tr>
+  <tr><td>test_opik_integration.py</td><td>Opik tracing integration</td></tr>
+  <tr><td>test_deploy_smoke.py</td><td>Deployment smoke tests</td></tr>
+</table>
+
+<!-- ═══════ ERROR HANDLING ═══════ -->
+<h2 id="errors">Error Handling & Common Issues</h2>
+
+<h3>Error Handling Architecture</h3>
+<p>IDOP uses a structured error handling approach:</p>
+<ul>
+  <li><strong>API endpoints:</strong> FastAPI HTTPException with status code + detail message</li>
+  <li><strong>Graph nodes:</strong> Return error state (e.g., <code>sql_status: "error"</code>, <code>mutation_status: "error"</code>) — exceptions are caught and converted to state fields</li>
+  <li><strong>Services:</strong> Standard Python exceptions, caught by calling code</li>
+  <li><strong>Global:</strong> <code>global_exception_handler</code> catches unhandled exceptions at the FastAPI level</li>
+</ul>
+
+<h3>Common Errors & Solutions</h3>
+<table>
+  <tr><th>Error</th><th>What It Means</th><th>Solution</th></tr>
+  <tr><td><code>429 insufficient_quota</code></td><td>OpenAI API key has no credits</td><td>Add OpenAI credits, or switch to Nomic embeddings. Vanna will fall back to Groq for SQL generation.</td></tr>
+  <tr><td><code>Relation "customers" does not exist</code></td><td>PostgreSQL schema doesn't match expected tables</td><td>Run <code>scripts/init_db.py</code> to create seed data. Check DATABASE_URL in .env.</td></tr>
+  <tr><td><code>Qdrant connection refused</code></td><td>Qdrant cluster is down or URL is wrong</td><td>Check QDRANT_URL and QDRANT_API_KEY. Restart Qdrant if self-hosted.</td></tr>
+  <tr><td><code>Invalid, expired or already used token</code></td><td>Approval token is wrong or already consumed</td><td>Generate a new token via POST /sql/generate or POST /mutation/upload.</td></tr>
+  <tr><td><code>All Groq keys exhausted</code></td><td>All 4 Groq keys hit rate limits simultaneously</td><td>Wait 60 seconds (cooldown). Add more Groq keys. LiteLLM Router will automatically use keys after cooldown.</td></tr>
+  <tr><td><code>PostgreSQL connection timeout</code></td><td>Database server unreachable</td><td>Check DATABASE_URL format. Ensure IP is whitelisted in Supabase. Retry is automatic (3 attempts).</td></tr>
+  <tr><td><code>File exceeds maximum size</code></td><td>Uploaded file > 50MB</td><td>Compress or split the file. Max file size is configurable in FileValidator.</td></tr>
+  <tr><td><code>Unsupported file format</code></td><td>Uploaded file is not PDF/TXT/CSV (documents) or XLSX/XLS/CSV (mutations)</td><td>Convert to a supported format.</td></tr>
+</table>
+
+<h3>Graceful Degradation</h3>
+<ul>
+  <li><strong>Vanna fails:</strong> Falls back to Groq LLM for SQL generation — user sees no difference</li>
+  <li><strong>Redis unavailable:</strong> Falls back to in-memory cache — cache survives until restart</li>
+  <li><strong>S3 unavailable:</strong> Falls back to local filesystem cache — developer mode</li>
+  <li><strong>Database unavailable:</strong> Graph returns error state, approval tokens fall back to in-memory</li>
+  <li><strong>LLM Judge fails:</strong> Defaults to <code>is_correct=True</code> — doesn't block valid queries</li>
+  <li><strong>Embedding fails (quota):</strong> Retries 3 times with exponential backoff, then raises clear error</li>
+  <li><strong>Router fails:</strong> Defaults to CHAT path — at minimum the LLM can still respond</li>
+</ul>
+
+<!-- ═══════ SECURITY ═══════ -->
+<h2 id="security">Security Model</h2>
+
+<h3>1. Cryptographic Approval Tokens</h3>
+<ul>
+  <li>Every SQL generation and mutation upload generates a <code>secrets.token_hex(32)</code> token</li>
+  <li>Tokens are <strong>single-use</strong> — deleted from database after verification</li>
+  <li>Verified using <code>secrets.compare_digest()</code> — timing-safe comparison prevents timing attacks</li>
+  <li>Stored in PostgreSQL with in-memory fallback</li>
+  <li>Tokens are <strong>not returned</strong> in chat responses — only via explicit <code>POST /sql/generate</code> or <code>GET /sql/pending</code></li>
+</ul>
+
+<h3>2. SQL Injection Prevention</h3>
+<ul>
+  <li>All SQL goes through SQLValidator which blocks non-SELECT commands</li>
+  <li>Mutation SQL is fully parameterized — no string concatenation of user data</li>
+  <li>Word-boundary regex prevents false matches on column names (e.g., "updated_at" won't trigger UPDATE block)</li>
+  <li>LLM Judge provides a second opinion on semantic correctness</li>
+</ul>
+
+<h3>3. Mutation Safety</h3>
+<ul>
+  <li>All mutations execute inside <strong>all-or-nothing transactions</strong> — if any row fails, all changes roll back</li>
+  <li>Rejected mutations (approved=false) are discarded from the pending queue with status "rejected"</li>
+  <li>Business rules validate each row before execution</li>
+  <li>DELETE operations always require explicit confirmation</li>
+  <li>Max row limit (1000) prevents resource exhaustion</li>
+  <li>Only supported tables can be mutated (configurable in schema_registry.py)</li>
+</ul>
+
+<h3>4. Audit Trail</h3>
+<ul>
+  <li>Every SQL execution is logged to <code>idop_audit_logs</code></li>
+  <li>Every mutation execution is logged to <code>idop_audit_logs</code></li>
+  <li>Logs include: query_id, original question, SQL, status, timestamp</li>
+  <li>Both successful AND failed operations are logged</li>
+</ul>
+
+<h3>5. CORS</h3>
+<ul>
+  <li>Wildcard origin (<code>*</code>) allowed by default</li>
+  <li>Credentials automatically disabled when wildcard is used (per CORS spec)</li>
+  <li>Specific origins can be configured via <code>ALLOWED_ORIGINS</code></li>
+</ul>
+
+<!-- ═══════ PERFORMANCE ═══════ -->
+<h2 id="performance">Performance Metrics</h2>
+
+<h3>Typical Response Times</h3>
+<table>
+  <tr><th>Path</th><th>Typical Time</th><th>Bottlenecks</th></tr>
+  <tr><td>CHAT</td><td>0.5–2 seconds</td><td>LLM inference (Groq is fast)</td></tr>
+  <tr><td>SQL</td><td>1–4 seconds</td><td>SQL generation + LLM Judge + auto-execute</td></tr>
+  <tr><td>RAG</td><td>3–8 seconds</td><td>HyDE + Hybrid search + CRAG + SRAG loops</td></tr>
+  <tr><td>MUTATION</td><td>2–5 seconds</td><td>File parsing + column mapping + rule validation</td></tr>
+  <tr><td>HYBRID</td><td>4–10 seconds</td><td>Both SQL + RAG pipelines + synthesis</td></tr>
+</table>
+
+<h3>Cost Per Query (Approximate)</h3>
+<table>
+  <tr><th>Component</th><th>Cost</th><th>Notes</th></tr>
+  <tr><td>LLM call (Groq)</td><td>$0.00</td><td>Free tier at 30 req/min per key</td></tr>
+  <tr><td>LLM call (OpenAI fallback)</td><td>~$0.002</td><td>Only if all Groq keys fail</td></tr>
+  <tr><td>Vanna SQL gen (OpenAI)</td><td>$0.001–0.005</td><td>gpt-4o-mini per query</td></tr>
+  <tr><td>Qdrant search</td><td>~$0.00001</td><td>Pay per point stored</td></tr>
+  <tr><td>Tavily web search</td><td>~$0.005</td><td>1000 free / month</td></tr>
+  <tr><td>Redis cache</td><td>~$0.000001</td><td>Pay per request</td></tr>
+</table>
+
+<h3>Cache Hit Rate (Expected)</h3>
+<ul>
+  <li>Frequently asked questions: 60–80% hit rate on RAG cache</li>
+  <li>Repeated SQL queries: 70–90% hit rate on SQL gen cache</li>
+  <li>Same document uploaded twice: 100% hit rate on document cache</li>
+  <li>Embedding reuse: 40–60% hit rate</li>
+</ul>
+
+<!-- ═══════ VANNA VS FALLBACK ═══════ -->
+<h2 id="vanna">Vanna vs Fallback — Detailed Comparison</h2>
+
+<h3>How the Fallback Works</h3>
+<div class="flow">
+  <div class="flow-item">Question</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--sql);">Vanna Agent<br>gpt-4o-mini<br>(OpenAI)</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--accent3);">Exception?</div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-item" style="border-color:var(--rag);">Fallback<br>get_chat_llm()<br>(Groq)</div>
+</div>
+
+<h3>What Errors Trigger the Fallback</h3>
+<table>
+  <tr><th>Error</th><th>Scenario</th><th>Fallback Behavior</th></tr>
+  <tr><td>OpenAI 404 (model not found)</td><td>Wrong model name sent to OpenAI</td><td>✅ Fixed — now uses gpt-4o-mini (real OpenAI model)</td></tr>
+  <tr><td>OpenAI 429 (insufficient quota)</td><td>API key has no credits</td><td>✅ Falls back to Groq — SQL generated correctly</td></tr>
+  <tr><td>OpenAI network timeout</td><td>Network issues</td><td>✅ Falls back to Groq</td></tr>
+  <tr><td>TypeError (non-awaitable)</td><td>Sync method where async expected</td><td>✅ Fixed — resolve_user is now async def</td></tr>
+</table>
+
+<h3>Feature Comparison</h3>
+<div class="compare">
+  <div class="compare-header compare-l">Capability</div>
+  <div class="compare-header">Vanna</div>
+  <div class="compare-header">Fallback (Groq)</div>
+
+  <div class="compare-l">Schema context</div><div>✅ Auto-discovered</div><div>✅ Same schema context passed in prompt</div>
+  <div class="compare-l">SQL quality</div><div>✅ Good</div><div>✅ Equally good</div>
+  <div class="compare-l">Multi-turn refinement</div><div>✅ Can iterate on SQL</div><div>❌ Single-shot only</div>
+  <div class="compare-l">Self-correction on errors</div><div>✅ Sees errors and retries</div><div>❌ Errors propagate up</div>
+  <div class="compare-l">Dynamic schema queries</div><div>✅ Queries DB during gen</div><div>❌ Static context only</div>
+  <div class="compare-l">Complexity</div><div>🔧 Complex agent framework</div><div>✅ Simple prompt</div>
+  <div class="compare-l">Dependency size</div><div>~50MB library</div><div>✅ Minimal</div>
+  <div class="compare-l">Provider requirement</div><div>OpenAI only</div><div>Groq (free) or OpenAI</div>
+</div>
+
+<h3>What Happens if Both Fail?</h3><p>If both Vanna AND the Groq fallback fail (extremely rare — e.g., network outage), the SQL generation node returns:</p>
+<pre><code>{
+  "sql_status": "error",
+  "sql_explanation": "Generation failed: ...",
+  "answer": "❌ SQL generation failed: ..."
+}</code></pre>
+<p>This error message is returned to the user through the chat response. The LLM will say "Sorry, I couldn't generate SQL for that question."</p>
+
+<h3>How to Tell Which Path Was Used</h3>
+<p>Check the <code>explanation</code> field in the SQL generation response:</p>
+<ul>
+  <li><strong>Vanna path:</strong> <code>"SQL generated via Vanna"</code></li>
+  <li><strong>Fallback path:</strong> <code>"⚠️ Direct LLM Fallback: Generated using the primary LLM (LiteLLM/Groq) as the core Vanna agent was unavailable."</code></li>
+</ul>
+
+<!-- ═══════ REAL EXAMPLES ═══════ -->
+<h2 id="examples">Real-World Examples</h2>
+
+<h3>Example 1: Complete SQL Question</h3>
+<div class="example-box">
+  <p><strong>Request:</strong></p>
+  <pre><code>POST /chat
+{
+  "question": "How many SMB customers are in Canada?",
+  "thread_id": "thread-123",
+  "user_id": "user-456",
+  "search_mode": "hybrid"
+}</code></pre>
+  <p><strong>Internal Flow:</strong></p>
+  <div class="flow" style="flex-wrap:nowrap;">
+    <div class="flow-item">Router</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item sql">SQL</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">Vanna<br>Fails</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">Groq<br>Generates</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">Auto-<br>Execute</div>
+  </div>
+  <p><strong>Generated SQL:</strong></p>
+  <pre><code>SELECT COUNT(*) as customer_count
+FROM customers
+WHERE country = 'Canada' AND segment = 'SMB';</code></pre>
+  <p><strong>Response:</strong></p>
+  <pre><code>{
+  "answer": "There are 28 SMB customers located in Canada.",
+  "query_type": "SQL",
+  "sql_query": "SELECT COUNT(*) ...",
+  "sql_status": "executed",
+  "processing_time_ms": 2150.43
+}</code></pre>
+</div>
+
+<h3>Example 2: Complete Mutation Workflow</h3>
+<div class="example-box">
+  <p><strong>Step 1 — Upload file:</strong></p>
+  <pre><code>POST /mutation/upload
+Form data:
+  table_name: "products"
+  request_intent: "Add new electronic products"
+  file: products.xlsx (5 rows)</code></pre>
+  <p><strong>Response (Step 1):</strong></p>
+  <pre><code>{
+  "mutation_id": "abc-123",
+  "op_type": "INSERT",
+  "row_count": 5,
+  "status": "pending_approval",
+  "mappings": {"Product Name": "name", "Price": "price", ...},
+  "errors": [],
+  "token": "crypto_token_hex_64_chars"
+}</code></pre>
+  <p><strong>Step 2 — Approve:</strong></p>
+  <pre><code>POST /mutation/approve
+{
+  "mutation_id": "abc-123",
+  "approved": true,
+  "token": "crypto_token_hex_64_chars"
+}</code></pre>
+  <p><strong>Response (Step 2):</strong></p>
+  <pre><code>{
+  "mutation_id": "abc-123",
+  "rows_affected": 5,
+  "status": "executed"
+}</code></pre>
+</div>
+
+<h3>Example 3: Complete RAG Query with Web Fallback</h3>
+<div class="example-box">
+  <p><strong>Request:</strong></p>
+  <pre><code>POST /chat
+{
+  "question": "What is the latest AI regulation policy in the EU?",
+  "thread_id": "thread-789",
+  "user_id": "user-456",
+  "enable_hyde": true,
+  "enable_reranking": true
+}</code></pre>
+  <p><strong>Internal Flow:</strong></p>
+  <div class="flow" style="flex-wrap:nowrap;overflow-x:auto;">
+    <div class="flow-item">Router</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item rag">RAG</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">HyDE</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">Hybrid<br>Search</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">CRAG:<br>AMBIGUOUS</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">Web<br>Search</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-item">SRAG<br>Verify</div>
+  </div>
+  <p><strong>Explanation:</strong> Internal documents score 0.45 (AMBIGUOUS). Tavily web search fetches latest EU AI Act information. The answer is synthesized from web results with proper citations.</p>
+</div>
+
+<h3>Example 4: Complete HYBRID Request</h3>
+<div class="example-box">
+  <p><strong>Request:</strong></p>
+  <pre><code>POST /chat
+{
+  "question": "Do our current stock levels meet the minimum requirements in the inventory policy?",
+  "thread_id": "thread-abc",
+  "user_id": "warehouse-manager"
+}</code></pre>
+  <p><strong>Internal (Parallel):</strong></p>
+  <p><strong>→ SQL path:</strong> <code>SELECT product_name, stock_quantity FROM products ORDER BY stock_quantity</code></p>
+  <p><strong>→ RAG path:</strong> Searches inventory_policy.pdf → "Minimum stock level for all products is 10 units"</p>
+  <p><strong>Synthesis:</strong></p>
+  <pre><code>{
+  "answer": "## Stock Level Compliance Report\n\n**Policy Requirement:** All products must maintain minimum stock of 10 units.\n\n**Current Status:** 3 out of 15 products (20%) are below minimum:\n| Product | Stock | Status |\n|---------|-------|--------|\n| Widget A | 5 | ⚠️ Below min |\n| Gadget B | 3 | ❌ Critical |\n| Thing C | 7 | ⚠️ Below min |\n\n**Recommendation:** Reorder Widget A, Gadget B, and Thing C immediately.",
+  "sql_results": [...],
+  "sql_status": "executed",
+  "crag_verdict": "CORRECT",
+  "processing_time_ms": 6234.12
+}</code></pre>
+</div>
+
+<!-- ═══════ FOOTER ═══════ -->
+<p style="margin-top:60px;padding:20px 0;border-top:1px solid var(--border);text-align:center;color:var(--text2);font-size:14px;">
+  IDOP — Intelligent Data Operations Platform v0.1.1<br>
+  Documentation generated from source code analysis. Last updated: June 2026.
+</p>
+
+</main>
+
+<!-- ═══════ SEARCH JAVASCRIPT ═══════ -->
+<script>
+(function() {
+  const input = document.getElementById('searchInput');
+  const clearBtn = document.getElementById('searchClear');
+  const countEl = document.getElementById('searchCount');
+  const main = document.querySelector('main');
+  const sidebar = document.getElementById('sidebar');
+  
+  // Collect all searchable content sections
+  const sections = [];
+  const headings = main.querySelectorAll('h1, h2, h3, h4');
+  
+  headings.forEach(function(h) {
+    const section = document.createElement('div');
+    // Find the parent section boundary (next heading of same or higher level)
+    let el = h.nextElementSibling;
+    let content = '';
+    while (el && !el.matches('h1, h2, h3, h4')) {
+      if (el.tagName !== 'SCRIPT') {
+        content += el.textContent + ' ';
+      }
+      el = el.nextElementSibling;
+    }
+    sections.push({
+      id: h.id || '',
+      heading: h.textContent,
+      headingEl: h,
+      content: content.trim()
+    });
+  });
+  
+  // Collect sidebar links for nav filtering
+  const navLinks = sidebar ? sidebar.querySelectorAll('a') : [];
+  
+  function clearSearch() {
+    input.value = '';
+    clearBtn.classList.remove('visible');
+    countEl.classList.remove('visible');
+    sections.forEach(function(s) {
+      if (s.headingEl) {
+        s.headingEl.classList.remove('search-hidden');
+        // Also show all content under this heading
+        let el = s.headingEl.nextElementSibling;
+        while (el && !el.matches('h1, h2, h3, h4')) {
+          el.classList.remove('search-hidden');
+          el = el.nextElementSibling;
+        }
+      }
+    });
+    // Show all sidebar links
+    Array.from(navLinks).forEach(function(a) { a.classList.remove('search-hidden'); });
+    scrollTo(0,0);
+  }
+  
+  function doSearch(query) {
+    if (!query || query.length < 2) {
+      clearSearch();
+      return;
+    }
+    
+    const q = query.toLowerCase();
+    let totalMatches = 0;
+    
+    // First pass: score and show/hide sections
+    sections.forEach(function(s) {
+      const headingText = s.heading.toLowerCase();
+      const contentText = s.content.toLowerCase();
+      const matches = headingText.includes(q) || contentText.includes(q);
+      
+      if (matches) totalMatches++;
+      
+      // Show/hide the heading
+      if (s.headingEl) {
+        s.headingEl.classList.toggle('search-hidden', !matches);
+        // Show/hide following content until next heading
+        let el = s.headingEl.nextElementSibling;
+        while (el && !el.matches('h1, h2, h3, h4')) {
+          el.classList.toggle('search-hidden', !matches);
+          el = el.nextElementSibling;
+        }
+      }
+    });
+    
+    // Filter sidebar navigation
+    Array.from(navLinks).forEach(function(a) {
+      const href = a.getAttribute('href');
+      if (!href || href === '#') { a.classList.remove('search-hidden'); return; }
+      const targetId = href.replace('#', '');
+      const section = sections.find(function(s) { return s.id === targetId; });
+      a.classList.toggle('search-hidden', !section || section.headingEl.classList.contains('search-hidden'));
+      
+      // Always show section headers in nav
+      if (a.classList.contains('section')) {
+        const nextLinks = [];
+        let sib = a.nextElementSibling;
+        while (sib && !sib.classList.contains('section')) {
+          nextLinks.push(sib);
+          sib = sib.nextElementSibling;
+        }
+        const hasVisibleChildren = nextLinks.some(function(l) { return !l.classList.contains('search-hidden'); });
+        a.classList.toggle('search-hidden', !hasVisibleChildren);
+      }
+    });
+    
+    // Update count
+    countEl.textContent = totalMatches + ' section' + (totalMatches !== 1 ? 's' : '') + ' match' + (totalMatches !== 1 ? 'es' : '');
+    countEl.classList.toggle('visible', true);
+    clearBtn.classList.toggle('visible', true);
+  }
+  
+  // Debounced input handler
+  let debounceTimer;
+  input.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() {
+      doSearch(input.value.trim());
+    }, 150);
+  });
+  
+  clearBtn.addEventListener('click', function() {
+    clearSearch();
+    input.focus();
+  });
+  
+  // Keyboard shortcut: Ctrl+/ or Cmd+/ to focus search
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      input.focus();
+    }
+  });
+  
+})();
+</script>
+</body>
+</html>

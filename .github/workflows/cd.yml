@@ -626,7 +626,7 @@ jobs:
                 networks:
                   - idop-net
                 # t2.micro has 1GB RAM — limit containers to prevent OOM kills
-                # when ML models (torch, docling, transformers) load into memory
+                # docling + torch REMOVED (2026-06-07) — pypdf is lightweight (~30 MB)
                 mem_limit: 768m
                 mem_reservation: 512m
 

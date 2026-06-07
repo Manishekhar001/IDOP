@@ -449,7 +449,7 @@ class TestExtensionSync:
         FileValidator.ALLOWED_EXTENSIONS keys must be an exact match
         with DocumentProcessor.SUPPORTED_EXTENSIONS.
         """
-        # Lazy import: DocumentProcessor triggers docling/langchain imports (slow).
+        # Lazy import: DocumentProcessor triggers langchain imports (slow).
         from app.core.document_processor import DocumentProcessor
         from app.utils.validators import FileValidator
 

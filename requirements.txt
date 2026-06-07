@@ -28,8 +28,7 @@ openai>=1.0.0  # Direct dependency for LLM judges (feature1_sql, feature2_mutati
 litellm==1.87.1
 tavily-python>=0.3.0
 langchain-tavily>=0.2.0  # Standalone Tavily integration (replaces langchain-community.tavily)
-docling>=2.96.1  # py3-none-any wheel — Python 3.13 classifier confirmed
-transformers>=4.42.0,<4.57.0  # docling-ibm-models needs AutoProcessor/AutoModelForImageTextToText in top-level namespace — removed in v4.57+ and v5+
+pypdf>=3.0.0  # Lightweight PDF text extraction — no torch/ML dependencies
 opik>=2.0.54    # py3-none-any wheel — Python 3.13 classifier confirmed
 moto[s3]>=5.0.0  # S3 storage backend mocking for tests
 python-multipart>=0.0.12

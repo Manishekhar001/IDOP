@@ -39,7 +39,7 @@ graph TB
 
     subgraph Parse["Document Parsing"]
         style Parse fill:#f3e5f5,stroke:#9C27B0,stroke-width:2px
-        PDFLoader["Docling DocumentConverter<br/>(PDF files)"]
+        PDFLoader["pypdf PdfReader<br/>(PDF files)"]
         TextLoader["TextLoader<br/>(TXT files)"]
         CSVLoader["CSVLoader<br/>(CSV files)"]
     end
@@ -69,9 +69,7 @@ graph TB
     CacheCheck -->|"Yes"| LoadCache --> RebuildDocs --> Qdrant
     CacheCheck -->|"No"| PDFLoader
     CacheCheck -->|"No"| TextLoader
-    CacheCheck -->|"No"| CSVLoader
-
-    PDFLoader --> Splitter
+    CacheCheck -->|"No"| CSVLoader    PDFLoader --> Splitter
     TextLoader --> Splitter
     CSVLoader --> Splitter
     Splitter --> IndexTag
@@ -118,16 +116,16 @@ doc_id = sha256.hexdigest()
 
 | File Type | Parser | Output |
 |---|---|---|
-| `.pdf` | **Docling** `DocumentConverter` | One `Document` with structured markdown output |
+| `.pdf` | **pypdf** `PdfReader` | Single `Document` with raw extracted text |
 | `.txt` | `TextLoader` (UTF-8) | Single `Document` per file |
 | `.csv` | `CSVLoader` (UTF-8) | One `Document` per row |
 
-> **Note:** PDFs are parsed using IBM's [Docling](https://github.com/docling-project/docling) AI document understanding library (`DocumentConverter`), which preserves document structure (headings, tables, lists) and exports to markdown. This replaces the older `PyPDFLoader` for superior layout handling and OCR support on scanned documents.
+> **Note:** PDFs are parsed using [pypdf](https://github.com/py-pdf/pypdf) (`PdfReader`) for lightweight text extraction from born-digital PDFs. Unlike the previous Docling implementation, pypdf does NOT use torch, ML models, or OCR — eliminating OOM kills on t2.micro (1 GB RAM). Scanned/image-based PDFs will produce empty output. For structured table extraction, consider pdfplumber as an alternative.
 
 - Files are written to a temporary path before parsing
 - Temporary files are cleaned up (`unlink`) in a `finally` block
 - Each document's `metadata.source` is set to the original upload filename
-- Source: [document_processor.py](../../app/core/document_processor.py) (lines 38–88)
+- Source: [document_processor.py](../../app/core/document_processor.py)
 
 ### Text Chunking
 
@@ -247,7 +245,7 @@ Check cache: S3/local for doc_id
     │   Return response (fast path)
     │
     └── CACHE MISS:
-        Parse with Docling DocumentConverter → Document (structured markdown)
+        Parse with pypdf PdfReader → Document (raw text)
         │
         ▼
         Split with RecursiveCharacterTextSplitter
@@ -278,7 +276,7 @@ Check cache: S3/local for doc_id
 |---|---|---|
 | **SHA-256 hash** (10 MB file) | ~20 ms | Streamed in 8 KB blocks |
 | **Cache hit** (load + upsert) | ~200–500 ms | Skips parsing + embedding entirely |
-| **PDF parsing** (50 pages) | ~3–10 s | Docling DocumentConverter with layout analysis |
+| **PDF parsing** (50 pages) | ~0.1–0.5 s | pypdf PdfReader — no ML models |
 | **Chunking** (500 chunks) | ~50 ms | In-memory text splitting |
 | **Dense embedding** (500 chunks) | ~3–8 s | Nomic API batch call (rate-limited) |
 | **Sparse vectors** (500 chunks) | ~100 ms | In-process tokenization + hashing |
