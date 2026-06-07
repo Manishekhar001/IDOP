@@ -13,14 +13,15 @@ COPY requirements.txt .
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
 # Notes:
-# - CPU-only PyTorch: torch is installed FIRST from the CPU-only index, so CUDA
-#   runtime packages (~1.5-2GB) never enter the venv. EC2 t2.micro has no GPU.
-# - torch has been removed from requirements.txt to prevent PyPI pulling in CUDA torch.
-# - docling uses torch at runtime for PDF parsing — CPU-only is sufficient.
+# - CPU-only PyTorch: torch and torchvision installed FIRST from the CPU-only index.
+#   This prevents PyPI from pulling in CUDA-compiled torchvision (~1.5-2GB CUDA
+#   runtime) which is incompatible with CPU-only torch (torchvision::nms error).
+# - EC2 t2.micro has no GPU — CPU-only is sufficient for docling PDF parsing.
+# - torch/torchvision removed from requirements.txt to prevent PyPI override.
 
 
 # Production stage
