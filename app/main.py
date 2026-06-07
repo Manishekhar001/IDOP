@@ -118,17 +118,21 @@ async def lifespan(app: FastAPI):
 
     # Run both Postgres inits in parallel — they're independent and this cuts
     # worst-case startup from ~34s to ~17s (exponential backoff: 1s, 2s, 4s, 8s).
+    # EC2 cold start (t2.micro) can take up to 115s for Postgres to be healthy.
+    # The CD pipeline health check waits 210s.  Our retry window must cover that.
+    # Exponential backoff: 3, 6, 12, 24, 48, 96, 192 = 381s total.
+    # This comfortably exceeds the 210s compose healthcheck timeout.
     logger.info("Connecting AsyncPostgresStore (LTM) and AsyncPostgresSaver...")
     store_task = _retry_init(
         lambda: _connect_pg_resource(AsyncPostgresStore),
         "AsyncPostgresStore (LTM)",
-        max_retries=5,
+        max_retries=8,
         initial_delay=3.0,
     )
     checkpointer_task = _retry_init(
         lambda: _connect_pg_resource(AsyncPostgresSaver),
         "AsyncPostgresSaver (checkpointer)",
-        max_retries=5,
+        max_retries=8,
         initial_delay=3.0,
     )
     store, checkpointer = await asyncio.gather(store_task, checkpointer_task)
