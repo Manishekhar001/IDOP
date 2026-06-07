@@ -71,7 +71,9 @@ class DocumentProcessor:
                 all_text.append(text)
 
         if not all_text:
-            logger.warning(f"No text extracted from {file_path.name} — may be a scanned PDF")
+            logger.warning(
+                f"No text extracted from {file_path.name} — may be a scanned PDF"
+            )
             return []
 
         full_text = "\n\n".join(all_text)
