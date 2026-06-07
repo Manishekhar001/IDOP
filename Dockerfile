@@ -57,7 +57,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY app/ ./app/
 COPY business_rules/ ./business_rules/
 
-RUN chown -R appuser:appgroup /app
+RUN chown -R appuser:appgroup /app /opt/venv
 
 USER appuser
 
