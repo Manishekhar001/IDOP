@@ -625,6 +625,10 @@ jobs:
                     condition: service_healthy
                 networks:
                   - idop-net
+                # t2.micro has 1GB RAM — limit containers to prevent OOM kills
+                # when ML models (torch, docling, transformers) load into memory
+                mem_limit: 768m
+                mem_reservation: 512m
 
               checkpoint-db:
                 image: postgres:15-alpine
@@ -643,6 +647,8 @@ jobs:
                   timeout: 5s
                   retries: 30
                   start_period: 60s
+                mem_limit: 256m
+                mem_reservation: 128m
                 networks:
                   - idop-net
                 # ⬆️ retries: 30 × 5s = 150s max + 60s start_period = 210s total

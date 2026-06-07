@@ -30,6 +30,9 @@ services:
       retries: 15
       start_period: 40s
     restart: unless-stopped
+    # t2.micro has 1GB RAM — prevent Postgres from starving the app
+    mem_limit: 256m
+    mem_reservation: 128m
 
   idop:
     build: .
@@ -49,6 +52,10 @@ services:
     networks:
       - idop-net
     restart: unless-stopped
+    # t2.micro has 1GB RAM — limit containers to prevent OOM kills
+    # when ML models (torch, docling, transformers) are loaded
+    mem_limit: 768m
+    mem_reservation: 512m
 
 networks:
   idop-net:
