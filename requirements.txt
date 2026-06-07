@@ -29,7 +29,7 @@ litellm==1.87.1
 tavily-python>=0.3.0
 langchain-tavily>=0.2.0  # Standalone Tavily integration (replaces langchain-community.tavily)
 docling>=2.96.1  # py3-none-any wheel — Python 3.13 classifier confirmed
-transformers>=4.30.0,<5.0.0  # Pinned to v4.x — docling-ibm-models incompatible with transformers v5's lazy module alias system
+transformers>=4.42.0,<4.57.0  # docling-ibm-models needs AutoProcessor/AutoModelForImageTextToText in top-level namespace — removed in v4.57+ and v5+
 opik>=2.0.54    # py3-none-any wheel — Python 3.13 classifier confirmed
 moto[s3]>=5.0.0  # S3 storage backend mocking for tests
 python-multipart>=0.0.12
