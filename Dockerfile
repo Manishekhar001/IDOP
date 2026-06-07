@@ -19,8 +19,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     # Strip torch test suite (~1.5GB on Linux) — not needed at runtime
     rm -rf /opt/venv/lib/python3.12/site-packages/torch/test/ && \
-    # Remove pip cache and __pycache__ to further reduce image size
-    find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+    # Strip torchvision test suite as well
+    rm -rf /opt/venv/lib/python3.12/site-packages/torchvision/test/ 2>/dev/null || true && \
+    # Remove .pyc bytecode files and __pycache__ directories
+    find /opt/venv -name '*.pyc' -delete && \
+    find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove pip's persistent cache in /root
+    rm -rf /root/.cache/pip 2>/dev/null || true
 
 # Notes:
 # - CPU-only PyTorch: torch and torchvision installed FIRST from the CPU-only index.

@@ -777,8 +777,8 @@ jobs:
             echo "=========================================="
             df -h /
             AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
-            if [ "$AVAIL_KB" -lt 2097152 ]; then
-              echo "⚠️ Less than 2GB free (${AVAIL_KB}KB). Attempting EBS volume resize..."
+            if [ "$AVAIL_KB" -lt 5242880 ]; then
+              echo "⚠️ Less than 5GB free (${AVAIL_KB}KB). Attempting EBS volume resize to 20GB..."
               INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || \
                             curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
                               http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
@@ -796,10 +796,10 @@ jobs:
                   VOL_ID=$(echo "$VOL_DATA" | awk '{print $1}')
                   CURRENT_SIZE=$(echo "$VOL_DATA" | awk '{print $2}')
                   echo "  📀 Root volume: $VOL_ID (${CURRENT_SIZE}GB)"
-                  if [ "$CURRENT_SIZE" -lt 20 ] 2>/dev/null; then
-                    echo "  🔧 Resizing $VOL_ID from ${CURRENT_SIZE}GB to 20GB..."
+                  if [ "$CURRENT_SIZE" -lt 30 ] 2>/dev/null; then
+                    echo "  🔧 Resizing $VOL_ID from ${CURRENT_SIZE}GB to 30GB..."
                     MODIFY_RESULT=$(aws ec2 modify-volume \
-                      --volume-id "$VOL_ID" --size 20 \
+                      --volume-id "$VOL_ID" --size 30 \
                       --region $AWS_REGION 2>&1)
                     if [ $? -eq 0 ]; then
                       echo "  ✅ Resize initiated! Waiting for completion..."
@@ -827,6 +827,8 @@ jobs:
                     fi
                   else
                     echo "  ✅ Volume is already ${CURRENT_SIZE}GB — sufficient."
+                  else
+                    echo "  Volume is large enough, skipping resize."
                   fi
                 else
                   echo "  ⚠️ Could not determine root volume ID (describe-volumes may lack ec2:DescribeVolumes permission)."
