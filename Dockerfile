@@ -6,6 +6,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    libgl1-mesa-dev \
+    libglib2.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -38,6 +40,8 @@ ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     libmagic1 \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appgroup && useradd -r -m -g appgroup appuser

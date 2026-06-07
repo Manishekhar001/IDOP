@@ -46,11 +46,28 @@ class DocumentProcessor:
         which splits blindly by character count.
         """
         logger.info(f"Loading PDF with Docling: {file_path.name}")
-        from docling.document_converter import DocumentConverter
-        from docling.chunking import HybridChunker
+        try:
+            from docling.document_converter import DocumentConverter
+            from docling.chunking import HybridChunker
+        except ImportError as e:
+            raise ImportError(
+                f"Docling PDF processing dependencies not available: {e}. "
+                "Ensure 'docling' and 'transformers>=4.42.0,<4.57.0' are installed. "
+                "In Docker, also install: apt-get install -y libgl1 libglib2.0-0"
+            ) from e
 
-        converter = DocumentConverter()
-        result = converter.convert(str(file_path))
+        try:
+            converter = DocumentConverter()
+            result = converter.convert(str(file_path))
+        except Exception as e:
+            err_msg = str(e)
+            if "AutoProcessor" in err_msg or "Could not import" in err_msg:
+                raise RuntimeError(
+                    f"Docling PDF conversion failed due to missing system dependencies: {e}. "
+                    "In Docker, ensure 'libgl1' and 'libglib2.0-0' are installed. "
+                    "Also verify transformers>=4.42.0,<4.57.0 is installed."
+                ) from e
+            raise
         docling_doc = result.document
 
         # Use Docling's HybridChunker for structure-preserving chunking
