@@ -72,10 +72,18 @@ class WebSearchService:
 
         web_docs: list[Document] = []
         for r in results:
-            title = r.get("title", "")
-            url = r.get("url", "")
-            content = r.get("content", "") or r.get("snippet", "")
-            text = f"TITLE: {title}\nURL: {url}\nCONTENT:\n{content}"
+            if isinstance(r, dict):
+                title = r.get("title", "")
+                url = r.get("url", "")
+                raw_content = r.get("content", "") or r.get("snippet", "")
+            elif isinstance(r, str):
+                title = ""
+                url = r
+                raw_content = r
+            else:
+                logger.warning(f"Unexpected Tavily result type: {type(r)}")
+                continue
+            text = f"TITLE: {title}\nURL: {url}\nCONTENT:\n{raw_content}"
             web_docs.append(
                 Document(
                     page_content=text,
