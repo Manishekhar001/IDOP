@@ -827,8 +827,6 @@ jobs:
                     fi
                   else
                     echo "  ✅ Volume is already ${CURRENT_SIZE}GB — sufficient."
-                  else
-                    echo "  Volume is large enough, skipping resize."
                   fi
                 else
                   echo "  ⚠️ Could not determine root volume ID (describe-volumes may lack ec2:DescribeVolumes permission)."
