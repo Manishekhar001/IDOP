@@ -104,6 +104,24 @@ def _build_litellm_router() -> Any:
         )
         logger.info(f"  Groq deployment {i+1}: groq/{model}")
 
+    # Add OpenAI as a fallback deployment within the same model group.
+    # If all Groq deployments fail (e.g. invalid/expired keys, rate limits),
+    # the Router will automatically fall through to this OpenAI deployment.
+    openai_api_key = settings.openai_api_key
+    if openai_api_key and str(openai_api_key).strip():
+        fallback_model = "gpt-4o-mini"
+        model_list.append(
+            {
+                "model_name": model_group,
+                "litellm_params": {
+                    "model": f"openai/{fallback_model}",
+                    "api_key": openai_api_key,
+                },
+                "rpm": 50,  # OpenAI gpt-4o-mini: tier-1 is 50 RPM
+            }
+        )
+        logger.info(f"  Fallback deployment: openai/{fallback_model}")
+
     # Configure the Router with cooldown and retry settings
     router = Router(
         model_list=model_list,
