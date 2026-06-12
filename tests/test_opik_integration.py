@@ -247,7 +247,6 @@ SERVICE_FILES_WITH_TRACK = [
     "app/core/feature2_mutation/executor.py",
     "app/core/feature2_mutation/file_parser.py",
     "app/core/feature2_mutation/rule_validator.py",
-    "app/core/feature3_rag/retrieval.py",
     "app/core/feature3_rag/hyde.py",
     "app/core/feature3_rag/reranking.py",
     "app/core/feature3_rag/context_enrichment.py",
