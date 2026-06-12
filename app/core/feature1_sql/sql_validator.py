@@ -28,9 +28,6 @@ class SQLValidator:
         "EXEC",
     }
 
-    def __init__(self):
-        pass
-
     @track(name="sql_validator_validate")
     def validate(self, sql: str) -> tuple[bool, str]:
         """

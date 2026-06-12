@@ -11,9 +11,6 @@ class MutationGenerator:
     Generates safe parameterised SQL statements for batch database mutations (INSERT/UPDATE/DELETE).
     """
 
-    def __init__(self):
-        pass
-
     @track(name="mutation_generator_insert")
     def generate_insert(
         self, table_name: str, mapped_rows: List[Dict[str, Any]]

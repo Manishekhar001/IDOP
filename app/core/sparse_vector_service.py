@@ -66,9 +66,6 @@ class SparseVectorService:
         "now",
     }
 
-    def __init__(self):
-        pass
-
     def tokenize(self, text: str) -> List[str]:
         text = text.lower()
         tokens = re.findall(r"\b[a-z0-9]+(?:-[a-z0-9]+)*\b", text)

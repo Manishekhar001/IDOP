@@ -13,9 +13,6 @@ class FileParser:
     Parses user uploaded Excel or CSV data spreadsheets using pandas and openpyxl.
     """
 
-    def __init__(self):
-        pass
-
     @track(name="file_parser_parse")
     def parse_file(self, file_content: bytes, filename: str) -> List[Dict[str, Any]]:
         """
