@@ -60,7 +60,7 @@ The mutation pipeline relies on seven specialized architectural layers:
 *   **RuleValidator (`app/core/feature2_mutation/rule_validator.py`)**: Executes programmatic type, range, regex, and integrity checks against the validation dictionary specified in `business_rules/rules.json`.
 *   **MutationGenerator (`app/core/feature2_mutation/mutation_generator.py`)**: Translates the mapped and validated rows into standard parameterized PostgreSQL mutation queries, keeping data parameterized to prevent SQL injection.
 *   **MutationLLMJudge (`app/core/feature2_mutation/llm_judge.py`)**: Audits draft queries for logical validation (e.g. massive deletion scope or out-of-bounds update ranges).
-*   **MutationApprovalGate (`app/core/feature2_mutation/approval_gate.py`)**: Generates a single-use cryptographically secure hex token (`secrets.token_hex(32)`) and stores the pending transaction payload in memory until the user signs off.
+*   **MutationApprovalGate**: Uses the shared [ApprovalGate](../../app/core/approval_gate.py) class (instantiated as `mutation_approval_gate`), providing a single-use cryptographically secure hex token (`secrets.token_hex(32)`) and stores the pending transaction payload until the user signs off. The original `app/core/feature2_mutation/approval_gate.py` is now a thin re-export of the shared singleton.
 
 ---
 
@@ -124,21 +124,37 @@ Once cleared, a session token is generated.
 > Transactions are **NEVER** executed automatically. The FastAPI server returns a pending status alongside an approval token. The operation is kept in a thread-safe cache for up to 30 minutes, awaiting confirmation at `POST /mutation/approve` with the token.
 
 ### 5. Execution and Automatic Rollback
-When the user submits the correct cryptographic token, the `MutationExecutor` runs the transaction inside an isolated block on the Supabase PostgreSQL database:
+When the user submits the correct cryptographic token, the `MutationExecutor` runs the transaction inside an isolated block on the Supabase PostgreSQL database. Audit logging uses the shared [AuditLogger](../../app/core/audit_logger.py) class (consolidated from duplicate code in both `SQLExecutor` and `MutationExecutor`):
 
 ```python
+from app.core.audit_logger import AuditLogger
+
+audit = AuditLogger()
+# ... inside the execution block:
+audit.ensure_table(conn)
+audit.log(conn, mutation_id, question, sql, "SUCCESS")
+```
+
+**Transaction flow:**
+```python
 # app/core/feature2_mutation/executor.py
-async def execute_mutation(db_session, parameterized_queries, parameters):
-    try:
-        # Run inside standard transaction block
-        async with db_session.begin():
-            for query, params in zip(parameterized_queries, parameters):
-                await db_session.execute(query, params)
-        # Writes auto-commit on block exit
-    except Exception as e:
-        # Implicit rollback occurs on failure
-        logger.error(f"Mutation execution failed, rolling back. Error: {e}")
-        raise DatabaseTransactionError("Transaction rolled back due to execution failure.")
+conn = psycopg2.connect(...)
+audit.ensure_table(conn)  # DDL commits on its own
+conn.autocommit = False
+
+try:
+    # Execute parameterized SQL
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+    
+    audit.log(conn, mutation_id, question, sql, "SUCCESS")
+    conn.commit()
+except Exception as e:
+    conn.rollback()
+    audit.log(conn, mutation_id, question, sql, f"FAILED: {e}")
+    conn.commit()
+finally:
+    conn.close()
 ```
 
 ---

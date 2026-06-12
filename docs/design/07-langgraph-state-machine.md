@@ -163,20 +163,45 @@ graph TD
 The LangGraph compiler directs the execution flow dynamically using five custom conditional edge functions based on the current state:
 
 ### 1. `route_after_router`
-Classifies the raw input and directs the process to one of the five specific functional entrypoints:
+Classifies the raw input and directs the process to one of the five specific functional entrypoints. Note that the HYBRID path returns `"hybrid"` which is mapped to the registered `"hybrid_gen"` node name via the graph builder's edge configuration:
 ```python
 def route_after_router(state: CSRAGState) -> str:
-    query_type = state.get("query_type", "CHAT")
-    if query_type == "SQL":
+    """
+    Route the query to the appropriate first pipeline node.
+
+    Returns the NEXT graph node name:
+    - "sql_gen"        → SQL pipeline (Feature 1)
+    - "mutation"       → Mutation pipeline (Feature 2)
+    - "ltm_remember"   → RAG pipeline (Feature 3)
+    - "hybrid"         → HYBRID pipeline (parallel SQL + RAG)
+    - "chat"           → Direct LLM response (no retrieval)
+    """
+    q_type = state.get("query_type", "CHAT")
+    if q_type == "SQL":
         return "sql_gen"
-    elif query_type == "MUTATION":
+    elif q_type == "MUTATION":
         return "mutation"
-    elif query_type == "RAG":
+    elif q_type == "RAG":
         return "ltm_remember"
-    elif query_type == "HYBRID":
-        return "hybrid_gen"
+    elif q_type == "HYBRID":
+        return "hybrid"
     else:
-        return "generate_direct"
+        return "chat"
+```
+
+The graph builder maps the router output to actual node names via:
+```python
+builder.add_conditional_edges(
+    "router",
+    route_after_router,
+    {
+        "sql_gen": "sql_gen",
+        "mutation": "mutation",
+        "ltm_remember": "ltm_remember",
+        "hybrid": "hybrid_gen",   # mapped to the wrapped node
+        "chat": "generate_direct",
+    },
+)
 ```
 
 ### 2. `route_after_decide`
@@ -189,13 +214,16 @@ def route_after_decide(state: CSRAGState) -> str:
 ```
 
 ### 3. `route_after_crag`
-Decides whether external internet queries are needed to rectify poor database context:
+Decides whether external internet queries are needed to rectify poor database context. Now handles three CRAG verdicts — for AMBIGUOUS docs, it goes directly to web search without an LLM query rewrite round-trip:
 ```python
 def route_after_crag(state: CSRAGState) -> str:
-    verdict = state.get("crag_verdict", "CORRECT")
+    verdict = state["crag_verdict"]
     if verdict == "CORRECT":
         return "refine_context"
-    # Triggers query rewrite followed by live Tavily search
+    elif verdict == "AMBIGUOUS":
+        # AMBIGUOUS: internal docs partially relevant — go directly to web search
+        # to supplement, skipping the query rewrite LLM round-trip.
+        return "web_search"
     return "rewrite_query"
 ```
 
@@ -231,28 +259,31 @@ To compile the graph with persistent STM (Short-Term Session Memory) and LTM (Lo
 # app/core/graph/builder.py
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
+
 from app.core.graph.nodes import (
-    router_node, sql_generation_node, mutation_node, ltm_remember_node, 
-    decide_retrieval_node, generate_direct_node, retrieve_docs_node, 
-    evaluate_docs_node, rewrite_query_node, web_search_node, 
-    refine_context_node, generate_answer_node, verify_support_node, 
-    revise_answer_node, verify_usefulness_node, rewrite_question_node, 
-    stm_summarize_node, hybrid_generation_node
+    router_node, sql_generation_node, mutation_node, ltm_remember_node,
+    decide_retrieval_node, generate_direct_node, retrieve_docs_node,
+    evaluate_docs_node, rewrite_query_node, web_search_node,
+    refine_context_node, generate_answer_node, verify_support_node,
+    revise_answer_node, verify_usefulness_node, rewrite_question_node,
+    stm_summarize_node, hybrid_generation_node,
 )
 
 async def compile_idop_graph(conn_string: str, vector_store):
     # Setup Persistent Stores
     store = AsyncPostgresStore.from_conn_string(conn_string)
     checkpointer = AsyncPostgresSaver.from_conn_string(conn_string)
-    
+
     # Initialize StateGraph
     builder = StateGraph(CSRAGState)
-    
+
     # Register all 18 nodes
     builder.add_node("router", router_node)
     builder.add_node("sql_gen", sql_generation_node)
     builder.add_node("mutation", mutation_node)
-    builder.add_node("hybrid_gen", hybrid_generation_node)
+    # hybrid_gen wraps hybrid_generation_node with vector_store injection
+    hybrid_with_store = partial(hybrid_generation_node, vector_store=vector_store)
+    builder.add_node("hybrid_gen", hybrid_with_store)
     builder.add_node("ltm_remember", ltm_remember_node)
     builder.add_node("decide_retrieval", decide_retrieval_node)
     builder.add_node("generate_direct", generate_direct_node)
@@ -267,14 +298,30 @@ async def compile_idop_graph(conn_string: str, vector_store):
     builder.add_node("verify_usefulness", verify_usefulness_node)
     builder.add_node("rewrite_question", rewrite_question_node)
     builder.add_node("stm_summarize", stm_summarize_node)
-    
-    # Configure recursion parameters and compile
+
+    # Edges with conditional routing
+    builder.add_conditional_edges(
+        "router", route_after_router,
+        {
+            "sql_gen": "sql_gen",
+            "mutation": "mutation",
+            "ltm_remember": "ltm_remember",
+            "hybrid": "hybrid_gen",
+            "chat": "generate_direct",
+        },
+    )
+    # ... remaining edges follow the CSRAG flow
+
     compiled_graph = builder.compile(
         checkpointer=checkpointer,
         store=store
     )
     return compiled_graph
 ```
+
+> **Note:** The `hybrid_gen` node uses `functools.partial` to inject the `vector_store` dependency at graph compilation time. This avoids creating a new `VectorStoreService` for every invocation.
+
+> **Note:** An unreachable auto-execute SELECT block (~50 lines) and a duplicate `pending_approval` return (~25 lines) were removed from `sql_generation_node` in a refactoring pass. The function always returns `pending_approval` — execution happens via `/sql/approve`.
 
 > [!TIP]
 > The recursion limit is set to a high value of **80** in execution scripts to comfortably accommodate dual support-revision and usefulness-rewrite feedback loops without hitting LangGraph's safety limits.

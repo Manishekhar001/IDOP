@@ -2,7 +2,7 @@
 
 **Project:** Intelligent Data Operations Platform (IDOP)
 **Version:** 0.1.0
-**Last Updated:** 2026-05-25
+**Last Updated:** 2026-06-12
 
 ---
 
@@ -140,10 +140,28 @@ A `GPT-4o-mini`-powered semantic evaluator that audits generated SQL for logical
 - The warning is surfaced to the user in the approval interface so they can make an informed decision
 - Source: [llm_judge.py](../../app/core/feature1_sql/llm_judge.py)
 
-### ApprovalGate
+### ApprovalGate (Shared)
 
-Generates a cryptographic one-time session token for human-in-the-loop approval:
+A shared, parameterized `ApprovalGate` class provides cryptographic session tokens for **both** SQL (Feature 1) and mutation (Feature 2) pipelines. It eliminates the near-identical duplicate approval gates that existed in each feature module.
 
+The class is instantiated with different table names and session column names for each use case:
+
+```python
+# Shared singleton in app/core/approval_gate.py
+approval_gate = ApprovalGate(
+    table_name="idop_approval_tokens",
+    session_column="query_id",
+    logger_name="idop_app.approval_gate",
+)
+
+mutation_approval_gate = ApprovalGate(
+    table_name="idop_mutation_approval_tokens",
+    session_column="mutation_id",
+    logger_name="idop_app.mutation_approval_gate",
+)
+```
+
+**Token generation:**
 ```python
 token = secrets.token_hex(32)  # 64-char hex string
 ```
@@ -159,8 +177,22 @@ pending_queries[query_id] = {
 ```
 
 - Tokens are single-use — consumed on first approval/rejection
+- Tokens are persisted in PostgreSQL (table: `idop_approval_tokens`) with an in-memory fallback for local/offline testing
 - Sessions persist in memory on the EC2 instance (not Lambda, which would lose state)
-- Source: [approval_gate.py](../../app/core/feature1_sql/approval_gate.py)
+- Source: [approval_gate.py](../../app/core/approval_gate.py)
+
+### AuditLogger (Shared)
+
+Audit logging logic that was previously duplicated in both `SQLExecutor` and `MutationExecutor` is now consolidated into a single `AuditLogger` class in `app/core/audit_logger.py`. It manages the `idop_audit_logs` table and provides `ensure_table()` and `log()` methods.
+
+```python
+# Shared service (app/core/audit_logger.py)
+audit = AuditLogger()
+audit.ensure_table(conn)                          # CREATE TABLE IF NOT EXISTS
+audit.log(conn, query_id, question, sql, status)  # INSERT INTO idop_audit_logs
+```
+
+Source: [audit_logger.py](../../app/core/audit_logger.py)
 
 ### SQLExecutor
 
@@ -168,7 +200,7 @@ Executes approved SQL queries against Supabase PostgreSQL and logs the results:
 
 - **Connection:** Direct PostgreSQL connection to Supabase
 - **Execution:** Parameterized query execution
-- **Audit logging:** Records `query_id`, `question`, `sql`, `result_count`, `timestamp`, `user_id`
+- **Audit logging:** Uses the shared `AuditLogger` to record `query_id`, `question`, `sql`, `status`, `timestamp`
 - **Error handling:** Database errors are caught and returned as structured error responses
 - Source: [executor.py](../../app/core/feature1_sql/executor.py)
 
@@ -196,8 +228,8 @@ async def sql_generation_node(state: CSRAGState) -> dict:
     # 4. Generate cryptographic approval token
     token = gate.generate_session(query_id)
     
-    # 5. Store pending session
-    sql_service.pending_queries[query_id] = { ... }
+    # 5. Store pending session in shared pending store
+    shared_pending_queries[query_id] = { ... }
     
     return {
         "sql_query": sql,
@@ -210,7 +242,9 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
 **Graph edge:** `sql_gen → END` — the pipeline terminates at the approval gate. Execution happens via a separate `/sql/approve` API call.
 
-Source: [nodes.py](../../app/core/graph/nodes.py) (lines 91–148)
+Source: [nodes.py](../../app/core/graph/nodes.py) (lines 91–141)
+
+> **Note:** An unreachable auto-execute SELECT block (~50 lines) and a duplicate `pending_approval` return block (~25 lines) were removed from `sql_generation_node` — the function always returns `pending_approval`; execution happens via the separate `/sql/approve` API call.
 
 ---
 
