@@ -46,9 +46,7 @@ class SQLExecutor:
         except Exception as e:
             logger.error(f"SQL Execution failed: {e}")
             try:
-                self.audit.log(
-                    conn, query_id, question, sql, f"FAILED: {str(e)}"
-                )
+                self.audit.log(conn, query_id, question, sql, f"FAILED: {str(e)}")
                 conn.commit()
             except Exception as log_err:
                 logger.error(f"Failed to write failure audit log: {log_err}")
