@@ -23,8 +23,9 @@ from app.core.vector_store import VectorStoreService
 # Feature 1 & 2 Imports
 from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature1_sql.llm_judge import LLMJudge
-from app.core.feature1_sql.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
+
+from app.core.approval_gate import approval_gate as gate
 
 from app.opik import track
 from app.utils.logger import get_logger
@@ -252,7 +253,7 @@ async def mutation_node(state: CSRAGState) -> dict:
     from app.core.feature2_mutation.rule_validator import RuleValidator
     from app.core.feature2_mutation.mutation_generator import MutationGenerator
     from app.core.feature2_mutation.llm_judge import MutationLLMJudge
-    from app.core.feature2_mutation.approval_gate import mutation_approval_gate as gate
+    from app.core.approval_gate import mutation_approval_gate as gate
     from app.services.pending_store import pending_mutations as shared_pending_mutations
 
     try:

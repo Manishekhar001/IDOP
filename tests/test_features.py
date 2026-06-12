@@ -9,7 +9,7 @@ import json
 import pytest
 
 from app.core.feature1_sql.sql_validator import SQLValidator
-from app.core.feature1_sql.approval_gate import ApprovalGate
+from app.core.approval_gate import ApprovalGate
 from app.core.feature2_mutation.rule_validator import RuleValidator
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -170,7 +170,11 @@ class TestApprovalGate:
 
     @pytest.fixture
     def gate(self):
-        return ApprovalGate()
+        return ApprovalGate(
+            table_name="test_tokens",
+            session_column="query_id",
+            logger_name="test_gate",
+        )
 
     def test_generate_session_returns_token(self, gate):
         """Test that generating a session returns a hex token."""

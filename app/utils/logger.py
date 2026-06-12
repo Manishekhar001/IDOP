@@ -34,9 +34,3 @@ def setup_logging(log_level: str = "INFO") -> None:
 @lru_cache
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
-
-
-class LoggerMixin:
-    @property
-    def logger(self) -> logging.Logger:
-        return get_logger(self.__class__.__name__)

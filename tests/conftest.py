@@ -119,10 +119,10 @@ def mock_settings():
     # connect to the database. The patch below ensures _get_connection returns
     # None (no DB available in tests), avoiding a ~30s TCP timeout per call.
     with patch(
-        "app.core.feature1_sql.approval_gate.ApprovalGate._get_connection",
+        "app.core.approval_gate.ApprovalGate._get_connection",
         return_value=None,
     ), patch(
-        "app.core.feature2_mutation.approval_gate.MutationApprovalGate._get_connection",
+        "app.core.approval_gate.ApprovalGate._get_connection",
         return_value=None,
     ), patch(
         "app.services.pending_store.PendingStore._get_connection",

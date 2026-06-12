@@ -255,8 +255,7 @@ SERVICE_FILES_WITH_TRACK = [
 ]
 
 SERVICE_FILES_WITHOUT_TRACK = [
-    "app/core/feature1_sql/approval_gate.py",
-    "app/core/feature2_mutation/approval_gate.py",
+    "app/core/approval_gate.py",
     "app/services/storage_backend.py",
     "app/services/local_storage.py",
     "app/services/s3_storage.py",

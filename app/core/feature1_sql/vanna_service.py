@@ -639,11 +639,3 @@ Do not include any additional text outside the code block.
             }
         except Exception as e:
             raise Exception(f"Failed to generate SQL: {str(e)}")
-
-    def get_pending_queries(self) -> List[Dict[str, Any]]:
-        """
-        Deprecated: pending_queries are stored in the shared PendingStore
-        (app.services.pending_store), not in TextToSQLService. This method
-        is kept for backward compatibility — always returns empty list.
-        """
-        return []

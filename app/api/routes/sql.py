@@ -7,7 +7,7 @@ from app.api.schemas import (
     ErrorResponse,
     SQLGenerationRequest,
 )
-from app.core.feature1_sql.approval_gate import approval_gate as gate
+from app.core.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
 from app.core.feature1_sql.shared import sql_service
 from app.services.pending_store import pending_queries as shared_pending_queries
