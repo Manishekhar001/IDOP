@@ -1,8 +1,9 @@
-import json
-import hashlib
-import logging
 import fnmatch
-from typing import Optional, Dict, Any
+import hashlib
+import json
+import logging
+from typing import Any, ClassVar
+
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -12,16 +13,14 @@ class QueryCacheService:
     """Redis-based cache service for query results, embeddings, and SQL."""
 
     # Shared class-level local cache so all instances share the same data
-    _local_cache_shared: Dict[str, str] = {}
+    _local_cache_shared: ClassVar[dict[str, str]] = {}
 
     @classmethod
     def reset_local_cache(cls) -> None:
         """Clear the shared in-memory local cache. Useful for test isolation."""
         cls._local_cache_shared.clear()
 
-    def __init__(
-        self, redis_url: Optional[str] = None, redis_token: Optional[str] = None
-    ):
+    def __init__(self, redis_url: str | None = None, redis_token: str | None = None):
         settings = get_settings()
         self.enabled = False
         self.client = None
@@ -72,7 +71,7 @@ class QueryCacheService:
     def _deserialize(self, value: str) -> Any:
         return json.loads(value)
 
-    def get(self, key: str, cache_type: str = "rag") -> Optional[Dict]:
+    def get(self, key: str, cache_type: str = "rag") -> dict | None:
         if not self.enabled and not self.use_local:
             self._record_miss(cache_type)
             return None
@@ -102,7 +101,7 @@ class QueryCacheService:
             self._record_miss(cache_type)
             return None
 
-    def set(self, key: str, value: Dict, ttl: int, cache_type: str = "rag") -> bool:
+    def set(self, key: str, value: dict, ttl: int, cache_type: str = "rag") -> bool:
         if not self.enabled and not self.use_local:
             return False
 
@@ -202,7 +201,7 @@ class QueryCacheService:
         if cache_type in self.stats:
             self.stats[cache_type]["misses"] += 1
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         stats_with_rates = {}
         for cache_type, counts in self.stats.items():
             total = counts["hits"] + counts["misses"]
@@ -230,7 +229,7 @@ class QueryCacheService:
             self.stats[cache_type] = {"hits": 0, "misses": 0}
         logger.info("Cache statistics reset")
 
-    def health_check(self) -> Dict:
+    def health_check(self) -> dict:
         if self.use_local:
             return {
                 "status": "healthy",
@@ -244,4 +243,4 @@ class QueryCacheService:
             self.client.ping()
             return {"status": "healthy", "message": "Redis connection OK"}
         except Exception as e:
-            return {"status": "unhealthy", "message": f"Redis error: {str(e)}"}
+            return {"status": "unhealthy", "message": f"Redis error: {e!s}"}

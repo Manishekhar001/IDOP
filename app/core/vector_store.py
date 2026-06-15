@@ -1,25 +1,24 @@
 from functools import lru_cache
-from typing import Optional
 from uuid import uuid4
 
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
-    VectorParams,
-    Filter,
     FieldCondition,
-    MatchValue,
-    SparseVectorParams,
-    Prefetch,
-    FusionQuery,
+    Filter,
     Fusion,
+    FusionQuery,
+    MatchValue,
+    Prefetch,
+    SparseVectorParams,
+    VectorParams,
 )
 
-from app.opik import track
 from app.config import get_settings
 from app.core.embeddings import EmbeddingsService
 from app.core.sparse_vector_service import SparseVectorService
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -151,7 +150,7 @@ class VectorStoreService:
 
     def _deduplicate_chunks(self, documents, texts, hashes):
         """Deduplicate chunks by content_hash against Qdrant."""
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
 
         new_documents = []
         new_texts = []
@@ -362,7 +361,7 @@ class VectorStoreService:
             logger.error(f"Search failed: {e}")
             return []
 
-    def get_chunk_by_index(self, source: str, index: int) -> Optional[Document]:
+    def get_chunk_by_index(self, source: str, index: int) -> Document | None:
         """Fetch a specific chronological chunk from the Qdrant database."""
         filter_cond = Filter(
             must=[

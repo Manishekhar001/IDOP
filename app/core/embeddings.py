@@ -92,8 +92,7 @@ def _create_embedding_model() -> Any:
         voyage_api_key = settings.voyage_api_key
         if not voyage_api_key:
             raise ValueError(
-                "VOYAGE_API_KEY is not set. "
-                "Voyage AI is the active embedding provider."
+                "VOYAGE_API_KEY is not set. Voyage AI is the active embedding provider."
             )
         from langchain_voyageai import VoyageAIEmbeddings
 
@@ -107,7 +106,7 @@ def _create_embedding_model() -> Any:
         nomic_api_key = settings.nomic_api_key
         if not nomic_api_key:
             raise ValueError(
-                "NOMIC_API_KEY is not set. " "Nomic is the active embedding provider."
+                "NOMIC_API_KEY is not set. Nomic is the active embedding provider."
             )
         from langchain_nomic import NomicEmbeddings
 

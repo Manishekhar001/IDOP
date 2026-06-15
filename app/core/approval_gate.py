@@ -20,10 +20,11 @@ Usage:
     gate.verify_and_close_session("mutation-uuid", token)
 """
 
-import secrets
 import logging
+import secrets
+
 import psycopg2
-from typing import Dict
+
 from app.config import get_settings
 
 
@@ -54,7 +55,7 @@ class ApprovalGate:
         self.session_column = session_column
         self.logger = logging.getLogger(logger_name)
         # Maps session_id -> session_token (always kept up to date for fast lookups)
-        self.active_sessions: Dict[str, str] = {}
+        self.active_sessions: dict[str, str] = {}
 
     def _get_connection(self):
         """Get connection to the Supabase database for token persistence."""

@@ -5,13 +5,13 @@ Tests graph compilation, state shape, conditional routing functions,
 and the CSRAGEngine format_result utility.
 """
 
-from app.core.graph.state import CSRAGState
 from app.core.graph.nodes import (
-    route_after_decide,
     route_after_crag,
+    route_after_decide,
     route_after_support,
     route_after_usefulness,
 )
+from app.core.graph.state import CSRAGState
 
 # ═══════════════════════════════════════════════════════════════════════
 # CSRAGState Shape Tests
@@ -248,8 +248,9 @@ class TestFormatResult:
         assert result["reranking_used"] is False
 
     def test_format_result_truncates_long_source_content(self):
-        from app.core.csrag_engine import CSRAGEngine
         from langchain_core.documents import Document
+
+        from app.core.csrag_engine import CSRAGEngine
 
         long_content = "A" * 1000
         state = {
@@ -282,8 +283,9 @@ class TestFormatResult:
         assert len(source_content) == 503  # 500 chars + "..."
 
     def test_format_result_separates_internal_and_web_sources(self):
-        from app.core.csrag_engine import CSRAGEngine
         from langchain_core.documents import Document
+
+        from app.core.csrag_engine import CSRAGEngine
 
         state = {
             "answer": "Combined answer",

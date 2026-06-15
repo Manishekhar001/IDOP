@@ -1,12 +1,10 @@
 import asyncio
 import sys
-from datetime import datetime, timezone
-from typing import Any, Dict
-from fastapi import APIRouter, Request, status
-import psycopg2
+from datetime import UTC, datetime
+from typing import Any
 
-from app.config import get_settings
-from app.services.cache_init import get_doc_cache, get_query_cache
+import psycopg2
+from fastapi import APIRouter, Request, status
 
 from app.api.schemas import (
     DetailedHealthResponse,
@@ -14,7 +12,9 @@ from app.api.schemas import (
     SystemInfoResponse,
     SystemStatsResponse,
 )
+from app.config import get_settings
 from app.opik import track
+from app.services.cache_init import get_doc_cache, get_query_cache
 
 router = APIRouter(tags=["System Diagnostics"])
 
@@ -66,7 +66,7 @@ def _format_redis_cache(query_cache) -> dict:
     summary="Enhanced Health Check — detailed per-service status, feature flags, config status, Qdrant info, and Redis metrics",
 )
 @track(name="health_check")
-async def health_check(request: Request) -> Dict[str, Any]:
+async def health_check(request: Request) -> dict[str, Any]:
     """
     Enhanced Health check endpoint to verify the API is running and check service connectivity.
     Queries Qdrant, PostgreSQL, Upstash Redis, S3/local backends, and external LLM/Search provider keys.
@@ -166,13 +166,15 @@ async def health_check(request: Request) -> Dict[str, Any]:
     health_status = (
         "healthy"
         if (postgres_connected and supabase_connected and qdrant_connected)
-        else "degraded" if any_service_available else "unhealthy"
+        else "degraded"
+        if any_service_available
+        else "unhealthy"
     )
 
     return {
         "status": health_status,
         "service": "IDOP — Intelligent Data Operations Platform API",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": settings.app_version,
         "git_commit_sha": settings.git_commit_sha,
         "services": services_status,
@@ -203,7 +205,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
     "/health/ready", response_model=DetailedReadinessResponse, summary="Readiness check"
 )
 @track(name="readiness_check")
-async def readiness(request: Request) -> Dict[str, Any]:
+async def readiness(request: Request) -> dict[str, Any]:
     """
     Readiness probe validating underlying Qdrant, PostgreSQL, and Supabase connections.
     """
@@ -267,7 +269,7 @@ async def readiness(request: Request) -> Dict[str, Any]:
     summary="Get system layout and documentation info",
 )
 @track(name="get_system_info")
-async def get_info() -> Dict[str, Any]:
+async def get_info() -> dict[str, Any]:
     """
     Get system layout, design manuals, operational project phases, and detailed platform endpoint mappings.
     """
@@ -321,7 +323,7 @@ async def get_info() -> Dict[str, Any]:
     summary="Get platform statistics and query cache savings",
 )
 @track(name="get_system_stats")
-async def get_stats(request: Request) -> Dict[str, Any]:
+async def get_stats(request: Request) -> dict[str, Any]:
     """
     Get system statistics, document ingestion sizes, vector count profiles, and query cache savings estimates.
     """
@@ -388,7 +390,7 @@ async def get_stats(request: Request) -> Dict[str, Any]:
         except Exception as e:
             cache_stats = {
                 "enabled": True,
-                "error": f"Failed to retrieve stats: {str(e)}",
+                "error": f"Failed to retrieve stats: {e!s}",
             }
 
     return {
@@ -400,7 +402,7 @@ async def get_stats(request: Request) -> Dict[str, Any]:
         },
         "query_cache": cache_stats,
         "system": {
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         },
         "configuration": {

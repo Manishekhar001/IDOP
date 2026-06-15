@@ -1,13 +1,14 @@
 import re
 from collections import Counter
-from typing import List
+from typing import ClassVar
+
 from qdrant_client.models import SparseVector
 
 
 class SparseVectorService:
     """Service for generating sparse vectors for BM25-style search."""
 
-    STOP_WORDS = {
+    STOP_WORDS: ClassVar[set[str]] = {
         "a",
         "an",
         "and",
@@ -66,7 +67,7 @@ class SparseVectorService:
         "now",
     }
 
-    def tokenize(self, text: str) -> List[str]:
+    def tokenize(self, text: str) -> list[str]:
         text = text.lower()
         tokens = re.findall(r"\b[a-z0-9]+(?:-[a-z0-9]+)*\b", text)
         tokens = [t for t in tokens if t not in self.STOP_WORDS]
@@ -89,5 +90,5 @@ class SparseVectorService:
 
         return SparseVector(indices=indices, values=values)
 
-    def generate_sparse_vectors_batch(self, texts: List[str]) -> List[SparseVector]:
+    def generate_sparse_vectors_batch(self, texts: list[str]) -> list[SparseVector]:
         return [self.generate_sparse_vector(text) for text in texts]

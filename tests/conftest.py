@@ -17,9 +17,10 @@ IMPORTANT — Settings Strategy:
 
 import os
 import sys
-import pytest
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Ensure the IDOP project root is on sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -109,6 +110,7 @@ def mock_settings():
     Returns the active Settings instance (built from the env vars set above).
     """
     from unittest.mock import patch
+
     from app.services.cache_init import reset_caches
     from app.services.pending_store import reset_pending_store
 
@@ -118,15 +120,19 @@ def mock_settings():
     # IMPORTANT: reset_pending_store() calls PendingStore.clear() which tries to
     # connect to the database. The patch below ensures _get_connection returns
     # None (no DB available in tests), avoiding a ~30s TCP timeout per call.
-    with patch(
-        "app.core.approval_gate.ApprovalGate._get_connection",
-        return_value=None,
-    ), patch(
-        "app.core.approval_gate.ApprovalGate._get_connection",
-        return_value=None,
-    ), patch(
-        "app.services.pending_store.PendingStore._get_connection",
-        return_value=None,
+    with (
+        patch(
+            "app.core.approval_gate.ApprovalGate._get_connection",
+            return_value=None,
+        ),
+        patch(
+            "app.core.approval_gate.ApprovalGate._get_connection",
+            return_value=None,
+        ),
+        patch(
+            "app.services.pending_store.PendingStore._get_connection",
+            return_value=None,
+        ),
     ):
         reset_pending_store()
         yield _get_settings()

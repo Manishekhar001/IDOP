@@ -38,9 +38,12 @@ _OPIK_DISABLED = os.environ.get("OPIK_TRACK_DISABLE", "").lower() in ("true", "1
 if not _OPIK_DISABLED:
     try:
         # OPIK monitoring (optional — gracefully handles if not configured)
-        from opik import track  # noqa: F401
-        from opik import start_as_current_trace, start_as_current_span  # noqa: F401
-        from opik import opik_context  # noqa: F401
+        from opik import (
+            opik_context,
+            start_as_current_span,
+            start_as_current_trace,
+            track,
+        )
 
         OPIK_AVAILABLE = True
     except ImportError:

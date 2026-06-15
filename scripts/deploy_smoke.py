@@ -11,12 +11,13 @@ by executing real integration tests against the live API endpoints:
 """
 
 import os
-import sys
-import uuid
-import time
 import socket
-import requests
+import sys
+import time
+import uuid
 from urllib.parse import urlparse
+
+import requests
 
 # Retrieve API base target URL from environment variable (injected by cd.yml)
 API_URL = os.getenv("API_TARGET_URL", "http://localhost:8000").rstrip("/")

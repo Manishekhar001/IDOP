@@ -1,7 +1,8 @@
-import pandas as pd
 import logging
 from io import BytesIO
-from typing import List, Dict, Any
+from typing import Any
+
+import pandas as pd
 
 from app.opik import track
 
@@ -14,7 +15,7 @@ class FileParser:
     """
 
     @track(name="file_parser_parse")
-    def parse_file(self, file_content: bytes, filename: str) -> List[Dict[str, Any]]:
+    def parse_file(self, file_content: bytes, filename: str) -> list[dict[str, Any]]:
         """
         Parse file bytes into a list of row dictionaries.
 

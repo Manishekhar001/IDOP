@@ -8,13 +8,12 @@ Mirrors the pattern used by CRAG (evaluator.py) and SRAG (verifier.py).
 
 import logging
 from functools import lru_cache
-from typing import Optional
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.opik import track
 from app.core.llm_factory import get_memory_llm
+from app.opik import track
 
 logger = logging.getLogger("idop_app.ragas_evaluator")
 
@@ -221,7 +220,7 @@ class RagasEvaluator:
         question: str,
         answer: str,
         contexts: list[str],
-    ) -> Optional[RagasScores]:
+    ) -> RagasScores | None:
         """
         Compute RAGAS-style metrics for a single Q/A pair.
         Returns a RagasScores object, or None if evaluation fails entirely.
@@ -254,7 +253,7 @@ class RagasEvaluator:
             # 3. Context Precision
             chunks_text = (
                 "\n\n---\n\n".join(
-                    f"Chunk {i+1}: {c[:500]}" for i, c in enumerate(contexts[:10])
+                    f"Chunk {i + 1}: {c[:500]}" for i, c in enumerate(contexts[:10])
                 )
                 if contexts
                 else "(no chunks retrieved)"
@@ -278,9 +277,7 @@ class RagasEvaluator:
             logger.error(f"RAGAS evaluation failed: {e}", exc_info=True)
             return None
 
-    def _parse_json_score(
-        self, content: str, schema_class: type
-    ) -> Optional[BaseModel]:
+    def _parse_json_score(self, content: str, schema_class: type) -> BaseModel | None:
         """Parse JSON from LLM response and validate against a Pydantic schema."""
         import json
         import re

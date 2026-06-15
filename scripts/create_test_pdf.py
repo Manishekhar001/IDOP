@@ -3,11 +3,12 @@
 Create a minimal valid PDF with extractable text for testing PDF upload.
 Generates a proper PDF structure with xref table for pypdf to parse.
 """
-import sys
+
 import os
+import sys
 
 
-def create_pdf(filepath: str, text: str = None):
+def create_pdf(filepath: str, text: str | None = None):
     """Create a PDF with substantial multi-paragraph text."""
     if text is None:
         text = (

@@ -114,11 +114,12 @@ def _extract_contexts(result_state: dict) -> list[str]:
 
 
 async def run_benchmark():
-    from app.core.csrag_engine import CSRAGEngine
-    from app.core.vector_store import VectorStoreService
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from langgraph.store.postgres.aio import AsyncPostgresStore
+
     from app.config import get_settings
+    from app.core.csrag_engine import CSRAGEngine
+    from app.core.vector_store import VectorStoreService
 
     settings = get_settings()
     vector_store = VectorStoreService()
@@ -141,12 +142,12 @@ async def run_benchmark():
         all_results = []
 
         for cfg in CONFIGS:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  Config {cfg['id']}: {cfg['name']}")
             print(
                 f"  {cfg['search_mode']}, hyde={cfg['enable_hyde']}, rerank={cfg['enable_reranking']}, top_k={cfg['top_k']}"
             )
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             faith_scores = []
             relev_scores = []
@@ -232,9 +233,9 @@ async def run_benchmark():
             all_results.append({"config": cfg["name"], "metrics": metrics})
 
         # Final comparison
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("  RESULTS SUMMARY")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         for r in all_results:
             m = r["metrics"]
             print(

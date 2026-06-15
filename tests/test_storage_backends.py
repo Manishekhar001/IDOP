@@ -6,8 +6,8 @@ they correctly implement the StorageBackend interface for the IDOP
 document caching pipeline.
 """
 
-import pytest
 import numpy as np
+import pytest
 
 from app.services.local_storage import LocalStorageBackend
 from app.services.s3_storage import S3StorageBackend
@@ -210,8 +210,8 @@ class TestS3StorageBackend:
     def s3_storage(self):
         """Create an S3StorageBackend with a mocked S3 service."""
         try:
-            from moto import mock_aws
             import boto3
+            from moto import mock_aws
         except ImportError:
             pytest.skip("moto or boto3 not installed — skipping S3 tests")
 
@@ -379,8 +379,8 @@ class TestStorageBackendCompatibility:
             yield LocalStorageBackend(cache_dir=tmp_path)
         elif request.param == "s3":
             try:
-                from moto import mock_aws
                 import boto3
+                from moto import mock_aws
             except ImportError:
                 pytest.skip("moto or boto3 not installed — skipping S3 tests")
 

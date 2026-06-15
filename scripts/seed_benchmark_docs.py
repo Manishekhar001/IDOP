@@ -227,10 +227,10 @@ async def upload_document(api_base: str, filepath: Path) -> dict:
 
 async def upload_all_documents(api_base: str):
     """Upload all benchmark documents."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Uploading benchmark documents to Qdrant...")
     print(f"  API: {api_base}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     results = []
     for filename, _ in DOCUMENTS:
@@ -239,13 +239,13 @@ async def upload_all_documents(api_base: str):
         results.append(result)
 
     # Print summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     total_chunks = sum(r.get("chunks_created", 0) for r in results if "error" not in r)
     successes = sum(1 for r in results if "error" not in r)
     failures = sum(1 for r in results if "error" in r)
     print(f"  Upload complete: {successes} succeeded, {failures} failed")
     print(f"  Total chunks indexed: {total_chunks}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     return results
 
 
@@ -284,7 +284,7 @@ def start_server(port: int = 8088) -> subprocess.Popen:
         try:
             resp = httpx.get(f"{api_base}/health", timeout=2.0)
             if resp.status_code == 200:
-                print(f"  [OK] Server ready (attempt {i+1})")
+                print(f"  [OK] Server ready (attempt {i + 1})")
                 return proc
         except (httpx.ConnectError, httpx.TimeoutException):
             pass
@@ -341,9 +341,9 @@ def main():
 
         # Step 4: Optionally run ablation study
         if args.run:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("  Running ablation study...")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             cmd = [sys.executable, "-m", "scripts.eval_ragas", "--no-ragas"]
             if args.subset:

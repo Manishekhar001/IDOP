@@ -1,11 +1,12 @@
 import json
-import shutil
 import logging
+import shutil
 from pathlib import Path
-from typing import Dict, List
+
 import numpy as np
-from app.services.storage_backend import StorageBackend
+
 from app.config import get_settings
+from app.services.storage_backend import StorageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class LocalStorageBackend(StorageBackend):
     Filesystem-based storage for local development.
     """
 
-    def __init__(self, cache_dir: Path = None):
+    def __init__(self, cache_dir: Path | None = None):
         settings = get_settings()
         self.cache_dir = cache_dir or Path(
             settings.cache_dir
@@ -52,7 +53,7 @@ class LocalStorageBackend(StorageBackend):
         logger.info(f"Saved original document to {destination}")
 
     def save_chunks(
-        self, document_id: str, file_extension: str, chunks: List[Dict]
+        self, document_id: str, file_extension: str, chunks: list[dict]
     ) -> None:
         doc_path = self._get_document_path(document_id=document_id)
         doc_path.mkdir(parents=True, exist_ok=True)
@@ -71,7 +72,7 @@ class LocalStorageBackend(StorageBackend):
         logger.debug(f"Saved embeddings {embeddings.shape} to {embeddings_file}")
 
     def save_metadata(
-        self, document_id: str, file_extension: str, metadata: Dict
+        self, document_id: str, file_extension: str, metadata: dict
     ) -> None:
         doc_path = self._get_document_path(document_id=document_id)
         doc_path.mkdir(parents=True, exist_ok=True)
@@ -80,7 +81,7 @@ class LocalStorageBackend(StorageBackend):
             json.dump(metadata, f, indent=2)
         logger.debug(f"Saved metadata to {metadata_file}")
 
-    def load_chunks(self, document_id: str, file_extension: str) -> List[Dict]:
+    def load_chunks(self, document_id: str, file_extension: str) -> list[dict]:
         chunks_file = self._get_document_path(document_id=document_id) / "chunks.json"
         if not chunks_file.exists():
             raise FileNotFoundError(f"Chunks file not found: {chunks_file}")
@@ -99,7 +100,7 @@ class LocalStorageBackend(StorageBackend):
         logger.debug(f"Loaded embeddings {embeddings.shape} from {embeddings_file}")
         return embeddings
 
-    def load_metadata(self, document_id: str, file_extension: str) -> Dict:
+    def load_metadata(self, document_id: str, file_extension: str) -> dict:
         metadata_file = (
             self._get_document_path(document_id=document_id) / "metadata.json"
         )
@@ -128,14 +129,14 @@ class LocalStorageBackend(StorageBackend):
         logger.info(f"Cleared entire local cache: {count} documents deleted")
         return count
 
-    def list_documents(self) -> List[str]:
+    def list_documents(self) -> list[str]:
         if not self.cache_dir.exists():
             return []
         document_ids = [d.name for d in self.cache_dir.iterdir() if d.is_dir()]
         logger.debug(f"Found {len(document_ids)} cached documents")
         return document_ids
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         total_size = 0
         total_files = 0
         documents_count = 0

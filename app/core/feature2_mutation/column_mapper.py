@@ -1,16 +1,17 @@
 import logging
-from typing import Dict, List
-from pydantic import BaseModel, Field
+
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
+
 from app.core.llm_factory import get_memory_llm
-from app.opik import track
 from app.core.schema_registry import TABLE_SCHEMAS
+from app.opik import track
 
 logger = logging.getLogger("idop_app.column_mapper")
 
 
 class MappingResult(BaseModel):
-    mappings: Dict[str, str] = Field(
+    mappings: dict[str, str] = Field(
         ...,
         description="Mapping from spreadsheet column names to database column names.",
     )
@@ -54,8 +55,8 @@ class ColumnMapper:
 
     @track(name="column_mapper_map")
     async def get_semantic_mapping(
-        self, table_name: str, file_headers: List[str]
-    ) -> Dict[str, str]:
+        self, table_name: str, file_headers: list[str]
+    ) -> dict[str, str]:
         """
         Map spreadsheet headers to target DB table column names using semantic matching.
         """

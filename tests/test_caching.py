@@ -5,8 +5,9 @@ Tests the document-level cache service with both local and S3 backends,
 and the Redis-backed query cache with local in-memory fallback.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from app.services.cache_service import CacheService
 from app.services.local_storage import LocalStorageBackend

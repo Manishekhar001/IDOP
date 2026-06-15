@@ -1,11 +1,11 @@
 import logging
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 import pandas as pd
 
 # Vanna imports are lazy-loaded inside VannaAgentWrapper to avoid ImportError
 # when vanna 2.0 submodules are not available.
-
 from app.config import get_settings
 from app.opik import track
 
@@ -35,13 +35,13 @@ class VannaAgentWrapper:
 
         try:
             from vanna import Agent as VannaAgent
+            from vanna.core.registry import ToolRegistry
+            from vanna.core.user.models import User
+            from vanna.core.user.resolver import UserResolver
+            from vanna.integrations.local.agent_memory import DemoAgentMemory
             from vanna.integrations.openai import OpenAILlmService
             from vanna.integrations.postgres import PostgresRunner
-            from vanna.core.registry import ToolRegistry
             from vanna.tools import RunSqlTool
-            from vanna.integrations.local.agent_memory import DemoAgentMemory
-            from vanna.core.user.resolver import UserResolver
-            from vanna.core.user.models import User
 
             settings = get_settings()
             vanna_model = settings.vanna_llm_model
@@ -145,7 +145,7 @@ class VannaAgentWrapper:
         return sql
 
     @track(name="vanna_execute_sql")
-    async def execute_sql_async(self, sql: str) -> List[Dict[str, Any]]:
+    async def execute_sql_async(self, sql: str) -> list[dict[str, Any]]:
         if not self._available or self.postgres_runner is None:
             raise RuntimeError(
                 "Vanna agent not available — cannot execute SQL through Vanna"
@@ -153,10 +153,11 @@ class VannaAgentWrapper:
 
         logger.info(f"Executing SQL directly: {sql[:100]}...")
         try:
-            import psycopg2
-            import psycopg2.extras
             import socket
             from urllib.parse import urlparse
+
+            import psycopg2
+            import psycopg2.extras
 
             conn_str = self.postgres_runner.connection_string
             parsed = urlparse(conn_str)
@@ -188,7 +189,7 @@ class VannaAgentWrapper:
                 raise e
         except Exception as e:
             logger.error(f"SQL execution failed: {e}")
-            raise ValueError(f"Failed to execute SQL: {str(e)}")
+            raise ValueError(f"Failed to execute SQL: {e!s}")
 
 
 class TextToSQLService:
@@ -506,10 +507,10 @@ class TextToSQLService:
         self,
         question: str,
         explain: bool = True,
-        vanna_temperature: Optional[float] = None,
-        vanna_seed: Optional[int] = None,
-        vanna_top_p: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        vanna_temperature: float | None = None,
+        vanna_seed: int | None = None,
+        vanna_top_p: float | None = None,
+    ) -> dict[str, Any]:
         settings = get_settings()
         if not self.is_trained:
             self.complete_training()
@@ -575,6 +576,7 @@ class TextToSQLService:
                     f"Vanna SQL generation failed: {vanna_err}. Falling back to direct LLM SQL generation..."
                 )
                 from langchain_core.messages import HumanMessage
+
                 from app.core.llm_factory import get_chat_llm
 
                 llm = get_chat_llm()
@@ -638,4 +640,4 @@ Do not include any additional text outside the code block.
                 "cost_saved": "$0.00",
             }
         except Exception as e:
-            raise Exception(f"Failed to generate SQL: {str(e)}")
+            raise Exception(f"Failed to generate SQL: {e!s}")

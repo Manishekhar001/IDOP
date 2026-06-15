@@ -1,11 +1,11 @@
-from functools import lru_cache
 import uuid
+from functools import lru_cache
 
 from langchain_core.messages import HumanMessage, RemoveMessage
 
-from app.opik import track
 from app.config import get_settings
 from app.core.llm_factory import get_memory_llm
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,8 +37,9 @@ class STMSummarizer:
                 "Capture key facts, user preferences, and conclusions."
             )
 
-        messages_for_summary = list(messages) + [
-            HumanMessage(content=prompt_text, id=str(uuid.uuid4()))
+        messages_for_summary = [
+            *list(messages),
+            HumanMessage(content=prompt_text, id=str(uuid.uuid4())),
         ]
 
         logger.info(

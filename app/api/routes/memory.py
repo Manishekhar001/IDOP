@@ -74,7 +74,7 @@ async def list_memories(user_id: str, request: Request) -> MemoryListResponse:
         logger.error(f"list_memories error: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve memories: {str(e)}",
+            detail=f"Failed to retrieve memories: {e!s}",
         )
 
 
@@ -127,5 +127,5 @@ async def delete_memories(user_id: str, request: Request) -> DeleteMemoryRespons
         logger.error(f"delete_memories error: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to delete memories: {str(e)}",
+            detail=f"Failed to delete memories: {e!s}",
         )

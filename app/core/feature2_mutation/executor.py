@@ -1,9 +1,11 @@
 import logging
+from typing import Any
+
 import psycopg2
-from typing import List, Any, Tuple
-from app.opik import track
+
 from app.config import get_settings
 from app.core.audit_logger import AuditLogger
+from app.opik import track
 
 logger = logging.getLogger("idop_app.mutation_executor")
 
@@ -20,7 +22,7 @@ class MutationExecutor:
 
     @track(name="mutation_executor_insert")
     def execute_insert_transaction(
-        self, mutation_id: str, table_name: str, sql: str, params: List[Tuple[Any, ...]]
+        self, mutation_id: str, table_name: str, sql: str, params: list[tuple[Any, ...]]
     ) -> int:
         """
         Execute bulk insert inside a single safe transaction.
@@ -68,20 +70,20 @@ class MutationExecutor:
                     mutation_id,
                     f"Bulk INSERT to {table_name}",
                     sql,
-                    f"FAILED: {str(e)}",
+                    f"FAILED: {e!s}",
                 )
                 conn.commit()
             except Exception as log_err:
                 logger.error(f"Failed to write failure log: {log_err}")
             conn.close()
-            raise ValueError(f"All-or-Nothing bulk INSERT failed: {str(e)}")
+            raise ValueError(f"All-or-Nothing bulk INSERT failed: {e!s}")
 
     @track(name="mutation_executor_update")
     def execute_updates_transaction(
         self,
         mutation_id: str,
         table_name: str,
-        updates: List[Tuple[str, Tuple[Any, ...]]],
+        updates: list[tuple[str, tuple[Any, ...]]],
     ) -> int:
         """
         Execute updates inside a single safe transaction.
@@ -123,17 +125,17 @@ class MutationExecutor:
                     mutation_id,
                     f"Bulk UPDATE to {table_name}",
                     "Update batch",
-                    f"FAILED: {str(e)}",
+                    f"FAILED: {e!s}",
                 )
                 conn.commit()
             except Exception as log_err:
                 logger.error(f"Failed to write failure log: {log_err}")
             conn.close()
-            raise ValueError(f"All-or-Nothing bulk UPDATE failed: {str(e)}")
+            raise ValueError(f"All-or-Nothing bulk UPDATE failed: {e!s}")
 
     @track(name="mutation_executor_delete")
     def execute_delete_transaction(
-        self, mutation_id: str, table_name: str, sql: str, ids: List[Any]
+        self, mutation_id: str, table_name: str, sql: str, ids: list[Any]
     ) -> int:
         """
         Execute delete inside a single safe transaction.
@@ -174,10 +176,10 @@ class MutationExecutor:
                     mutation_id,
                     f"Bulk DELETE from {table_name}",
                     sql,
-                    f"FAILED: {str(e)}",
+                    f"FAILED: {e!s}",
                 )
                 conn.commit()
             except Exception as log_err:
                 logger.error(f"Failed to write failure log: {log_err}")
             conn.close()
-            raise ValueError(f"All-or-Nothing bulk DELETE failed: {str(e)}")
+            raise ValueError(f"All-or-Nothing bulk DELETE failed: {e!s}")

@@ -20,7 +20,7 @@ Usage:
 
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from app.config import get_settings
 
@@ -137,7 +137,7 @@ class PendingStore(dict):
     # Dict overrides with Redis-first strategy
     # ------------------------------------------------------------------
 
-    def __setitem__(self, key: str, value: Dict[str, Any]) -> None:
+    def __setitem__(self, key: str, value: dict[str, Any]) -> None:
         # Always update memory for fast local reads
         super().__setitem__(key, value)
 
@@ -182,7 +182,7 @@ class PendingStore(dict):
             finally:
                 conn.close()
 
-    def __getitem__(self, key: str) -> Dict[str, Any]:
+    def __getitem__(self, key: str) -> dict[str, Any]:
         # 1. Check local memory first (fast path)
         try:
             return super().__getitem__(key)

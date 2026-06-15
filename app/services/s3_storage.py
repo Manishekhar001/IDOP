@@ -1,11 +1,12 @@
-import json
 import io
+import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+
 import numpy as np
-from app.services.storage_backend import StorageBackend
+
 from app.config import get_settings
+from app.services.storage_backend import StorageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class S3StorageBackend(StorageBackend):
     S3-based storage for production Lambda deployment.
     """
 
-    def __init__(self, bucket_name: str = None):
+    def __init__(self, bucket_name: str | None = None):
         try:
             import boto3
             from botocore.config import Config
@@ -50,7 +51,7 @@ class S3StorageBackend(StorageBackend):
         else:
             self.s3_client = boto3.client("s3", config=boto_config)
 
-        self.validation_error: Optional[str] = None
+        self.validation_error: str | None = None
         try:
             self._validate_bucket()
             logger.info(
@@ -134,7 +135,7 @@ class S3StorageBackend(StorageBackend):
             raise
 
     def save_chunks(
-        self, document_id: str, file_extension: str, chunks: List[Dict]
+        self, document_id: str, file_extension: str, chunks: list[dict]
     ) -> None:
         if not self.enabled:
             return
@@ -180,7 +181,7 @@ class S3StorageBackend(StorageBackend):
             raise
 
     def save_metadata(
-        self, document_id: str, file_extension: str, metadata: Dict
+        self, document_id: str, file_extension: str, metadata: dict
     ) -> None:
         if not self.enabled:
             return
@@ -199,7 +200,7 @@ class S3StorageBackend(StorageBackend):
             logger.error(f"Failed to save metadata to S3: {e}")
             raise
 
-    def load_chunks(self, document_id: str, file_extension: str) -> List[Dict]:
+    def load_chunks(self, document_id: str, file_extension: str) -> list[dict]:
         key = self._get_s3_key(document_id, file_extension, "chunks.json")
         from botocore.exceptions import ClientError
 
@@ -228,7 +229,7 @@ class S3StorageBackend(StorageBackend):
                 raise FileNotFoundError(f"Embeddings file not found in S3: {key}")
             raise
 
-    def load_metadata(self, document_id: str, file_extension: str) -> Dict:
+    def load_metadata(self, document_id: str, file_extension: str) -> dict:
         key = self._get_s3_key(document_id, file_extension, "metadata.json")
         from botocore.exceptions import ClientError
 
@@ -286,7 +287,7 @@ class S3StorageBackend(StorageBackend):
             logger.error(f"Failed to delete all from S3: {e}")
             raise
 
-    def list_documents(self) -> List[str]:
+    def list_documents(self) -> list[str]:
         if not self.enabled:
             return []
         document_ids = set()
@@ -304,7 +305,7 @@ class S3StorageBackend(StorageBackend):
             logger.error(f"Failed to list documents from S3: {e}")
             return []
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         if not self.enabled:
             return {"backend": "s3", "status": "disabled"}
         total_size = 0

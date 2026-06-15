@@ -1,17 +1,19 @@
 import asyncio
+
 from fastapi import APIRouter, HTTPException
+
 from app.api.schemas import (
-    SQLApprovalRequest,
-    SQLResponse,
-    SQLExecuteResponse,
     ErrorResponse,
+    SQLApprovalRequest,
+    SQLExecuteResponse,
     SQLGenerationRequest,
+    SQLResponse,
 )
 from app.core.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
 from app.core.feature1_sql.shared import sql_service
-from app.services.pending_store import pending_queries as shared_pending_queries
 from app.opik import track
+from app.services.pending_store import pending_queries as shared_pending_queries
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -182,9 +184,7 @@ async def approve_sql(body: SQLApprovalRequest) -> SQLExecuteResponse:
         )
     except Exception as e:
         logger.error(f"SQL execution endpoint failed: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Database execution failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Database execution failed: {e!s}")
 
 
 @router.get(

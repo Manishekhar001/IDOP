@@ -9,8 +9,9 @@ This test simulates a broken/missing vanna installation by:
 """
 
 import builtins
-import sys
 import importlib
+import sys
+
 import pytest
 
 
@@ -53,10 +54,10 @@ def test_vanna_import_fallback():
         if "app" in sys.modules:
             del sys.modules["app"]
 
-        from app.core.feature1_sql.vanna_service import VannaAgentWrapper
-
         # Create VannaAgentWrapper — this is where the lazy imports happen
         import os
+
+        from app.core.feature1_sql.vanna_service import VannaAgentWrapper
 
         wrapper = VannaAgentWrapper(
             openai_api_key=os.environ.get("OPENAI_API_KEY", "sk-test-key"),
@@ -66,9 +67,9 @@ def test_vanna_import_fallback():
         )
 
         # Verify it gracefully degrades
-        assert (
-            not wrapper._available
-        ), "Expected _available to be False when vanna is missing"
+        assert not wrapper._available, (
+            "Expected _available to be False when vanna is missing"
+        )
         assert wrapper.agent is None, "Expected agent to be None when vanna is missing"
         assert wrapper.postgres_runner is None, "Expected postgres_runner to be None"
 
@@ -97,9 +98,9 @@ def test_vanna_available_when_installed():
     """
     When vanna IS installed, VannaAgentWrapper should initialize successfully.
     """
-    from app.core.feature1_sql.vanna_service import VannaAgentWrapper
-
     import os
+
+    from app.core.feature1_sql.vanna_service import VannaAgentWrapper
 
     database_url = os.environ.get("DATABASE_URL", "")
     openai_key = os.environ.get("OPENAI_API_KEY", "")

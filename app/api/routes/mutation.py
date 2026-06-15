@@ -1,29 +1,28 @@
-import uuid
 import asyncio
-from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+import uuid
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
 from app.api.schemas import (
-    MutationResponse,
+    ErrorResponse,
     MutationApprovalRequest,
     MutationExecuteResponse,
-    ErrorResponse,
+    MutationResponse,
 )
+from app.core.approval_gate import mutation_approval_gate as gate
+from app.core.feature2_mutation.column_mapper import ColumnMapper
+from app.core.feature2_mutation.executor import MutationExecutor
+from app.core.feature2_mutation.file_parser import FileParser
+from app.core.feature2_mutation.llm_judge import MutationLLMJudge
+from app.core.feature2_mutation.mutation_generator import MutationGenerator
 
 # Feature 2 component imports
 from app.core.feature2_mutation.op_classifier import OpClassifier
-from app.core.feature2_mutation.file_parser import FileParser
-from app.core.feature2_mutation.column_mapper import ColumnMapper
 from app.core.feature2_mutation.rule_validator import RuleValidator
-from app.core.feature2_mutation.mutation_generator import MutationGenerator
-from app.core.feature2_mutation.llm_judge import MutationLLMJudge
-from app.core.approval_gate import mutation_approval_gate as gate
-from app.core.feature2_mutation.executor import MutationExecutor
-
-from app.services.pending_store import pending_mutations as shared_pending_mutations
-from app.opik import track
-from app.utils.logger import get_logger
-
 from app.core.schema_registry import SUPPORTED_MUTATION_TABLES
+from app.opik import track
+from app.services.pending_store import pending_mutations as shared_pending_mutations
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/mutation", tags=["Database Mutations"])
@@ -68,18 +67,18 @@ async def upload_mutation(
         ...,
         description="Excel (.xlsx/.xls) or CSV spreadsheet containing the mutation payload data",
     ),
-    max_bulk_rows: Optional[str] = Form(
+    max_bulk_rows: str | None = Form(
         None,
         description="Maximum allowed rows to prevent resource exhaustion (default: 1000)",
     ),
-    primary_key: Optional[str] = Form(
+    primary_key: str | None = Form(
         "id", description="Primary key column name for UPDATE and DELETE operations"
     ),
-    auto_map: Optional[str] = Form(
+    auto_map: str | None = Form(
         "true",
         description="Enable automatic LLM-based column mapping from file headers to database columns",
     ),
-    skip_validation: Optional[str] = Form(
+    skip_validation: str | None = Form(
         "false", description="Skip business rules validation checks"
     ),
 ) -> MutationResponse:
@@ -191,9 +190,7 @@ async def upload_mutation(
         # 3. Business Rule Validation
         validation_errors = []
         if not parsed_skip_validation:
-            is_valid, validation_errors = validator.validate_rows(
-                table_name, mapped_rows
-            )
+            _, validation_errors = validator.validate_rows(table_name, mapped_rows)
 
         # 4. Classify Mutation Type (INSERT, UPDATE, DELETE)
         classifier = OpClassifier()
@@ -254,7 +251,7 @@ async def upload_mutation(
     except Exception as e:
         logger.error(f"Mutation upload endpoint failed: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to process mutation upload: {str(e)}"
+            status_code=500, detail=f"Failed to process mutation upload: {e!s}"
         )
 
 

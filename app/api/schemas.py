@@ -1,4 +1,5 @@
-from typing import Any, Literal, List, Optional, Dict
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 # ==================== System Health & Diagnostics Schemas ====================
@@ -31,7 +32,7 @@ class ServiceStatus(BaseModel):
         ...,
         description="Runtime document cache backend type: 's3', 's3_disabled', 'local', or 'unknown'.",
     )
-    document_cache_error: Optional[str] = Field(
+    document_cache_error: str | None = Field(
         None,
         description="S3 initialization error detail when document cache fell back to local storage.",
     )
@@ -170,10 +171,10 @@ class RedisCacheStatus(BaseModel):
     message: str = Field(
         ..., description="Human-readable description of the cache state."
     )
-    hit_rate: Optional[str] = Field(
+    hit_rate: str | None = Field(
         None, description="Overall cache hit rate percentage when available."
     )
-    total_savings: Optional[str] = Field(
+    total_savings: str | None = Field(
         None, description="Estimated total cost savings from cache hits."
     )
 
@@ -313,7 +314,7 @@ class DetailedReadinessResponse(BaseModel):
     supabase_connected: bool = Field(
         ..., description="Boolean connection status of the Supabase company database."
     )
-    collection_info: Dict[str, Any] = Field(
+    collection_info: dict[str, Any] = Field(
         ...,
         description="Key-value dictionary showing the Qdrant collection status, vector counts, and indexing progress.",
     )
@@ -344,21 +345,21 @@ class SystemInfoResponse(BaseModel):
     Python runtime version, and full endpoint mapping documentation.
     """
 
-    application: Dict[str, str] = Field(
+    application: dict[str, str] = Field(
         ..., description="Application metadata: name, version, and environment."
     )
-    phases: Dict[str, str] = Field(
+    phases: dict[str, str] = Field(
         ...,
         description="IDOP implementation phases mapped to completion status strings.",
     )
-    features: Dict[str, Any] = Field(
+    features: dict[str, Any] = Field(
         ...,
         description="Active platform features including router pathways and cache tier descriptions.",
     )
-    system: Dict[str, str] = Field(
+    system: dict[str, str] = Field(
         ..., description="System runtime information including Python version."
     )
-    endpoints: Dict[str, str] = Field(
+    endpoints: dict[str, str] = Field(
         ...,
         description="Complete API endpoint documentation with descriptions and HTTP methods.",
     )
@@ -397,19 +398,19 @@ class SystemStatsResponse(BaseModel):
     system runtime info, and current configuration parameters.
     """
 
-    indexing: Dict[str, Any] = Field(
+    indexing: dict[str, Any] = Field(
         ...,
         description="Document indexing metrics: total Qdrant vectors, cached document count and storage size.",
     )
-    query_cache: Dict[str, Any] = Field(
+    query_cache: dict[str, Any] = Field(
         ...,
         description="Query cache performance metrics: enabled status, per-type hit counts, and estimated cost savings.",
     )
-    system: Dict[str, str] = Field(
+    system: dict[str, str] = Field(
         ...,
         description="System runtime information including check timestamp and Python version.",
     )
-    configuration: Dict[str, Any] = Field(
+    configuration: dict[str, Any] = Field(
         ...,
         description="Current operational configuration: chunk size, overlap, and per-cache-type TTL values.",
     )
@@ -469,10 +470,10 @@ class DocumentUploadResponse(BaseModel):
         ...,
         description="A list of unique UUID string hashes created for each chunk stored in Qdrant.",
     )
-    chunk_size_applied: Optional[int] = Field(
+    chunk_size_applied: int | None = Field(
         None, description="The chunk size used during document parsing and chunking."
     )
-    chunk_overlap_applied: Optional[int] = Field(
+    chunk_overlap_applied: int | None = Field(
         None, description="The chunk overlap used during document parsing and chunking."
     )
     cache_hit: bool = Field(
@@ -655,7 +656,7 @@ class ChatResponse(BaseModel):
         ...,
         description="The beautifully formatted, synthesized markdown response compiled by the LLM.",
     )
-    sources: Optional[list[SourceDocument]] = Field(
+    sources: list[SourceDocument] | None = Field(
         None,
         description="The complete list of cited source document chunks or web links backing the answer.",
     )
@@ -695,56 +696,54 @@ class ChatResponse(BaseModel):
         0,
         description="The quantity of query reformulations and Qdrant scroll iterations executed.",
     )
-    sql_query: Optional[str] = Field(
+    sql_query: str | None = Field(
         None,
         description="The SQL query statement compiled (returned only for hybrid RAG + SQL and pure SQL paths).",
     )
-    sql_results: Optional[List[Dict[str, Any]]] = Field(
+    sql_results: list[dict[str, Any]] | None = Field(
         None,
         description="SQL execution result rows retrieved directly from PostgreSQL (only for hybrid).",
     )
     hyde_used: bool = Field(
         default=False, description="True if HYDE query expansion was executed."
     )
-    hyde_hypotheses: Optional[list[str]] = Field(
+    hyde_hypotheses: list[str] | None = Field(
         None, description="The hypothetical passages generated by the HyDE model."
     )
     reranking_used: bool = Field(
         default=False, description="True if cross-encoder reranking was applied."
     )
-    ragas_scores: Optional[Dict[str, Any]] = Field(
+    ragas_scores: dict[str, Any] | None = Field(
         None,
         description="RAGAS evaluation metrics computed when enable_ragas=True. Contains answer_relevancy, faithfulness, context_precision scores.",
     )
-    query_type: Optional[str] = Field(
+    query_type: str | None = Field(
         None,
         description="The classified query type from the 5-path LLM semantic router.",
     )
-    ltm_context: Optional[str] = Field(
+    ltm_context: str | None = Field(
         None, description="The personalized long-term user memory context loaded."
     )
-    mutation_id: Optional[str] = Field(
+    mutation_id: str | None = Field(
         None,
         description="The unique session ID of the spreadsheet mutation pending approval.",
     )
-    mutation_table: Optional[str] = Field(
+    mutation_table: str | None = Field(
         None, description="The parsed destination database table targets."
     )
-    mutation_op: Optional[str] = Field(
+    mutation_op: str | None = Field(
         None,
         description="The classified database operation type: INSERT | UPDATE | DELETE.",
     )
-    mutation_status: Optional[str] = Field(
-        None, description="Mutation workflow status."
-    )
-    mutation_error: Optional[str] = Field(
+    mutation_status: str | None = Field(None, description="Mutation workflow status.")
+    mutation_error: str | None = Field(
         None,
         description="Detailed execution exception message if database operations failed.",
     )
-    mutation_result_count: Optional[int] = Field(
+    mutation_result_count: int | None = Field(
         None, description="Affected rows count for database mutations."
     )
-    approval_token: Optional[str] = Field(
+    approval_token: str | None = Field(
         None, description="The secure token generated for human-in-the-loop validation."
     )
 
@@ -1015,7 +1014,7 @@ class SQLResponse(BaseModel):
         default=False,
         description="True if the SQL generation matched an existing query key in the cache.",
     )
-    token: Optional[str] = Field(
+    token: str | None = Field(
         None,
         description="The cryptographic single-use session token generated by the approval gate.",
     )
@@ -1042,7 +1041,7 @@ class SQLExecuteResponse(BaseModel):
 
     query_id: str = Field(..., description="The query session ID executed.")
     sql: str = Field(..., description="The SQL query statement executed.")
-    results: List[Dict[str, Any]] = Field(
+    results: list[dict[str, Any]] = Field(
         default_factory=list,
         description="The complete list of query result rows retrieved from the database.",
     )
@@ -1128,15 +1127,15 @@ class MutationResponse(BaseModel):
         ...,
         description="Mutation workflow status (e.g. 'pending_approval', 'rules_violation').",
     )
-    mappings: Dict[str, str] = Field(
+    mappings: dict[str, str] = Field(
         default_factory=dict,
         description="Key-value mapping showing how file columns align with database fields.",
     )
-    errors: List[str] = Field(
+    errors: list[str] = Field(
         default_factory=list,
         description="Detailed list of specific business rule violation messages (pricing boundaries, segments, etc.).",
     )
-    token: Optional[str] = Field(
+    token: str | None = Field(
         None,
         description="The cryptographic single-use session token generated by the mutation approval gate.",
     )
@@ -1176,7 +1175,7 @@ class MutationExecuteResponse(BaseModel):
         ...,
         description="Commit state flag (e.g. 'executed', 'rolled_back', 'rejected').",
     )
-    error: Optional[str] = Field(
+    error: str | None = Field(
         None,
         description="Detailed Postgres execution exception message if database operations failed.",
     )
@@ -1203,7 +1202,7 @@ class ErrorResponse(BaseModel):
         description="Operational error classification class (e.g. 'DatabaseError', 'ValidationError').",
     )
     message: str = Field(..., description="Human-readable summary of the failure.")
-    detail: Optional[str] = Field(
+    detail: str | None = Field(
         None,
         description="Technical trace logs, exception codes, or parameters to aid debugging.",
     )

@@ -1,15 +1,16 @@
-from langchain_core.messages import HumanMessage
 import uuid
+
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres.aio import AsyncPostgresStore
 
 from app.config import get_settings
+from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
 from app.core.graph.builder import build_graph
 from app.core.vector_store import VectorStoreService
+from app.opik import opik_context, start_as_current_span, start_as_current_trace, track
 from app.services.cache_init import get_query_cache
 from app.utils.logger import get_logger
-from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
-from app.opik import track, start_as_current_trace, start_as_current_span, opik_context
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -126,7 +127,7 @@ class CSRAGEngine:
         vanna_top_p: float = 0.1,
     ) -> dict:
         logger.info(
-            f"async query — thread={thread_id}, user={user_id}, " f"q='{question[:80]}'"
+            f"async query — thread={thread_id}, user={user_id}, q='{question[:80]}'"
         )
 
         query_cache = get_query_cache()
@@ -236,8 +237,7 @@ class CSRAGEngine:
         lifecycle from first yield to generator exhaustion.
         """
         logger.info(
-            f"streaming query — thread={thread_id}, user={user_id}, "
-            f"q='{question[:80]}'"
+            f"streaming query — thread={thread_id}, user={user_id}, q='{question[:80]}'"
         )
 
         # Build trace input metadata once
@@ -325,7 +325,7 @@ class CSRAGEngine:
                     vanna_top_p=vanna_top_p,
                 )
 
-                _ANSWER_NODES = {"generate_answer", "generate_direct"}
+                answer_nodes = {"generate_answer", "generate_direct"}
                 char_count = 0
                 had_error = False
 
@@ -337,7 +337,7 @@ class CSRAGEngine:
                     ):
                         node = metadata.get("langgraph_node", "")
                         if (
-                            node in _ANSWER_NODES
+                            node in answer_nodes
                             and hasattr(msg, "content")
                             and msg.content
                         ):
@@ -347,7 +347,7 @@ class CSRAGEngine:
                 except Exception as e:
                     had_error = True
                     logger.error(f"Streaming error: {e}", exc_info=True)
-                    yield f"\n\n[Error: {type(e).__name__}: {str(e)}]"
+                    yield f"\n\n[Error: {type(e).__name__}: {e!s}]"
                 finally:
                     # Finalize span & trace with output metadata
                     span_output = {

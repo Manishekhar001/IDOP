@@ -11,19 +11,19 @@ Usage:
 """
 
 import logging
-from typing import Optional
+
 from app.services.cache_service import CacheService
 from app.services.query_cache_service import QueryCacheService
 
 logger = logging.getLogger(__name__)
 
-_doc_cache: Optional[CacheService] = None
-_query_cache: Optional[QueryCacheService] = None
+_doc_cache: CacheService | None = None
+_query_cache: QueryCacheService | None = None
 _doc_cache_init_attempted = False
 _query_cache_init_attempted = False
 
 
-def get_doc_cache() -> Optional[CacheService]:
+def get_doc_cache() -> CacheService | None:
     """Lazy-init document cache. Returns None if initialization fails."""
     global _doc_cache, _doc_cache_init_attempted
     if _doc_cache is None and not _doc_cache_init_attempted:
@@ -38,7 +38,7 @@ def get_doc_cache() -> Optional[CacheService]:
     return _doc_cache
 
 
-def get_query_cache() -> Optional[QueryCacheService]:
+def get_query_cache() -> QueryCacheService | None:
     """Lazy-init query cache. Returns None if initialization fails."""
     global _query_cache, _query_cache_init_attempted
     if _query_cache is None and not _query_cache_init_attempted:
@@ -59,7 +59,11 @@ def get_query_cache() -> Optional[QueryCacheService]:
 
 def reset_caches() -> None:
     """Reset both cache singletons and clear in-memory cache data. Useful for testing or hot-reloading config."""
-    global _doc_cache, _query_cache, _doc_cache_init_attempted, _query_cache_init_attempted
+    global \
+        _doc_cache, \
+        _query_cache, \
+        _doc_cache_init_attempted, \
+        _query_cache_init_attempted
     _doc_cache = None
     _query_cache = None
     _doc_cache_init_attempted = False

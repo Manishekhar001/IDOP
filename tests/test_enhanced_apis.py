@@ -2,8 +2,9 @@
 Unit tests for IDOP enhanced API responses and detail schemas.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 from app.api.schemas import ChatResponse, MutationResponse
@@ -23,6 +24,7 @@ class TestStorageBackendDefault:
     def test_health_reports_s3_when_backend_is_s3(self):
         """Verify /health reports s3_cache_configured: true when storage_backend is 's3'."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -49,6 +51,7 @@ class TestStorageBackendDefault:
     def test_health_reports_local_when_backend_is_local(self):
         """Verify /health reports s3_cache_configured: false when storage_backend is 'local'."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -206,9 +209,9 @@ class TestEnhancedApiEndpoints:
             form_data = {"chunk_size": "512", "chunk_overlap": "50"}
 
             response = client.post("/documents/upload", files=file_data, data=form_data)
-            assert (
-                response.status_code == 200
-            ), f"Expected 200, got {response.status_code}: {response.text}"
+            assert response.status_code == 200, (
+                f"Expected 200, got {response.status_code}: {response.text}"
+            )
             data = response.json()
             assert data["filename"] == "test.txt"
             assert data["chunk_size_applied"] == 512

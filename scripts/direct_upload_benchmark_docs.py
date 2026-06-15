@@ -38,7 +38,7 @@ _DOCS_DIR = Path(__file__).parent.parent / "benchmark_docs"
 
 def _load_doc(filename: str) -> str:
     path = _DOCS_DIR / filename
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return f.read()
 
 
@@ -166,10 +166,10 @@ async def main_async():
         print("  Running ablation study...")
         print(f"{'=' * 60}\n")
 
-        from scripts.eval_ragas import main as run_ablation
-
         # Override sys.argv for the ablation script
         import sys as _sys
+
+        from scripts.eval_ragas import main as run_ablation
 
         _sys.argv = ["eval_ragas.py", "--no-ragas"]
         if args.subset:

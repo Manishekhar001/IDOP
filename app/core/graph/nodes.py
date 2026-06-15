@@ -4,38 +4,35 @@ import re
 import uuid
 from typing import Literal
 
+import pandas as pd
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from app.core.approval_gate import approval_gate as gate
 from app.core.crag.evaluator import get_crag_evaluator
 from app.core.crag.web_search import get_web_search_service
-from app.core.graph.state import CSRAGState
-from app.core.graph.router import QueryRouter
-from app.core.llm_factory import get_chat_llm as _get_chat_llm
-from app.core.memory.ltm import get_ltm_service
-from app.core.memory.stm import get_stm_summarizer
-from app.core.srag.verifier import get_srag_verifier
-from app.core.vector_store import VectorStoreService
-
-# Feature 1 & 2 Imports
-from app.core.feature1_sql.sql_validator import SQLValidator
-from app.core.feature1_sql.llm_judge import LLMJudge
 from app.core.feature1_sql.executor import SQLExecutor
-
-from app.core.approval_gate import approval_gate as gate
-
-from app.opik import track
-from app.utils.logger import get_logger
+from app.core.feature1_sql.llm_judge import LLMJudge
 
 # Shared service instances — avoid creating per-call TextToSQLService instances
 # so that schema training state and query cache are consistently shared with
 # the module-level sql_service in app.api.routes.sql.
 from app.core.feature1_sql.shared import sql_service as shared_sql_service
 
-import pandas as pd
+# Feature 1 & 2 Imports
+from app.core.feature1_sql.sql_validator import SQLValidator
+from app.core.graph.router import QueryRouter
+from app.core.graph.state import CSRAGState
+from app.core.llm_factory import get_chat_llm as _get_chat_llm
+from app.core.memory.ltm import get_ltm_service
+from app.core.memory.stm import get_stm_summarizer
+from app.core.srag.verifier import get_srag_verifier
+from app.core.vector_store import VectorStoreService
+from app.opik import track
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -152,8 +149,8 @@ async def sql_generation_node(state: CSRAGState) -> dict:
         logger.error(f"SQL generation failed: {e}")
         return {
             "sql_status": "error",
-            "sql_explanation": f"Generation failed: {str(e)}",
-            "answer": f"❌ SQL generation failed: {str(e)}",
+            "sql_explanation": f"Generation failed: {e!s}",
+            "answer": f"❌ SQL generation failed: {e!s}",
         }
 
 
@@ -177,11 +174,11 @@ async def mutation_node(state: CSRAGState) -> dict:
     question = state.get("question", "")
     logger.info(f"Feature 2 Mutation Node triggered: '{question}'")
 
+    from app.core.approval_gate import mutation_approval_gate as gate
+    from app.core.feature2_mutation.llm_judge import MutationLLMJudge
+    from app.core.feature2_mutation.mutation_generator import MutationGenerator
     from app.core.feature2_mutation.op_classifier import OpClassifier
     from app.core.feature2_mutation.rule_validator import RuleValidator
-    from app.core.feature2_mutation.mutation_generator import MutationGenerator
-    from app.core.feature2_mutation.llm_judge import MutationLLMJudge
-    from app.core.approval_gate import mutation_approval_gate as gate
     from app.services.pending_store import pending_mutations as shared_pending_mutations
 
     try:
@@ -226,7 +223,7 @@ async def mutation_node(state: CSRAGState) -> dict:
         judge = MutationLLMJudge()
 
         # Validate business rules
-        is_valid, validation_errors = validator.validate_rows(table_name, rows)
+        _, validation_errors = validator.validate_rows(table_name, rows)
 
         # Generate SQL based on operation type
         pk = "id"
@@ -285,8 +282,8 @@ async def mutation_node(state: CSRAGState) -> dict:
         logger.error(f"Mutation processing failed: {e}")
         return {
             "mutation_status": "error",
-            "mutation_error": f"Mutation processing failed: {str(e)}",
-            "answer": f"❌ Mutation processing failed: {str(e)}",
+            "mutation_error": f"Mutation processing failed: {e!s}",
+            "answer": f"❌ Mutation processing failed: {e!s}",
         }
 
 
@@ -388,9 +385,10 @@ async def generate_direct_node(state: CSRAGState) -> dict:
         state.get("ltm_context", ""),
         state.get("summary", ""),
     )
-    messages = [SystemMessage(content=system_msg, id=str(uuid.uuid4()))] + list(
-        state["messages"]
-    )
+    messages = [
+        SystemMessage(content=system_msg, id=str(uuid.uuid4())),
+        *list(state["messages"]),
+    ]
     response = await llm.ainvoke(messages)
     answer = response.content
     return {
@@ -709,14 +707,14 @@ async def stm_summarize_node(state: CSRAGState) -> dict:
     ai_msg = AIMessage(content=answer, id=str(uuid.uuid4()))
 
     summarizer = get_stm_summarizer()
-    all_messages = list(state["messages"]) + [ai_msg]
+    all_messages = [*list(state["messages"]), ai_msg]
 
     if summarizer.should_summarize(all_messages):
         new_summary, remove_ops = await summarizer.summarize(
             messages=all_messages,
             existing_summary=state.get("summary", ""),
         )
-        return {"messages": [ai_msg] + remove_ops, "summary": new_summary}
+        return {"messages": [ai_msg, *remove_ops], "summary": new_summary}
 
     return {"messages": [ai_msg]}
 
@@ -890,7 +888,7 @@ async def hybrid_generation_node(
         web_docs = []
         if docs:
             evaluator = get_crag_evaluator()
-            verdict, reason, crag_good_docs = await evaluator.evaluate(question, docs)
+            verdict, _, crag_good_docs = await evaluator.evaluate(question, docs)
             crag_verdict = verdict
             good_docs = crag_good_docs
 
@@ -965,10 +963,10 @@ You MUST integrate the structured database results (SQL) and unstructured docume
 
 Structured DB Context (PostgreSQL):
 {db_context}
-Status: {sql_status} {f'({sql_error})' if sql_error else ''}
+Status: {sql_status} {f"({sql_error})" if sql_error else ""}
 
 Unstructured Doc Context (Qdrant RAG):
-{refined_context if refined_context else 'No documentation context retrieved.'}
+{refined_context if refined_context else "No documentation context retrieved."}
 
 Answer the question thoroughly, citing specific numbers from the database results and guidelines from the documents.
 Explain how the database facts align, match, or conflict with the manual guidelines.

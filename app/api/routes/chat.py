@@ -48,8 +48,7 @@ async def chat(
     engine: CSRAGEngine = Depends(get_engine),
 ) -> ChatResponse:
     logger.info(
-        f"Chat — thread={body.thread_id}, user={body.user_id}, "
-        f"q='{body.question[:80]}'"
+        f"Chat — thread={body.thread_id}, user={body.user_id}, q='{body.question[:80]}'"
     )
     start_time = time.time()
 
@@ -72,7 +71,7 @@ async def chat(
         logger.error(f"Chat query failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Query processing failed: {type(e).__name__}: {str(e)}",
+            detail=f"Query processing failed: {type(e).__name__}: {e!s}",
         )
 
     processing_time = (time.time() - start_time) * 1000
@@ -181,7 +180,7 @@ async def chat_stream(
                 yield chunk
         except Exception as e:
             logger.error(f"Streaming error: {e}", exc_info=True)
-            yield f"\n\n[Error: {type(e).__name__}: {str(e)}]"
+            yield f"\n\n[Error: {type(e).__name__}: {e!s}]"
 
     return StreamingResponse(generate(), media_type="text/plain")
 
@@ -210,7 +209,7 @@ async def get_chat_history(
         logger.error(f"History retrieval failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve history: {type(e).__name__}: {str(e)}",
+            detail=f"Failed to retrieve history: {type(e).__name__}: {e!s}",
         )
 
     if checkpoint_tuple is None:

@@ -1,13 +1,14 @@
 import hashlib
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 import numpy as np
 
-from app.services.storage_backend import StorageBackend
+from app.config import get_settings
 from app.services.local_storage import LocalStorageBackend
 from app.services.s3_storage import S3StorageBackend
-from app.config import get_settings
+from app.services.storage_backend import StorageBackend
 
 logger = logging.getLogger("idop_app.cache_service")
 
@@ -17,8 +18,8 @@ class CacheService:
     Manages caching of document chunks and embeddings.
     """
 
-    def __init__(self, storage_backend: Optional[StorageBackend] = None):
-        self.init_error: Optional[str] = None
+    def __init__(self, storage_backend: StorageBackend | None = None):
+        self.init_error: str | None = None
         settings = get_settings()
         if storage_backend is None:
             backend_type = getattr(settings, "storage_backend", "s3").lower()
@@ -99,9 +100,9 @@ class CacheService:
         self,
         doc_id: str,
         file_extension: str,
-        chunks: List[Dict[str, Any]],
-        embeddings: List[List[float]],
-        metadata: Dict[str, Any],
+        chunks: list[dict[str, Any]],
+        embeddings: list[list[float]],
+        metadata: dict[str, Any],
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError(
@@ -125,11 +126,11 @@ class CacheService:
                 self.storage.delete(doc_id, file_extension)
             except Exception:
                 pass
-            raise Exception(f"Failed to save cache: {str(e)}")
+            raise Exception(f"Failed to save cache: {e!s}")
 
     def load_chunks_and_embeddings(
         self, doc_id: str, file_extension: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         if not self.cache_exists(doc_id, file_extension):
             return None
 
@@ -150,10 +151,10 @@ class CacheService:
             return {"chunks": chunks, "embeddings": embeddings, "metadata": metadata}
 
         except Exception as e:
-            logger.warning(f"Failed to load cache for {doc_id}: {str(e)}")
+            logger.warning(f"Failed to load cache for {doc_id}: {e!s}")
             return None
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         try:
             return self.storage.get_stats()
         except Exception as e:
@@ -161,8 +162,8 @@ class CacheService:
             return {"error": str(e), "total_documents": 0}
 
     def clear_cache(
-        self, doc_id: Optional[str] = None, file_extension: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, doc_id: str | None = None, file_extension: str | None = None
+    ) -> dict[str, Any]:
         try:
             if doc_id:
                 if not file_extension:
@@ -201,9 +202,9 @@ class CacheService:
                         "documents_cleared": len(doc_ids),
                     }
         except Exception as e:
-            logger.error(f"Failed to clear cache: {str(e)}")
+            logger.error(f"Failed to clear cache: {e!s}")
             return {
                 "cleared": False,
-                "message": f"Failed to clear cache: {str(e)}",
+                "message": f"Failed to clear cache: {e!s}",
                 "documents_cleared": 0,
             }

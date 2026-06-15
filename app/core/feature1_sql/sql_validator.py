@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import ClassVar
 
 from app.opik import track
 
@@ -13,7 +14,7 @@ class SQLValidator:
     """
 
     # Forbidden SQL commands to prevent destructive/write operations in query pipeline
-    FORBIDDEN_COMMANDS = {
+    FORBIDDEN_COMMANDS: ClassVar[set[str]] = {
         "DROP",
         "TRUNCATE",
         "ALTER",

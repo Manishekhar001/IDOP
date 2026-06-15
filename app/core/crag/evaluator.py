@@ -6,9 +6,9 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.opik import track
 from app.config import get_settings
 from app.core.llm_factory import get_memory_llm
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -92,12 +92,11 @@ class CRAGEvaluator:
         if any(s >= self._upper_th for s in scores):
             verdict: CRAGVerdict = "CORRECT"
             reason = (
-                f"At least one chunk scored >= {self._upper_th} "
-                f"(max={max(scores):.2f})"
+                f"At least one chunk scored >= {self._upper_th} (max={max(scores):.2f})"
             )
         elif all(s < self._lower_th for s in scores):
             verdict = "INCORRECT"
-            reason = f"All chunks scored < {self._lower_th} " f"(max={max(scores):.2f})"
+            reason = f"All chunks scored < {self._lower_th} (max={max(scores):.2f})"
             good_docs = []
         else:
             verdict = "AMBIGUOUS"

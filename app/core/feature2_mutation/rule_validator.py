@@ -1,8 +1,8 @@
 import json
-import re
 import logging
+import re
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Any
 
 from app.opik import track
 
@@ -28,7 +28,7 @@ class RuleValidator:
 
     def load_rules(self):
         try:
-            with open(self.rules_path, "r") as f:
+            with open(self.rules_path) as f:
                 self.rules = json.load(f)
             logger.info("Successfully loaded business validation rules")
         except Exception as e:
@@ -36,8 +36,8 @@ class RuleValidator:
 
     @track(name="rule_validator_validate")
     def validate_rows(
-        self, table_name: str, rows: List[Dict[str, Any]]
-    ) -> Tuple[bool, List[str]]:
+        self, table_name: str, rows: list[dict[str, Any]]
+    ) -> tuple[bool, list[str]]:
         """
         Validate all rows. Returns (is_valid, list_of_error_messages).
         """

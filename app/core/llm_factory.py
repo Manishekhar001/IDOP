@@ -38,7 +38,7 @@ Configuration (in .env):
 
 import logging
 from functools import lru_cache
-from typing import Any, Optional
+from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -102,7 +102,7 @@ def _build_litellm_router() -> Any:
                 "rpm": 30,  # Groq free tier: 30 req/min per key
             }
         )
-        logger.info(f"  Groq deployment {i+1}: groq/{model}")
+        logger.info(f"  Groq deployment {i + 1}: groq/{model}")
 
     # Add OpenAI as a fallback deployment within the same model group.
     # If all Groq deployments fail (e.g. invalid/expired keys, rate limits),
@@ -141,8 +141,8 @@ def _build_litellm_router() -> Any:
 
 @lru_cache
 def get_chat_llm(
-    model: Optional[str] = None,
-    temperature: Optional[float] = None,
+    model: str | None = None,
+    temperature: float | None = None,
 ) -> BaseChatModel:
     """
     Return a configured chat LLM based on settings.
@@ -245,8 +245,8 @@ def get_chat_llm(
 
 @lru_cache
 def get_memory_llm(
-    model: Optional[str] = None,
-    temperature: Optional[float] = None,
+    model: str | None = None,
+    temperature: float | None = None,
 ) -> BaseChatModel:
     """
     Return a lighter/cheaper LLM for memory/classification tasks.

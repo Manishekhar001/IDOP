@@ -11,10 +11,12 @@ requests.get() and environment variables, covering:
   - HTTP errors and network failures
 """
 
-import os
 import json
+import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from scripts import deploy_smoke
 
 # =========================================================================
@@ -63,8 +65,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": "abc123def456"}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123def456"}, clear=False),
         ):
             result = deploy_smoke.run_health_check()
             assert result is True
@@ -81,8 +84,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": "new-sha-value"}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": "new-sha-value"}, clear=False),
         ):
             result = deploy_smoke.run_health_check()
             assert result is False
@@ -99,8 +103,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False),
         ):
             result = deploy_smoke.run_health_check()
             assert result is True
@@ -117,8 +122,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False),
         ):
             result = deploy_smoke.run_health_check()
             assert result is True
@@ -135,8 +141,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False),
         ):
             result = deploy_smoke.run_health_check()
             assert result is True
@@ -154,8 +161,9 @@ class TestGitCommitSHAMatching:
         }
         resp = mock_response(200, health_data)
         # Only remove EXPECTED_GIT_SHA — don't wipe all env vars
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": ""}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": ""}, clear=False),
         ):
             # Clear the value so os.getenv returns None
             if "EXPECTED_GIT_SHA" in os.environ:
@@ -176,8 +184,9 @@ class TestGitCommitSHAMatching:
             },
         }
         resp = mock_response(200, health_data)
-        with patch.object(deploy_smoke.requests, "get", return_value=resp), patch.dict(
-            os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False
+        with (
+            patch.object(deploy_smoke.requests, "get", return_value=resp),
+            patch.dict(os.environ, {"EXPECTED_GIT_SHA": "abc123"}, clear=False),
         ):
             result = deploy_smoke.run_health_check()
             assert result is True

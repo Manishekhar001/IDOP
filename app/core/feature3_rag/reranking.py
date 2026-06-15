@@ -1,8 +1,9 @@
 import logging
-from typing import List
+
 from langchain_core.documents import Document
-from app.opik import track
+
 from app.config import get_settings
+from app.opik import track
 
 logger = logging.getLogger("idop_app.reranking")
 
@@ -38,8 +39,8 @@ class RerankingService:
 
     @track(name="reranking_service_rerank")
     def rerank(
-        self, query: str, documents: List[Document], top_k: int = 5
-    ) -> List[Document]:
+        self, query: str, documents: list[Document], top_k: int = 5
+    ) -> list[Document]:
         """
         Rerank a list of documents relative to the user query using Voyage AI.
         """

@@ -2,8 +2,9 @@
 Unit tests for IDOP SQL API and schema updates.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 
 from app.api.schemas import SQLResponse

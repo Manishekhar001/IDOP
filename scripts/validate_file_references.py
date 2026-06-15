@@ -20,7 +20,6 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
 
 # --- Paths -------------------------------------------------------------------
 
@@ -60,9 +59,9 @@ def is_python_file(path: Path) -> bool:
     return path.suffix in PYTHON_EXTS and path.name != "__init__.py"
 
 
-def get_all_project_files() -> Set[Path]:
+def get_all_project_files() -> set[Path]:
     """Return a set of all tracked project file paths (relative to PROJECT_ROOT)."""
-    files: Set[Path] = set()
+    files: set[Path] = set()
     for root, dirs, filenames in os.walk(PROJECT_ROOT):
         # Skip ignored/virtual directories
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
@@ -73,7 +72,7 @@ def get_all_project_files() -> Set[Path]:
     return files
 
 
-def _module_exists(module: str, all_files: Set[Path]) -> bool:
+def _module_exists(module: str, all_files: set[Path]) -> bool:
     """Check if a dotted module path corresponds to an existing file."""
     parts = module.split(".")
     # Candidate: module.py
@@ -89,14 +88,14 @@ def _module_exists(module: str, all_files: Set[Path]) -> bool:
 
 
 def check_python_imports(
-    file_paths: List[Path], all_files: Set[Path], verbose: bool
-) -> List[str]:
+    file_paths: list[Path], all_files: set[Path], verbose: bool
+) -> list[str]:
     """Parse every Python file and validate its import statements.
 
     Only validates imports from project-internal packages (app, tests, scripts, docs).
     Third-party and stdlib imports are skipped.
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     for file_rel in file_paths:
         if not is_python_file(file_rel) and file_rel.name != "__init__.py":
@@ -125,9 +124,7 @@ def check_python_imports(
                     if top not in PROJECT_PACKAGES:
                         continue
                     if not _module_exists(mod, all_files):
-                        errors.append(
-                            f"  {file_rel}: import {mod} - module not found"
-                        )
+                        errors.append(f"  {file_rel}: import {mod} - module not found")
 
             elif isinstance(node, ast.ImportFrom):
                 module = node.module or ""
@@ -150,9 +147,9 @@ def check_python_imports(
                             full_mod = ".".join(pkg_parts)
 
                         # Also check with the imported name as a submodule
-                        if not _module_exists(full_mod, all_files) and not _module_exists(
-                            full_mod + "." + name, all_files
-                        ):
+                        if not _module_exists(
+                            full_mod, all_files
+                        ) and not _module_exists(full_mod + "." + name, all_files):
                             rel_str = "." * node.level + module
                             errors.append(
                                 f"  {file_rel}: from {rel_str} import {name} - module not found"
@@ -175,8 +172,8 @@ def check_python_imports(
 
 
 def check_hardcoded_paths(
-    file_paths: List[Path], all_files: Set[Path], verbose: bool
-) -> List[str]:
+    file_paths: list[Path], all_files: set[Path], verbose: bool
+) -> list[str]:
     """Find hardcoded file path strings in Python files and check they exist.
 
     Catches patterns like:
@@ -184,7 +181,7 @@ def check_hardcoded_paths(
       - Config references to other files
       - Any string literal matching a project file path
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     for file_rel in file_paths:
         if file_rel.suffix not in PYTHON_EXTS:
@@ -202,17 +199,17 @@ def check_hardcoded_paths(
             p = Path(path_str.replace("/", os.sep).replace("\\", os.sep))
             if not p.is_absolute() and p not in all_files:
                 errors.append(
-                    f"  {file_rel}: string path \"{path_str}\" - file not found"
+                    f'  {file_rel}: string path "{path_str}" - file not found'
                 )
 
     return errors
 
 
 def check_doc_references(
-    doc_files: List[Path], all_files: Set[Path], verbose: bool
-) -> List[str]:
+    doc_files: list[Path], all_files: set[Path], verbose: bool
+) -> list[str]:
     """Scan documentation files for broken file references."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     # Pattern to find file references in markdown/docs
     doc_pattern = re.compile(
@@ -234,7 +231,7 @@ def check_doc_references(
         except Exception:
             continue
 
-        seen: Set[str] = set()
+        seen: set[str] = set()
         for match in doc_pattern.finditer(content):
             path_str = match.group(1).rstrip(")`")
             if path_str in seen:
@@ -243,16 +240,16 @@ def check_doc_references(
 
             p = Path(path_str.replace("/", os.sep))
             if p not in all_files:
-                errors.append(f"  {file_rel}: references \"{path_str}\" - file not found")
+                errors.append(f'  {file_rel}: references "{path_str}" - file not found')
 
     return errors
 
 
 def check_workflow_references(
-    workflow_files: List[Path], all_files: Set[Path], verbose: bool
-) -> List[str]:
+    workflow_files: list[Path], all_files: set[Path], verbose: bool
+) -> list[str]:
     """Check file references in GitHub Actions workflow files."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     # Pattern for scripts/ references in YAML
     script_re = re.compile(r"""(?:python\s+)?scripts/[\w\-./]+\.py""")
@@ -265,7 +262,7 @@ def check_workflow_references(
         except Exception:
             continue
 
-        seen: Set[str] = set()
+        seen: set[str] = set()
         for match in script_re.finditer(content):
             path_str = match.group(0).replace("python ", "")
             if path_str in seen:
@@ -275,7 +272,7 @@ def check_workflow_references(
             p = Path(path_str.replace("/", os.sep))
             if p not in all_files:
                 errors.append(
-                    f"  {file_rel}: references \"{path_str}\" - script not found"
+                    f'  {file_rel}: references "{path_str}" - script not found'
                 )
 
     return errors
@@ -286,7 +283,9 @@ def main():
 
     # Configure stdout for UTF-8 on Windows
     if sys.platform == "win32":
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
 
     print("=" * 60)
     print("  File Reference Validator")
@@ -308,7 +307,7 @@ def main():
     doc_files = [f for f in all_files if f.suffix in DOC_EXTS]
     workflow_files = [f for f in all_files if ".github/" in str(f).replace(os.sep, "/")]
 
-    all_errors: List[str] = []
+    all_errors: list[str] = []
 
     # --- Check 1: Python imports -------------------------------------------
     print("[1/4] Checking Python imports...")

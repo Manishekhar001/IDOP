@@ -4,8 +4,8 @@ from typing import Literal
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.opik import track
 from app.core.llm_factory import get_memory_llm
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

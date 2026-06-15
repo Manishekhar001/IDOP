@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Optional
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -137,12 +137,12 @@ class Settings(BaseSettings):
     s3_cache_bucket: str = "idop-cache-docs"
     cache_dir: str = "data/cached_chunks"  # local storage directory for document chunks
     aws_region: str = "us-east-1"
-    aws_access_key_id: Optional[str] = None
-    aws_secret_access_key: Optional[str] = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
 
     # Upstash Redis Configuration (for query/SQL cache)
-    upstash_redis_url: Optional[str] = None
-    upstash_redis_token: Optional[str] = None
+    upstash_redis_url: str | None = None
+    upstash_redis_token: str | None = None
 
     # Cache TTL Configurations (in seconds)
     cache_ttl_embeddings: int = 604800  # 7 days
@@ -169,9 +169,9 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
 
     # OPIK Observability Configuration (optional)
-    opik_api_key: Optional[str] = None
-    opik_workspace: Optional[str] = None
-    opik_project_name: Optional[str] = None
+    opik_api_key: str | None = None
+    opik_workspace: str | None = None
+    opik_project_name: str | None = None
 
 
 @lru_cache

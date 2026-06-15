@@ -1,8 +1,10 @@
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
-from app.services.cache_init import get_doc_cache, get_query_cache
+
 from app.opik import track
+from app.services.cache_init import get_doc_cache, get_query_cache
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -13,10 +15,10 @@ router = APIRouter(prefix="/cache", tags=["Cache Management"])
 class CacheStatsResponse(BaseModel):
     """Detailed statistics for both document and query caches."""
 
-    document_cache: Dict[str, Any] = Field(
+    document_cache: dict[str, Any] = Field(
         ..., description="Document-level storage cache stats (local or S3)"
     )
-    query_cache: Dict[str, Any] = Field(
+    query_cache: dict[str, Any] = Field(
         ..., description="Query-level cache stats (Redis or local fallback)"
     )
 
@@ -24,10 +26,10 @@ class CacheStatsResponse(BaseModel):
 class CacheClearResponse(BaseModel):
     """Result of a cache clear operation."""
 
-    document_cache: Optional[Dict[str, Any]] = Field(
+    document_cache: dict[str, Any] | None = Field(
         None, description="Document cache clear result"
     )
-    query_cache: Optional[Dict[str, Any]] = Field(
+    query_cache: dict[str, Any] | None = Field(
         None, description="Query cache clear result"
     )
 
@@ -35,8 +37,8 @@ class CacheClearResponse(BaseModel):
 class CacheHealthResponse(BaseModel):
     """Health status of both cache layers."""
 
-    document_cache: Dict[str, Any] = Field(..., description="Document cache health")
-    query_cache: Dict[str, Any] = Field(..., description="Query cache health")
+    document_cache: dict[str, Any] = Field(..., description="Document cache health")
+    query_cache: dict[str, Any] = Field(..., description="Query cache health")
     overall_status: str = Field(
         ..., description="Overall cache system status: healthy / degraded / unhealthy"
     )
@@ -49,7 +51,7 @@ class CacheTestResponse(BaseModel):
     cache_mode: str = Field(
         ..., description="Cache mode used for the test (redis / local_fallback)"
     )
-    details: Dict[str, Any] = Field(..., description="Step-by-step test results")
+    details: dict[str, Any] = Field(..., description="Step-by-step test results")
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ async def get_cache_stats() -> CacheStatsResponse:
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch cache stats: {str(e)}"
+            status_code=500, detail=f"Failed to fetch cache stats: {e!s}"
         )
 
 
@@ -99,13 +101,13 @@ async def get_cache_stats() -> CacheStatsResponse:
 )
 @track(name="clear_cache")
 async def clear_cache(
-    doc_id: Optional[str] = None,
-    file_extension: Optional[str] = None,
+    doc_id: str | None = None,
+    file_extension: str | None = None,
     clear_query_cache: bool = True,
 ) -> CacheClearResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     try:
         if doc_id:
             res = (
@@ -135,7 +137,7 @@ async def clear_cache(
 
         return CacheClearResponse(**result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e!s}")
 
 
 @router.get(
@@ -149,7 +151,7 @@ async def cache_health() -> CacheHealthResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
 
-    doc_health: Dict[str, Any]
+    doc_health: dict[str, Any]
     if doc_cache:
         backend_class = type(doc_cache.storage).__name__
         doc_health = {
@@ -164,7 +166,7 @@ async def cache_health() -> CacheHealthResponse:
             "message": "Document cache failed to initialize",
         }
 
-    query_health: Dict[str, Any]
+    query_health: dict[str, Any]
     if query_cache:
         query_health = query_cache.health_check()
     else:
@@ -216,7 +218,7 @@ async def test_cache() -> CacheTestResponse:
     )
     test_key = "cache_test:round_trip"
     test_value = {"test": True, "message": "IDOP cache round-trip test"}
-    details: Dict[str, Any] = {"mode": mode}
+    details: dict[str, Any] = {"mode": mode}
 
     # Step 1: Write
     write_ok = query_cache.set(test_key, test_value, ttl=60, cache_type="rag")

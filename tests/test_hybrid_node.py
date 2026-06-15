@@ -21,8 +21,9 @@ class TestHybridGenerationNode:
     @pytest.mark.asyncio
     async def test_returns_expected_keys(self):
         """The returned dict must contain all expected hybrid output keys."""
-        from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
+
+        from app.core.graph.nodes import hybrid_generation_node
 
         result = await hybrid_generation_node(
             {
@@ -83,8 +84,9 @@ class TestHybridGenerationNode:
     @pytest.mark.asyncio
     async def test_sql_status_defaults_to_skipped_when_no_data(self):
         """When no SQL data is available, sql_status should be 'skipped' or 'error'."""
-        from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
+
+        from app.core.graph.nodes import hybrid_generation_node
 
         result = await hybrid_generation_node(
             {
@@ -100,8 +102,9 @@ class TestHybridGenerationNode:
     @pytest.mark.asyncio
     async def test_sql_status_string_type(self):
         """sql_status should always be a string."""
-        from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
+
+        from app.core.graph.nodes import hybrid_generation_node
 
         result = await hybrid_generation_node(
             {
@@ -118,8 +121,9 @@ class TestHybridGenerationNode:
     @pytest.mark.asyncio
     async def test_answer_is_string(self):
         """The answer field should always be a string."""
-        from app.core.graph.nodes import hybrid_generation_node
         from langchain_core.messages import HumanMessage
+
+        from app.core.graph.nodes import hybrid_generation_node
 
         result = await hybrid_generation_node(
             {

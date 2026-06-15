@@ -18,8 +18,9 @@ from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+
 from app.config import get_settings
-from app.utils.logger import setup_logging, get_logger
+from app.utils.logger import get_logger, setup_logging
 
 # Ensure project root is on sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

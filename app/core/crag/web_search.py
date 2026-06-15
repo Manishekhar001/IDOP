@@ -1,21 +1,21 @@
 import asyncio
 from functools import lru_cache
 
-from langchain_tavily import TavilySearch
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_tavily import TavilySearch
 from pydantic import BaseModel, Field
 
-from app.opik import track
 from app.config import get_settings
 from app.core.llm_factory import get_memory_llm
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class WebQuery(BaseModel):
-    query: str = Field(..., description="Focused web-search query (6–14 keywords).")
+    query: str = Field(..., description="Focused web-search query (6-14 keywords).")
 
 
 _REWRITE_PROMPT = ChatPromptTemplate.from_messages(
@@ -24,7 +24,7 @@ _REWRITE_PROMPT = ChatPromptTemplate.from_messages(
             "system",
             "Rewrite the user question into a focused web-search query.\n"
             "Rules:\n"
-            "  - Keep it short: 6–14 keywords.\n"
+            "  - Keep it short: 6-14 keywords.\n"
             "  - If the question implies recency (recent/latest/last week), "
             "add a time constraint such as '(last 30 days)'.\n"
             "  - Do NOT answer the question.\n"
@@ -47,8 +47,7 @@ class WebSearchService:
             max_results=settings.tavily_max_results,
         )
         logger.info(
-            f"WebSearchService ready — "
-            f"tavily max_results={settings.tavily_max_results}"
+            f"WebSearchService ready — tavily max_results={settings.tavily_max_results}"
         )
 
     @track(name="web_search_rewrite")

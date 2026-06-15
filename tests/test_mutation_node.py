@@ -9,8 +9,9 @@ Tests verify:
   5. route_after_router correctly routes MUTATION to "mutation" (not "chat")
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from app.core.graph.nodes import mutation_node, route_after_router
 

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import Any
 
 from app.opik import track
 
@@ -13,8 +13,8 @@ class MutationGenerator:
 
     @track(name="mutation_generator_insert")
     def generate_insert(
-        self, table_name: str, mapped_rows: List[Dict[str, Any]]
-    ) -> Tuple[str, List[Tuple[Any, ...]]]:
+        self, table_name: str, mapped_rows: list[dict[str, Any]]
+    ) -> tuple[str, list[tuple[Any, ...]]]:
         """
         Generate parameterized bulk INSERT statement and corresponding flat parameter tuples.
         """
@@ -39,9 +39,9 @@ class MutationGenerator:
     def generate_update(
         self,
         table_name: str,
-        mapped_rows: List[Dict[str, Any]],
+        mapped_rows: list[dict[str, Any]],
         primary_key: str = "id",
-    ) -> List[Tuple[str, Tuple[Any, ...]]]:
+    ) -> list[tuple[str, tuple[Any, ...]]]:
         """
         Generate parameterized UPDATE statements for each row.
         Returns a list of tuples containing (sql_statement, parameters).
@@ -73,9 +73,9 @@ class MutationGenerator:
     def generate_delete(
         self,
         table_name: str,
-        mapped_rows: List[Dict[str, Any]],
+        mapped_rows: list[dict[str, Any]],
         primary_key: str = "id",
-    ) -> Tuple[str, List[Any]]:
+    ) -> tuple[str, list[Any]]:
         """
         Generate parameterized DELETE statement for bulk keys.
         """

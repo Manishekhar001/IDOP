@@ -6,10 +6,11 @@ Unit tests for IDOP Feature pipelines.
 """
 
 import json
+
 import pytest
 
-from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.approval_gate import ApprovalGate
+from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature2_mutation.rule_validator import RuleValidator
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -9,6 +9,8 @@ Provides:
 - format_file_size: Human-readable file size formatting
 """
 
+from typing import ClassVar
+
 from fastapi import UploadFile
 
 
@@ -27,7 +29,7 @@ class FileValidator:
     """
 
     # Sync verified by TestExtensionSync.test_validator_extensions_match_document_processor
-    ALLOWED_EXTENSIONS: dict[str, str] = {
+    ALLOWED_EXTENSIONS: ClassVar[dict[str, str]] = {
         ".pdf": "application/pdf",
         ".csv": "text/csv",
         ".txt": "text/plain",

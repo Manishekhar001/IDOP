@@ -5,8 +5,9 @@ Tests all five classification paths (SQL, MUTATION, RAG, CHAT, HYBRID)
 using mocked LangChain LLM chain, plus fallback behavior on API failure.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 from app.core.graph.router import QueryRouter, RouteDecision
 

@@ -1,8 +1,9 @@
 import asyncio
 import hashlib
 import os
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from typing import Optional
+
 from app.api.schemas import (
     CollectionInfoResponse,
     DocumentUploadResponse,
@@ -11,8 +12,8 @@ from app.api.schemas import (
 from app.core.document_processor import DocumentProcessor
 from app.core.embeddings import EmbeddingQuotaError
 from app.core.vector_store import VectorStoreService
-from app.services.cache_init import get_doc_cache
 from app.opik import track
+from app.services.cache_init import get_doc_cache
 from app.utils.logger import get_logger
 from app.utils.validators import FileValidator, ValidationError
 
@@ -59,10 +60,10 @@ def _validate_file_size(file_bytes: bytes) -> None:
 @track(name="upload_document")
 async def upload_document(
     file: UploadFile = File(..., description="Document to upload (PDF, TXT, CSV)"),
-    chunk_size: Optional[int] = Form(
+    chunk_size: int | None = Form(
         None, description="Custom target chunk size for parsing"
     ),
-    chunk_overlap: Optional[int] = Form(None, description="Custom chunk overlap"),
+    chunk_overlap: int | None = Form(None, description="Custom chunk overlap"),
     vector_store: VectorStoreService = Depends(get_vector_store),
 ) -> DocumentUploadResponse:
     """
@@ -285,7 +286,7 @@ async def upload_document(
             )
         logger.error(f"Upload error: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to process document: {str(e)}"
+            status_code=500, detail=f"Failed to process document: {e!s}"
         )
 
 
@@ -309,7 +310,7 @@ async def collection_info(
     except Exception as e:
         logger.error(f"Collection info error: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve collection info: {str(e)}"
+            status_code=500, detail=f"Failed to retrieve collection info: {e!s}"
         )
 
 
@@ -330,5 +331,5 @@ async def delete_collection(
     except Exception as e:
         logger.error(f"Collection deletion error: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to delete collection: {str(e)}"
+            status_code=500, detail=f"Failed to delete collection: {e!s}"
         )

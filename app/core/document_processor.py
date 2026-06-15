@@ -1,20 +1,20 @@
 import tempfile
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, ClassVar
 
 import pandas as pd
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from app.opik import track
 from app.config import get_settings
+from app.opik import track
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class DocumentProcessor:
-    SUPPORTED_EXTENSIONS: set[str] = {".pdf", ".txt", ".csv"}
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".pdf", ".txt", ".csv"}
 
     def __init__(
         self,
@@ -114,8 +114,7 @@ class DocumentProcessor:
         ext = file_path.suffix.lower()
         if ext not in self.SUPPORTED_EXTENSIONS:
             raise ValueError(
-                f"Unsupported extension '{ext}'. "
-                f"Supported: {self.SUPPORTED_EXTENSIONS}"
+                f"Unsupported extension '{ext}'. Supported: {self.SUPPORTED_EXTENSIONS}"
             )
         loaders = {
             ".pdf": self._load_pdf,
@@ -128,8 +127,7 @@ class DocumentProcessor:
         ext = Path(filename).suffix.lower()
         if ext not in self.SUPPORTED_EXTENSIONS:
             raise ValueError(
-                f"Unsupported extension '{ext}'. "
-                f"Supported: {self.SUPPORTED_EXTENSIONS}"
+                f"Unsupported extension '{ext}'. Supported: {self.SUPPORTED_EXTENSIONS}"
             )
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             tmp.write(file.read())
@@ -195,8 +193,7 @@ class DocumentProcessor:
         ext = Path(filename).suffix.lower()
         if ext not in self.SUPPORTED_EXTENSIONS:
             raise ValueError(
-                f"Unsupported extension '{ext}'. "
-                f"Supported: {self.SUPPORTED_EXTENSIONS}"
+                f"Unsupported extension '{ext}'. Supported: {self.SUPPORTED_EXTENSIONS}"
             )
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             tmp.write(file_bytes)

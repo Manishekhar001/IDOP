@@ -60,9 +60,9 @@ import random
 import sys
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -333,7 +333,7 @@ BENCHMARK = [
 # Pipeline Configurations
 # ═══════════════════════════════════════════════════════════════════════════════
 
-ABLATION_CONFIGS: List[Dict[str, Any]] = [
+ABLATION_CONFIGS: list[dict[str, Any]] = [
     {
         "id": 1,
         "name": "Dense Only",
@@ -387,7 +387,7 @@ ABLATION_CONFIGS: List[Dict[str, Any]] = [
 
 
 def _timestamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _progress_bar(current: int, total: int, width: int = 40) -> str:
@@ -400,11 +400,11 @@ def _progress_bar(current: int, total: int, width: int = 40) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _collect_contexts(state: dict) -> List[str]:
+def _collect_contexts(state: dict) -> list[str]:
     """Extract context texts from a pipeline result state dict."""
     from langchain_core.documents import Document
 
-    contexts: List[str] = []
+    contexts: list[str] = []
     for key in ("good_docs", "docs", "web_docs"):
         docs = state.get(key, []) or []
         for d in docs:
@@ -417,11 +417,12 @@ def _collect_contexts(state: dict) -> List[str]:
 
 async def _create_engine() -> tuple:
     """Create a shared CSRAGEngine with Postgres resources."""
-    from app.core.csrag_engine import CSRAGEngine
-    from app.core.vector_store import VectorStoreService
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from langgraph.store.postgres.aio import AsyncPostgresStore
+
     from app.config import get_settings
+    from app.core.csrag_engine import CSRAGEngine
+    from app.core.vector_store import VectorStoreService
 
     settings = get_settings()
     vector_store = VectorStoreService()
@@ -449,10 +450,10 @@ async def _create_engine() -> tuple:
 
 async def run_single_query(
     question: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     config_dir: Path,
     engine: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run one question through one pipeline configuration."""
     from app.core.csrag_engine import CSRAGEngine
 
@@ -494,10 +495,10 @@ async def run_single_query(
 
 
 async def run_configuration(
-    config: Dict[str, Any],
-    benchmark: List[Dict[str, Any]],
+    config: dict[str, Any],
+    benchmark: list[dict[str, Any]],
     config_dir: Path,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run pipeline queries (no evaluation). Returns raw pipeline outputs."""
     cfg_id = config["id"]
     cfg_name = config["name"]
@@ -512,10 +513,10 @@ async def run_configuration(
     print(f"{'=' * 70}")
 
     print("  [INIT] Creating CSRAGEngine...", end="", flush=True)
-    engine, store, checkpointer, cm_store, cm_checkpointer = await _create_engine()
+    engine, _, _, cm_store, cm_checkpointer = await _create_engine()
     print(" OK")
 
-    pipeline_outputs: List[Dict[str, Any]] = []
+    pipeline_outputs: list[dict[str, Any]] = []
     start_time = time.monotonic()
 
     try:
@@ -581,10 +582,10 @@ async def run_configuration(
 
 
 async def evaluate_config(
-    pipeline_outputs: List[Dict[str, Any]],
+    pipeline_outputs: list[dict[str, Any]],
     config_id: int,
     config_name: str,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Evaluate one config's pipeline outputs using the in-house evaluator.
     Adds delays between LLM calls to respect rate limits.
@@ -599,10 +600,10 @@ async def evaluate_config(
     from app.core.feature3_rag.ragas_evaluator import get_ragas_evaluator
 
     evaluator = get_ragas_evaluator()
-    faith_scores: List[float] = []
-    relev_scores: List[float] = []
-    prec_scores: List[float] = []
-    recall_numer: List[float] = []
+    faith_scores: list[float] = []
+    relev_scores: list[float] = []
+    prec_scores: list[float] = []
+    recall_numer: list[float] = []
     eval_errors = 0
 
     for q_idx, out in enumerate(pipeline_outputs, start=1):
@@ -657,8 +658,8 @@ async def evaluate_config(
 
 
 def _compute_category_metrics(
-    outputs: List[Dict[str, Any]],
-) -> Dict[str, Dict[str, float]]:
+    outputs: list[dict[str, Any]],
+) -> dict[str, dict[str, float]]:
     """Compute per-category success rates."""
     categories = defaultdict(list)
     for o in outputs:
@@ -688,12 +689,12 @@ def _compute_category_metrics(
 
 
 def _build_report(
-    all_results: List[Dict[str, Any]],
+    all_results: list[dict[str, Any]],
     benchmark_name: str,
     total_elapsed: float,
     actual_questions: int = 50,
 ) -> str:
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append("=" * 72)
     lines.append("  IDOP ABLATION STUDY REPORT")
     lines.append(f"  Benchmark: {benchmark_name} ({actual_questions} questions)")
@@ -763,7 +764,7 @@ def _build_report(
     return "\n".join(lines)
 
 
-def _save_csv(results_dir: Path, all_results: List[Dict[str, Any]]) -> Path:
+def _save_csv(results_dir: Path, all_results: list[dict[str, Any]]) -> Path:
     csv_path = results_dir / "ablation_summary.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -797,7 +798,7 @@ def _save_csv(results_dir: Path, all_results: List[Dict[str, Any]]) -> Path:
 
 
 def _save_per_question_csv(
-    results_dir: Path, all_results: List[Dict[str, Any]]
+    results_dir: Path, all_results: list[dict[str, Any]]
 ) -> Path:
     csv_path = results_dir / "per_question_results.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -841,7 +842,7 @@ def _save_per_question_csv(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="IDOP Ablation Study - benchmark 5 pipeline configurations",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1137,7 +1138,7 @@ async def main_async() -> None:
         questions = r.get("questions", [])
         total_cfgs = len(all_pipeline_results)
         print(
-            f"\n  >>> Evaluating Config {idx+1}/{total_cfgs}: {cfg_name} ({len(questions)} questions)",
+            f"\n  >>> Evaluating Config {idx + 1}/{total_cfgs}: {cfg_name} ({len(questions)} questions)",
             flush=True,
         )
 

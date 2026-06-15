@@ -1,10 +1,12 @@
 import logging
+from typing import Any
+
 import psycopg2
 import psycopg2.extras
-from typing import List, Dict, Any
-from app.opik import track
+
 from app.config import get_settings
 from app.core.audit_logger import AuditLogger
+from app.opik import track
 
 logger = logging.getLogger("idop_app.sql_executor")
 
@@ -22,7 +24,7 @@ class SQLExecutor:
     @track(name="sql_executor_execute")
     def execute_and_log(
         self, query_id: str, question: str, sql: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Execute SQL query and log to audit table.
         """
@@ -46,9 +48,9 @@ class SQLExecutor:
         except Exception as e:
             logger.error(f"SQL Execution failed: {e}")
             try:
-                self.audit.log(conn, query_id, question, sql, f"FAILED: {str(e)}")
+                self.audit.log(conn, query_id, question, sql, f"FAILED: {e!s}")
                 conn.commit()
             except Exception as log_err:
                 logger.error(f"Failed to write failure audit log: {log_err}")
             conn.close()
-            raise ValueError(f"Failed to execute approved SQL: {str(e)}")
+            raise ValueError(f"Failed to execute approved SQL: {e!s}")
