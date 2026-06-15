@@ -194,7 +194,9 @@ def _check_module_has_track_import(module_path: str) -> bool:
     """Check that a module file imports track from app.opik."""
     with open(module_path, encoding="utf-8") as f:
         content = f.read()
-    return "from app.opik import track" in content
+    # Match both single-import (from app.opik import track) and
+    # multi-import (from app.opik import ..., track, ...) lines.
+    return bool(re.search(r"^from app\.opik import .*\btrack\b", content, re.MULTILINE))
 
 
 ROUTE_FILES = [
