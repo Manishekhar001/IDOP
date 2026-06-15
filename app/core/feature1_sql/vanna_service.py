@@ -21,11 +21,7 @@ class VannaAgentWrapper:
     OpenAI SQL generation (handled in TextToSQLService.generate_sql_for_approval).
     """
 
-    def __init__(
-        self,
-        openai_api_key: str,
-        database_url: str,
-    ):
+    def __init__(self, openai_api_key: str, database_url: str):
         self._available = False
         self.agent = None
         self.postgres_runner = None
@@ -83,8 +79,7 @@ class VannaAgentWrapper:
 
                 async def resolve_user(self, request_context) -> User:
                     return User(
-                        id="default",
-                        data={"user_id": "default", "name": "IDOP User"},
+                        id="default", data={"user_id": "default", "name": "IDOP User"}
                     )
 
             self.agent = VannaAgent(
@@ -210,8 +205,7 @@ class TextToSQLService:
             raise ValueError("OPENAI_API_KEY is required for Text-to-SQL features.")
 
         self.vanna = VannaAgentWrapper(
-            openai_api_key=self.openai_api_key,
-            database_url=self.database_url,
+            openai_api_key=self.openai_api_key, database_url=self.database_url
         )
         self.is_trained = False
         self.schema_context = ""

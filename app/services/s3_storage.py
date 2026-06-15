@@ -33,11 +33,7 @@ class S3StorageBackend(StorageBackend):
         self.region = settings.aws_region
 
         boto_config = Config(
-            region_name=self.region,
-            retries={
-                "max_attempts": 3,
-                "mode": "adaptive",
-            },
+            region_name=self.region, retries={"max_attempts": 3, "mode": "adaptive"}
         )
 
         # Build boto3 client
@@ -98,11 +94,7 @@ class S3StorageBackend(StorageBackend):
         # NOTE: document.{ext} is intentionally excluded — the upload flow only saves
         # chunks.json, embeddings.npy, and metadata.json via save_chunks_and_embeddings().
         # LocalStorageBackend matches this check for consistency.
-        required_files = [
-            "chunks.json",
-            "embeddings.npy",
-            "metadata.json",
-        ]
+        required_files = ["chunks.json", "embeddings.npy", "metadata.json"]
         for filename in required_files:
             key = self._get_s3_key(document_id, file_extension, filename)
             if not self._object_exists(key):

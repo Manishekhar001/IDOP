@@ -57,12 +57,7 @@ class AuditLogger:
             conn.rollback()
 
     def log(
-        self,
-        conn,
-        query_id: str,
-        question: str,
-        sql_query: str,
-        status: str,
+        self, conn, query_id: str, question: str, sql_query: str, status: str
     ) -> None:
         """Write a single audit log entry.
 

@@ -17,9 +17,7 @@ class DocumentProcessor:
     SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {".pdf", ".txt", ".csv"}
 
     def __init__(
-        self,
-        chunk_size: int | None = None,
-        chunk_overlap: int | None = None,
+        self, chunk_size: int | None = None, chunk_overlap: int | None = None
     ) -> None:
         settings = get_settings()
         self.chunk_size = chunk_size or settings.chunk_size
@@ -79,10 +77,7 @@ class DocumentProcessor:
         full_text = "\n\n".join(all_text)
         doc = Document(
             page_content=full_text,
-            metadata={
-                "source": file_path.name,
-                "pages": len(reader.pages),
-            },
+            metadata={"source": file_path.name, "pages": len(reader.pages)},
         )
         logger.info(
             f"Loaded {file_path.name}: {len(reader.pages)} pages, "

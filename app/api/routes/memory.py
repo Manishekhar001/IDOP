@@ -30,9 +30,7 @@ def get_store(request: Request):
 @router.get(
     "/{user_id}",
     response_model=MemoryListResponse,
-    responses={
-        500: {"model": ErrorResponse, "description": "Postgres query error"},
-    },
+    responses={500: {"model": ErrorResponse, "description": "Postgres query error"}},
     summary="List user memories",
     description=(
         "Return all long-term memory (LTM) facts stored for a given user. "
@@ -66,24 +64,19 @@ async def list_memories(user_id: str, request: Request) -> MemoryListResponse:
         items = await store.asearch(ns)
         memories = [MemoryItem(data=it.value.get("data", "")) for it in items]
         return MemoryListResponse(
-            user_id=user_id,
-            memories=memories,
-            count=len(memories),
+            user_id=user_id, memories=memories, count=len(memories)
         )
     except Exception as e:
         logger.error(f"list_memories error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve memories: {e!s}",
+            status_code=500, detail=f"Failed to retrieve memories: {e!s}"
         )
 
 
 @router.delete(
     "/{user_id}",
     response_model=DeleteMemoryResponse,
-    responses={
-        500: {"model": ErrorResponse, "description": "Postgres deletion error"},
-    },
+    responses={500: {"model": ErrorResponse, "description": "Postgres deletion error"}},
     summary="Clear user memories",
     description=(
         "Delete all long-term memory facts for a given user. "
@@ -120,12 +113,8 @@ async def delete_memories(user_id: str, request: Request) -> DeleteMemoryRespons
 
         logger.info(f"Deleted {len(items)} memories for user={user_id}")
         return DeleteMemoryResponse(
-            message=f"Deleted {len(items)} memories successfully",
-            user_id=user_id,
+            message=f"Deleted {len(items)} memories successfully", user_id=user_id
         )
     except Exception as e:
         logger.error(f"delete_memories error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete memories: {e!s}",
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete memories: {e!s}")

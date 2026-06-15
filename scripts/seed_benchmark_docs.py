@@ -300,7 +300,7 @@ def start_server(port: int = 8088) -> subprocess.Popen:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description="Create benchmark documents and upload them to Qdrant",
+        description="Create benchmark documents and upload them to Qdrant"
     )
     parser.add_argument(
         "--run", action="store_true", help="Also run the ablation study after uploading"

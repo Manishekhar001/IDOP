@@ -103,10 +103,7 @@ def build_graph(
     builder.add_conditional_edges(
         "decide_retrieval",
         route_after_decide,
-        {
-            "generate_direct": "generate_direct",
-            "retrieve_docs": "retrieve_docs",
-        },
+        {"generate_direct": "generate_direct", "retrieve_docs": "retrieve_docs"},
     )
 
     builder.add_edge("retrieve_docs", "evaluate_docs")
@@ -129,10 +126,7 @@ def build_graph(
     builder.add_conditional_edges(
         "verify_support",
         route_after_support,
-        {
-            "revise_answer": "revise_answer",
-            "verify_usefulness": "verify_usefulness",
-        },
+        {"revise_answer": "revise_answer", "verify_usefulness": "verify_usefulness"},
     )
 
     builder.add_edge("revise_answer", "verify_support")
@@ -140,10 +134,7 @@ def build_graph(
     builder.add_conditional_edges(
         "verify_usefulness",
         route_after_usefulness,
-        {
-            "rewrite_question": "rewrite_question",
-            "stm_summarize": "stm_summarize",
-        },
+        {"rewrite_question": "rewrite_question", "stm_summarize": "stm_summarize"},
     )
 
     builder.add_edge(
@@ -151,10 +142,7 @@ def build_graph(
     )  # LOGIC-02: re-check LTM on rewritten query
     builder.add_edge("stm_summarize", END)
 
-    graph = builder.compile(
-        checkpointer=checkpointer,
-        store=store,
-    )
+    graph = builder.compile(checkpointer=checkpointer, store=store)
 
     logger.info("IDOP 5-path LangGraph state machine compiled successfully")
     return graph

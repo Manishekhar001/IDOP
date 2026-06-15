@@ -67,9 +67,9 @@ def test_vanna_import_fallback():
         )
 
         # Verify it gracefully degrades
-        assert not wrapper._available, (
-            "Expected _available to be False when vanna is missing"
-        )
+        assert (
+            not wrapper._available
+        ), "Expected _available to be False when vanna is missing"
         assert wrapper.agent is None, "Expected agent to be None when vanna is missing"
         assert wrapper.postgres_runner is None, "Expected postgres_runner to be None"
 
@@ -111,10 +111,7 @@ def test_vanna_available_when_installed():
         )
         return
 
-    wrapper = VannaAgentWrapper(
-        openai_api_key=openai_key,
-        database_url=database_url,
-    )
+    wrapper = VannaAgentWrapper(openai_api_key=openai_key, database_url=database_url)
 
     # In CI/CD without Postgres accessible, the PostgresRunner might fail,
     # but the Vanna Agent itself should initialize if imports work.

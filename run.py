@@ -30,7 +30,6 @@ if sys.platform == "win32":
 import uvicorn
 from app.config import get_settings
 
-
 if __name__ == "__main__":
     settings = get_settings()
     reload_enabled = "--prod" not in sys.argv

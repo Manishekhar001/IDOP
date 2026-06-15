@@ -51,11 +51,7 @@ REGIONAL_POLICY_DOC = _load_doc("regional_policy.txt")
 INTERNAL_MEMOS_DOC = _load_doc("internal_memos.txt")
 
 
-async def upload_document_direct(
-    vector_store,
-    filename: str,
-    content: str,
-) -> dict:
+async def upload_document_direct(vector_store, filename: str, content: str) -> dict:
     """Process and upload a document string directly to Qdrant."""
     from app.core.document_processor import DocumentProcessor
 
@@ -63,8 +59,7 @@ async def upload_document_direct(
 
     # Create a Document from the raw text
     doc = Document(
-        page_content=content,
-        metadata={"source": filename, "doc_type": "benchmark"},
+        page_content=content, metadata={"source": filename, "doc_type": "benchmark"}
     )
 
     # Split into chunks

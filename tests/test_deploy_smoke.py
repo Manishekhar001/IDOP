@@ -59,10 +59,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "abc123def456",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with (
@@ -78,10 +75,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "old-sha-value",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with (
@@ -97,10 +91,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "unknown",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with (
@@ -116,10 +107,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with (
@@ -135,10 +123,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": None,
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with (
@@ -154,10 +139,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "some-sha",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         # Only remove EXPECTED_GIT_SHA — don't wipe all env vars
@@ -178,10 +160,7 @@ class TestGitCommitSHAMatching:
             "status": "healthy",
             "version": "0.1.0",
             # git_commit_sha key deliberately absent
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with (
@@ -206,10 +185,7 @@ class TestDocumentCacheBackend:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "abc",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with patch.object(deploy_smoke.requests, "get", return_value=resp):
@@ -273,7 +249,7 @@ class TestDocumentCacheBackend:
             "git_commit_sha": "abc",
             "services": {
                 # document_cache_backend deliberately omitted
-                "query_cache_mode": "redis",
+                "query_cache_mode": "redis"
             },
         }
         resp = mock_response(200, health_data)
@@ -345,10 +321,7 @@ class TestQueryCacheMode:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "abc",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with patch.object(deploy_smoke.requests, "get", return_value=resp):
@@ -386,10 +359,7 @@ class TestHealthStatus:
             "status": "healthy",
             "version": "0.1.0",
             "git_commit_sha": "abc",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with patch.object(deploy_smoke.requests, "get", return_value=resp):
@@ -402,10 +372,7 @@ class TestHealthStatus:
             "status": "degraded",
             "version": "0.1.0",
             "git_commit_sha": "abc",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with patch.object(deploy_smoke.requests, "get", return_value=resp):
@@ -418,10 +385,7 @@ class TestHealthStatus:
             "status": "unhealthy",
             "version": "0.1.0",
             "git_commit_sha": "abc",
-            "services": {
-                "document_cache_backend": "s3",
-                "query_cache_mode": "redis",
-            },
+            "services": {"document_cache_backend": "s3", "query_cache_mode": "redis"},
         }
         resp = mock_response(200, health_data)
         with patch.object(deploy_smoke.requests, "get", return_value=resp):

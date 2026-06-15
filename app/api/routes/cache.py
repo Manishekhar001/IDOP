@@ -186,9 +186,7 @@ async def cache_health() -> CacheHealthResponse:
         overall = "unhealthy"
 
     return CacheHealthResponse(
-        document_cache=doc_health,
-        query_cache=query_health,
-        overall_status=overall,
+        document_cache=doc_health, query_cache=query_health, overall_status=overall
     )
 
 
@@ -241,8 +239,4 @@ async def test_cache() -> CacheTestResponse:
 
     test_passed = write_ok and read_ok and verify_ok
 
-    return CacheTestResponse(
-        test_passed=test_passed,
-        cache_mode=mode,
-        details=details,
-    )
+    return CacheTestResponse(test_passed=test_passed, cache_mode=mode, details=details)

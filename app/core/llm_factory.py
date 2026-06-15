@@ -95,10 +95,7 @@ def _build_litellm_router() -> Any:
         model_list.append(
             {
                 "model_name": model_group,
-                "litellm_params": {
-                    "model": groq_model,
-                    "api_key": key,
-                },
+                "litellm_params": {"model": groq_model, "api_key": key},
                 "rpm": 30,  # Groq free tier: 30 req/min per key
             }
         )
@@ -141,8 +138,7 @@ def _build_litellm_router() -> Any:
 
 @lru_cache
 def get_chat_llm(
-    model: str | None = None,
-    temperature: float | None = None,
+    model: str | None = None, temperature: float | None = None
 ) -> BaseChatModel:
     """
     Return a configured chat LLM based on settings.
@@ -176,9 +172,7 @@ def get_chat_llm(
                     f"temperature={resolved_temp}"
                 )
                 return ChatLiteLLMRouter(
-                    model="idop-llm",
-                    temperature=resolved_temp,
-                    router=router,
+                    model="idop-llm", temperature=resolved_temp, router=router
                 )
             # If router is None (no keys), fall through to next option
         except ImportError:
@@ -226,9 +220,7 @@ def get_chat_llm(
                 f"temperature={resolved_temp} (final fallback)"
             )
             return ChatOpenAI(
-                model=openai_model,
-                temperature=resolved_temp,
-                api_key=openai_api_key,
+                model=openai_model, temperature=resolved_temp, api_key=openai_api_key
             )
         except ImportError:
             logger.warning("langchain-openai not installed. No LLM provider available.")
@@ -245,8 +237,7 @@ def get_chat_llm(
 
 @lru_cache
 def get_memory_llm(
-    model: str | None = None,
-    temperature: float | None = None,
+    model: str | None = None, temperature: float | None = None
 ) -> BaseChatModel:
     """
     Return a lighter/cheaper LLM for memory/classification tasks.

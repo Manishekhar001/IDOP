@@ -449,10 +449,7 @@ async def _create_engine() -> tuple:
 
 
 async def run_single_query(
-    question: str,
-    config: dict[str, Any],
-    config_dir: Path,
-    engine: Any,
+    question: str, config: dict[str, Any], config_dir: Path, engine: Any
 ) -> dict[str, Any]:
     """Run one question through one pipeline configuration."""
     from app.core.csrag_engine import CSRAGEngine
@@ -495,9 +492,7 @@ async def run_single_query(
 
 
 async def run_configuration(
-    config: dict[str, Any],
-    benchmark: list[dict[str, Any]],
-    config_dir: Path,
+    config: dict[str, Any], benchmark: list[dict[str, Any]], config_dir: Path
 ) -> dict[str, Any]:
     """Run pipeline queries (no evaluation). Returns raw pipeline outputs."""
     cfg_id = config["id"]
@@ -582,9 +577,7 @@ async def run_configuration(
 
 
 async def evaluate_config(
-    pipeline_outputs: list[dict[str, Any]],
-    config_id: int,
-    config_name: str,
+    pipeline_outputs: list[dict[str, Any]], config_id: int, config_name: str
 ) -> dict[str, float]:
     """
     Evaluate one config's pipeline outputs using the in-house evaluator.
@@ -616,9 +609,7 @@ async def evaluate_config(
 
         try:
             scores = await evaluator.evaluate(
-                question=out["question"],
-                answer=answer,
-                contexts=contexts,
+                question=out["question"], answer=answer, contexts=contexts
             )
             if scores:
                 faith_scores.append(scores.faithfulness)

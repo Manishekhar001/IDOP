@@ -44,10 +44,7 @@ _SUPPORT_PROMPT = ChatPromptTemplate.from_messages(
             "back the answer. If no support exists, return an empty list.\n"
             "Output JSON only.",
         ),
-        (
-            "human",
-            "Question: {question}\n\nContext:\n{context}\n\nAnswer:\n{answer}",
-        ),
+        ("human", "Question: {question}\n\nContext:\n{context}\n\nAnswer:\n{answer}"),
     ]
 )
 

@@ -27,9 +27,7 @@ class EmbeddingQuotaError(Exception):
 
 
 def _retry_on_quota(
-    max_retries: int = 3,
-    base_delay: float = 2.0,
-    backoff: float = 4.0,
+    max_retries: int = 3, base_delay: float = 2.0, backoff: float = 4.0
 ):
     """
     Decorator that retries an embedding API call with exponential backoff
@@ -98,10 +96,7 @@ def _create_embedding_model() -> Any:
 
         model = settings.voyage_embedding_model or "voyage-3"
         logger.info(f"Initializing Voyage embeddings: model={model}")
-        return VoyageAIEmbeddings(
-            voyage_api_key=voyage_api_key,
-            model=model,
-        )
+        return VoyageAIEmbeddings(voyage_api_key=voyage_api_key, model=model)
     elif provider == "nomic":
         nomic_api_key = settings.nomic_api_key
         if not nomic_api_key:
@@ -116,9 +111,7 @@ def _create_embedding_model() -> Any:
             f"Initializing Nomic embeddings: model={model}, dimensionality={dimensionality}"
         )
         return NomicEmbeddings(
-            nomic_api_key=nomic_api_key,
-            model=model,
-            dimensionality=dimensionality,
+            nomic_api_key=nomic_api_key, model=model, dimensionality=dimensionality
         )
     else:
         raise ValueError(

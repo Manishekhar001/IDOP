@@ -68,8 +68,7 @@ def _build_system_prompt(ltm_context: str, summary: str) -> str:
 async def router_node(state: CSRAGState) -> dict:
     """Classifies user input into SQL, MUTATION, RAG, CHAT, or HYBRID."""
     last_human = next(
-        (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
-        None,
+        (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None
     )
     question = last_human.content if last_human else ""
     router = QueryRouter()
@@ -294,17 +293,13 @@ async def mutation_node(state: CSRAGState) -> dict:
 
 @track(name="graph_ltm_remember")
 async def ltm_remember_node(
-    state: CSRAGState,
-    config: RunnableConfig,
-    *,
-    store,
+    state: CSRAGState, config: RunnableConfig, *, store
 ) -> dict:
     user_id = config.get("configurable", {}).get("user_id", "default")
     ltm = get_ltm_service()
 
     last_human = next(
-        (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
-        None,
+        (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None
     )
     user_message = last_human.content if last_human else ""
 
@@ -382,8 +377,7 @@ async def decide_retrieval_node(state: CSRAGState) -> dict:
 async def generate_direct_node(state: CSRAGState) -> dict:
     llm = _get_chat_llm()
     system_msg = _build_system_prompt(
-        state.get("ltm_context", ""),
-        state.get("summary", ""),
+        state.get("ltm_context", ""), state.get("summary", "")
     )
     messages = [
         SystemMessage(content=system_msg, id=str(uuid.uuid4())),
@@ -391,11 +385,7 @@ async def generate_direct_node(state: CSRAGState) -> dict:
     ]
     response = await llm.ainvoke(messages)
     answer = response.content
-    return {
-        "answer": answer,
-        "issup": "skipped",
-        "evidence": [],
-    }
+    return {"answer": answer, "issup": "skipped", "evidence": []}
 
 
 # ---------------------------------------------------------------------------
@@ -488,14 +478,9 @@ async def retrieve_docs_node(
 async def evaluate_docs_node(state: CSRAGState) -> dict:
     evaluator = get_crag_evaluator()
     verdict, reason, good_docs = await evaluator.evaluate(
-        question=state["question"],
-        docs=state.get("docs", []),
+        question=state["question"], docs=state.get("docs", [])
     )
-    return {
-        "crag_verdict": verdict,
-        "crag_reason": reason,
-        "good_docs": good_docs,
-    }
+    return {"crag_verdict": verdict, "crag_reason": reason, "good_docs": good_docs}
 
 
 # ---------------------------------------------------------------------------
@@ -544,10 +529,7 @@ _BATCH_FILTER_PROMPT = ChatPromptTemplate.from_messages(
             "Indices of sentences helping answer the question.\n"
             "Output JSON with kept_indices (list of integers).",
         ),
-        (
-            "human",
-            "Question: {question}\n\nSentences:\n{sentences_json}",
-        ),
+        ("human", "Question: {question}\n\nSentences:\n{sentences_json}"),
     ]
 )
 
@@ -580,10 +562,7 @@ async def refine_context_node(state: CSRAGState) -> dict:
     kept = strips
     try:
         result: BatchFilterResult = await filter_chain.ainvoke(
-            {
-                "question": state["question"],
-                "sentences_json": json.dumps(strips),
-            }
+            {"question": state["question"], "sentences_json": json.dumps(strips)}
         )
         valid_indices = {i for i in result.kept_indices if 0 <= i < len(strips)}
         kept = [strips[i] for i in sorted(valid_indices)]
@@ -615,8 +594,7 @@ _RAG_PROMPT = ChatPromptTemplate.from_messages(
 async def generate_answer_node(state: CSRAGState) -> dict:
     llm = _get_chat_llm()
     system_prompt = _build_system_prompt(
-        state.get("ltm_context", ""),
-        state.get("summary", ""),
+        state.get("ltm_context", ""), state.get("summary", "")
     )
     response = await (_RAG_PROMPT | llm).ainvoke(
         {
@@ -660,8 +638,7 @@ async def revise_answer_node(state: CSRAGState) -> dict:
 async def verify_usefulness_node(state: CSRAGState) -> dict:
     verifier = get_srag_verifier()
     verdict, reason = await verifier.verify_usefulness(
-        question=state["question"],
-        answer=state["answer"],
+        question=state["question"], answer=state["answer"]
     )
     return {"isuse": verdict, "use_reason": reason}
 
@@ -711,8 +688,7 @@ async def stm_summarize_node(state: CSRAGState) -> dict:
 
     if summarizer.should_summarize(all_messages):
         new_summary, remove_ops = await summarizer.summarize(
-            messages=all_messages,
-            existing_summary=state.get("summary", ""),
+            messages=all_messages, existing_summary=state.get("summary", "")
         )
         return {"messages": [ai_msg, *remove_ops], "summary": new_summary}
 

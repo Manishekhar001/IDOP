@@ -267,10 +267,7 @@ async def upload_document(
         # Distinguish OpenAI quota errors (429) from generic 500 failures
         if isinstance(e, EmbeddingQuotaError):
             logger.error(f"OpenAI quota exhausted during document upload: {e}")
-            raise HTTPException(
-                status_code=429,
-                detail=str(e),
-            )
+            raise HTTPException(status_code=429, detail=str(e))
         # Catch raw openai.RateLimitError as a safety net for any non-embedding routes
         err_str = str(e).lower()
         if "429" in err_str or "insufficient_quota" in err_str:

@@ -197,9 +197,7 @@ async def run_benchmark():
 
                     evaluator = get_ragas_evaluator()
                     scores = await evaluator.evaluate(
-                        question=item["question"],
-                        answer=answer,
-                        contexts=contexts,
+                        question=item["question"], answer=answer, contexts=contexts
                     )
 
                     if scores:

@@ -172,9 +172,7 @@ class TestApprovalGate:
     @pytest.fixture
     def gate(self):
         return ApprovalGate(
-            table_name="test_tokens",
-            session_column="query_id",
-            logger_name="test_gate",
+            table_name="test_tokens", session_column="query_id", logger_name="test_gate"
         )
 
     def test_generate_session_returns_token(self, gate):

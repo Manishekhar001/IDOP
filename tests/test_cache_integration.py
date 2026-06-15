@@ -121,11 +121,7 @@ class TestQueryCacheRoundTrip:
         sql = "SELECT COUNT(*) FROM users WHERE active = true"
         key = cache.get_sql_result_key(sql)
 
-        exec_result = {
-            "rows": [{"count": 1523}],
-            "row_count": 1,
-            "columns": ["count"],
-        }
+        exec_result = {"rows": [{"count": 1523}], "row_count": 1, "columns": ["count"]}
 
         cache.set(key, exec_result, ttl=900, cache_type="sql_result")
         result = cache.get(key, cache_type="sql_result")

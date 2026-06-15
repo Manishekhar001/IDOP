@@ -142,9 +142,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Compiling IDOP Graph Engine...")
     app.state.engine = CSRAGEngine(
-        vector_store=app.state.vector_store,
-        store=store,
-        checkpointer=checkpointer,
+        vector_store=app.state.vector_store, store=store, checkpointer=checkpointer
     )
     logger.info("IDOP Engine ready — all services online")
 
@@ -234,11 +232,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger = get_logger(__name__)
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal Server Error",
-            "message": str(exc),
-        },
+        status_code=500, content={"error": "Internal Server Error", "message": str(exc)}
     )
 
 
@@ -246,8 +240,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "app.main:app",
-        host=settings.api_host,
-        port=settings.api_port,
-        reload=True,
+        "app.main:app", host=settings.api_host, port=settings.api_port, reload=True
     )

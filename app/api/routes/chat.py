@@ -44,8 +44,7 @@ def get_checkpointer(request: Request):
 )
 @track(name="chat")
 async def chat(
-    body: ChatRequest,
-    engine: CSRAGEngine = Depends(get_engine),
+    body: ChatRequest, engine: CSRAGEngine = Depends(get_engine)
 ) -> ChatResponse:
     logger.info(
         f"Chat — thread={body.thread_id}, user={body.user_id}, q='{body.question[:80]}'"
@@ -80,9 +79,7 @@ async def chat(
     if body.include_sources:
         sources = [
             SourceDocument(
-                content=s["content"],
-                metadata=s["metadata"],
-                origin=s["origin"],
+                content=s["content"], metadata=s["metadata"], origin=s["origin"]
             )
             for s in result.get("sources", [])
         ]
@@ -153,8 +150,7 @@ async def chat(
 )
 @track(name="chat_stream")
 async def chat_stream(
-    body: ChatRequest,
-    engine: CSRAGEngine = Depends(get_engine),
+    body: ChatRequest, engine: CSRAGEngine = Depends(get_engine)
 ) -> StreamingResponse:
     logger.info(
         f"Chat stream — thread={body.thread_id}, user={body.user_id}, "
@@ -195,10 +191,7 @@ async def chat_stream(
     summary="Get conversation history",
 )
 @track(name="get_chat_history")
-async def get_chat_history(
-    thread_id: str,
-    request: Request,
-) -> ChatHistoryResponse:
+async def get_chat_history(thread_id: str, request: Request) -> ChatHistoryResponse:
     logger.info(f"History request — thread={thread_id}")
     checkpointer = get_checkpointer(request)
 
@@ -214,8 +207,7 @@ async def get_chat_history(
 
     if checkpoint_tuple is None:
         raise HTTPException(
-            status_code=404,
-            detail=f"No conversation found for thread_id='{thread_id}'",
+            status_code=404, detail=f"No conversation found for thread_id='{thread_id}'"
         )
 
     channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})

@@ -26,18 +26,13 @@ class CSRAGEngine:
         checkpointer: AsyncPostgresSaver,
     ) -> None:
         self._graph = build_graph(
-            vector_store=vector_store,
-            store=store,
-            checkpointer=checkpointer,
+            vector_store=vector_store, store=store, checkpointer=checkpointer
         )
         logger.info("CSRAGEngine initialized with IDOP 5-path router")
 
     def _build_config(self, thread_id: str, user_id: str) -> dict:
         return {
-            "configurable": {
-                "thread_id": thread_id,
-                "user_id": user_id,
-            },
+            "configurable": {"thread_id": thread_id, "user_id": user_id},
             "recursion_limit": _RECURSION_LIMIT,
         }
 
@@ -331,9 +326,7 @@ class CSRAGEngine:
 
                 try:
                     async for msg, metadata in self._graph.astream(
-                        init_state,
-                        config,
-                        stream_mode="messages",
+                        init_state, config, stream_mode="messages"
                     ):
                         node = metadata.get("langgraph_node", "")
                         if (

@@ -57,14 +57,7 @@ class TestCSRAGState:
     def test_state_has_srag_fields(self):
         """Test that CSRAGState declares SRAG verification fields."""
         annotations = CSRAGState.__annotations__
-        srag_fields = [
-            "answer",
-            "issup",
-            "evidence",
-            "retries",
-            "isuse",
-            "use_reason",
-        ]
+        srag_fields = ["answer", "issup", "evidence", "retries", "isuse", "use_reason"]
         for field in srag_fields:
             assert field in annotations, f"Missing SRAG field: {field}"
 

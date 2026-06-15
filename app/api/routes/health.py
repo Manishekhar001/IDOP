@@ -166,9 +166,7 @@ async def health_check(request: Request) -> dict[str, Any]:
     health_status = (
         "healthy"
         if (postgres_connected and supabase_connected and qdrant_connected)
-        else "degraded"
-        if any_service_available
-        else "unhealthy"
+        else "degraded" if any_service_available else "unhealthy"
     )
 
     return {
@@ -294,7 +292,7 @@ async def get_info() -> dict[str, Any]:
             "cache_tier_2": "S3 / Local filesystem document chunk caching with SHA-256 deduplication",
         },
         "system": {
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
         },
         "endpoints": {
             "docs": "/docs (Interactive Swagger documentation)",
@@ -388,10 +386,7 @@ async def get_stats(request: Request) -> dict[str, Any]:
                 "overall_hit_rate": f"{hit_rate:.1f}%",
             }
         except Exception as e:
-            cache_stats = {
-                "enabled": True,
-                "error": f"Failed to retrieve stats: {e!s}",
-            }
+            cache_stats = {"enabled": True, "error": f"Failed to retrieve stats: {e!s}"}
 
     return {
         "indexing": {

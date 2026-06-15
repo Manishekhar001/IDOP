@@ -58,8 +58,7 @@ class TestQueryRouter:
     async def test_classify_rag_query(self, router):
         """Test that knowledge search requests are classified as RAG."""
         router._chain.ainvoke.return_value = RouteDecision(
-            query_type="RAG",
-            reason="The user is asking about a policy document.",
+            query_type="RAG", reason="The user is asking about a policy document."
         )
         result = await router.route_query("What is our company's refund policy?")
         assert result == "RAG"
@@ -68,8 +67,7 @@ class TestQueryRouter:
     async def test_classify_chat_query(self, router):
         """Test that general conversational queries are classified as CHAT."""
         router._chain.ainvoke.return_value = RouteDecision(
-            query_type="CHAT",
-            reason="The user is greeting the system.",
+            query_type="CHAT", reason="The user is greeting the system."
         )
         result = await router.route_query("Hello, how are you?")
         assert result == "CHAT"
@@ -92,8 +90,7 @@ class TestQueryRouter:
     async def test_invalid_query_type_falls_back_to_chat(self, router):
         """Test that an unrecognized query_type from the LLM falls back to CHAT."""
         router._chain.ainvoke.return_value = RouteDecision(
-            query_type="UNKNOWN_TYPE",
-            reason="Unrecognized classification.",
+            query_type="UNKNOWN_TYPE", reason="Unrecognized classification."
         )
         result = await router.route_query("Something weird and unclassifiable")
         assert result == "CHAT"
@@ -109,8 +106,7 @@ class TestQueryRouter:
     async def test_lowercase_query_type_normalized_to_uppercase(self, router):
         """Test that lowercase query_type from LLM is normalized to uppercase."""
         router._chain.ainvoke.return_value = RouteDecision(
-            query_type="sql",
-            reason="Lowercase classification.",
+            query_type="sql", reason="Lowercase classification."
         )
         result = await router.route_query("Show me all customers")
         assert result == "SQL"
@@ -119,8 +115,7 @@ class TestQueryRouter:
     async def test_mixed_case_query_type_normalized(self, router):
         """Test that mixed-case query_type is normalized correctly."""
         router._chain.ainvoke.return_value = RouteDecision(
-            query_type="Hybrid",
-            reason="Mixed case classification.",
+            query_type="Hybrid", reason="Mixed case classification."
         )
         result = await router.route_query("Compare data with docs")
         assert result == "HYBRID"

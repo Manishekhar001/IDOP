@@ -32,10 +32,7 @@ class RelevancyScore(BaseModel):
         le=1.0,
         description="Answer relevancy score. 1.0 = perfectly addresses the question.",
     )
-    reason: str = Field(
-        ...,
-        description="Short justification explaining the score.",
-    )
+    reason: str = Field(..., description="Short justification explaining the score.")
 
 
 class FaithfulnessScore(BaseModel):
@@ -63,13 +60,9 @@ class ContextPrecisionScore(BaseModel):
         description="Context precision score. 1.0 = all retrieved chunks are highly relevant to the question.",
     )
     num_relevant: int = Field(
-        ...,
-        description="Number of retrieved chunks judged relevant.",
+        ..., description="Number of retrieved chunks judged relevant."
     )
-    num_total: int = Field(
-        ...,
-        description="Total number of chunks evaluated.",
-    )
+    num_total: int = Field(..., description="Total number of chunks evaluated.")
 
 
 class RagasScores(BaseModel):
@@ -82,8 +75,7 @@ class RagasScores(BaseModel):
         description="Answer relevancy score — how well the answer addresses the question.",
     )
     answer_relevancy_reason: str = Field(
-        ...,
-        description="Short justification for the answer relevancy score.",
+        ..., description="Short justification for the answer relevancy score."
     )
     faithfulness: float = Field(
         ...,
@@ -102,12 +94,10 @@ class RagasScores(BaseModel):
         description="Context precision — relevance of the retrieved document chunks to the question.",
     )
     context_relevant_count: int = Field(
-        ...,
-        description="Number of retrieved chunks judged relevant out of total.",
+        ..., description="Number of retrieved chunks judged relevant out of total."
     )
     context_total_count: int = Field(
-        ...,
-        description="Total number of retrieved chunks evaluated.",
+        ..., description="Total number of retrieved chunks evaluated."
     )
 
     model_config = {
@@ -216,10 +206,7 @@ class RagasEvaluator:
 
     @track(name="ragas_evaluator_evaluate")
     async def evaluate(
-        self,
-        question: str,
-        answer: str,
-        contexts: list[str],
+        self, question: str, answer: str, contexts: list[str]
     ) -> RagasScores | None:
         """
         Compute RAGAS-style metrics for a single Q/A pair.
@@ -313,9 +300,7 @@ class RagasEvaluator:
         if result:
             return result
         return ContextPrecisionScore(
-            score=0.0,
-            num_relevant=0,
-            num_total=max(total_chunks, 1),
+            score=0.0, num_relevant=0, num_total=max(total_chunks, 1)
         )
 
 

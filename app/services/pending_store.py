@@ -208,8 +208,7 @@ class PendingStore(dict):
             if self._ensure_table(conn):
                 with conn.cursor() as cur:
                     cur.execute(
-                        f"SELECT payload FROM {self.table_name} WHERE id = %s",
-                        (key,),
+                        f"SELECT payload FROM {self.table_name} WHERE id = %s", (key,)
                     )
                     row = cur.fetchone()
                 if row:
@@ -251,8 +250,7 @@ class PendingStore(dict):
                 if self._ensure_table(conn):
                     with conn.cursor() as cur:
                         cur.execute(
-                            f"DELETE FROM {self.table_name} WHERE id = %s",
-                            (key,),
+                            f"DELETE FROM {self.table_name} WHERE id = %s", (key,)
                         )
                     conn.commit()
                     logger.debug(

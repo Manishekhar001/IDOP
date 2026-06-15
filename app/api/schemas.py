@@ -151,11 +151,7 @@ class QdrantInfo(BaseModel):
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {
-                    "status": "green",
-                    "points_count": 1420,
-                    "indexed_chunks": 1420,
-                }
+                {"status": "green", "points_count": 1420, "indexed_chunks": 1420}
             ]
         }
     }
@@ -373,18 +369,12 @@ class SystemInfoResponse(BaseModel):
                         "version": "0.1.0",
                         "environment": "production",
                     },
-                    "phases": {
-                        "Phase 1: Foundation": "Completed",
-                    },
+                    "phases": {"Phase 1: Foundation": "Completed"},
                     "features": {
-                        "router_pathways": ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"],
+                        "router_pathways": ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"]
                     },
-                    "system": {
-                        "python_version": "3.11.0",
-                    },
-                    "endpoints": {
-                        "health": "GET /health (Detailed liveness checks)",
-                    },
+                    "system": {"python_version": "3.11.0"},
+                    "endpoints": {"health": "GET /health (Detailed liveness checks)"},
                 }
             ]
         }
@@ -437,10 +427,7 @@ class SystemStatsResponse(BaseModel):
                     "configuration": {
                         "chunk_size": 512,
                         "chunk_overlap": 50,
-                        "cache_ttl": {
-                            "embeddings": "3600s",
-                            "rag": "1800s",
-                        },
+                        "cache_ttl": {"embeddings": "3600s", "rag": "1800s"},
                     },
                 }
             ]

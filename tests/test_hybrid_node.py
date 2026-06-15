@@ -56,12 +56,7 @@ class TestHybridGenerationNode:
         from app.core.graph.nodes import hybrid_generation_node
 
         result = await hybrid_generation_node(
-            {
-                "question": "",
-                "messages": [],
-                "ltm_context": "",
-                "summary": "",
-            }
+            {"question": "", "messages": [], "ltm_context": "", "summary": ""}
         )
         assert "answer" in result
         assert "sql_status" in result
@@ -73,11 +68,7 @@ class TestHybridGenerationNode:
         from app.core.graph.nodes import hybrid_generation_node
 
         result = await hybrid_generation_node(
-            {
-                "messages": [],
-                "ltm_context": "",
-                "summary": "",
-            }
+            {"messages": [], "ltm_context": "", "summary": ""}
         )
         assert "answer" in result
 
