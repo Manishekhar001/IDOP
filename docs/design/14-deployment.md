@@ -51,45 +51,44 @@ The standard virtual runtime uses Docker Compose to orchestrate local infrastruc
 version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  idop:
+    build: .
     container_name: idop-app
-    restart: always
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - ENV_STATE=production
-      - DATABASE_URL=postgresql://postgres:secure_passwd@checkpoint-db:5432/idop_memories
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - QDRANT_URL=${QDRANT_URL}
-      - QDRANT_API_KEY=${QDRANT_API_KEY}
-      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
-      - UPSTASH_REDIS_TOKEN=${UPSTASH_REDIS_TOKEN}
+      - DATABASE_URL=postgresql://postgres:secure_passwd@postgres:5432/postgres
     depends_on:
-      checkpoint-db:
+      postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-o", "/dev/null", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
 
-  checkpoint-db:
-    image: postgres:16-alpine
-    container_name: idop-checkpoint-db
-    restart: always
+  postgres:
+    image: postgres:16
+    container_name: idop-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secure_passwd
-      POSTGRES_DB: idop_memories
+      POSTGRES_DB: postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
+      start_period: 40s
 
 volumes:
   pgdata:

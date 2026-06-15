@@ -40,6 +40,7 @@ ARG GIT_COMMIT_SHA=unknown
 ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     libpq-dev \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*

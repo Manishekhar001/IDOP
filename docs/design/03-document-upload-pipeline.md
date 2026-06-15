@@ -92,6 +92,7 @@ graph TB
 - **Route:** `POST /documents/upload`
 - **Accepts:** Multipart file upload
 - **Supported extensions:** `.pdf`, `.txt`, `.csv`
+- **NOTE:** `.docx` files are NOT supported — only PDF, TXT, and CSV
 - Unsupported extensions return `400 Bad Request` with supported format list
 - Source: [documents.py](../../app/api/routes/documents.py)
 

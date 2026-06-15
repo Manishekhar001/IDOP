@@ -187,7 +187,7 @@ graph TB
 | **Chat** | `/chat` | POST | Primary query endpoint — routes through LangGraph |
 | **Chat** | `/chat/stream` | POST | SSE streaming variant of `/chat` |
 | **Chat** | `/chat/history/{thread_id}` | GET | Retrieve conversation history |
-| **Documents** | `/documents/upload` | POST | Upload PDF/DOCX/CSV/TXT for RAG indexing |
+| **Documents** | `/documents/upload` | POST | Upload PDF/TXT/CSV for RAG indexing |
 | **Documents** | `/documents/info` | GET | Get Qdrant collection info (name, point count, status) |
 | **Documents** | `/documents/collection` | DELETE | Delete and recreate the Qdrant collection |
 | **SQL** | `/sql/generate` | POST | Generate SQL from natural language (Feature 1) |

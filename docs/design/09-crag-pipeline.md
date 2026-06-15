@@ -126,11 +126,20 @@ The rewrite prompt enforces focused, search-optimized queries:
 
 ## Graph Routing Function
 
-The [route_after_crag](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/graph/nodes.py#L779-L780) function determines the next node:
+The [route_after_crag](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/graph/nodes.py) function determines the next node based on the verdict:
 
 ```python
-def route_after_crag(state: CSRAGState) -> Literal["refine_context", "rewrite_query"]:
-    return "refine_context" if state["crag_verdict"] == "CORRECT" else "rewrite_query"
+def route_after_crag(
+    state: CSRAGState,
+) -> Literal["refine_context", "rewrite_query", "web_search"]:
+    verdict = state["crag_verdict"]
+    if verdict == "CORRECT":
+        return "refine_context"
+    elif verdict == "AMBIGUOUS":
+        # AMBIGUOUS: internal docs partially relevant — go directly to web search
+        # to supplement, skipping the query rewrite LLM round-trip.
+        return "web_search"
+    return "rewrite_query"
 ```
 
 ### CRAG Routing Paths
@@ -138,12 +147,12 @@ def route_after_crag(state: CSRAGState) -> Literal["refine_context", "rewrite_qu
 | Verdict | Next Node | Then |
 |---|---|---|
 | `CORRECT` | `refine_context` | Direct to context refinement → answer generation |
-| `AMBIGUOUS` | `rewrite_query` → `web_search` → `refine_context` | Web supplements good_docs |
-| `INCORRECT` | `rewrite_query` → `web_search` → `refine_context` | Web docs replace all docs |
+| `AMBIGUOUS` | `web_search` (direct, no query rewrite) → `refine_context` | Web supplements good_docs |
+| `INCORRECT` | `rewrite_query` → `web_search` → `refine_context` | Web docs replace all docs (query rewritten first) |
 
 ### Context Merging in refine_context
 
-The [refine_context_node](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/graph/nodes.py#L395-L433) merges documents based on verdict:
+The [refine_context_node](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/graph/nodes.py) merges documents based on verdict:
 
 ```python
 if verdict == "CORRECT":

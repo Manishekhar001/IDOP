@@ -18,41 +18,47 @@ The complete execution context is stored within the thread-safe `CSRAGState` Typ
 
 ```python
 # app/core/graph/state.py
-from typing import List, Dict, Any, Literal, TypedDict
+from typing import Annotated, List, Literal
+from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
 
 class CSRAGState(TypedDict):
     # Core Fields
-    messages: List[BaseMessage]
+    messages: Annotated[list[BaseMessage], add_messages]
     summary: str
     user_id: str
-    thread_id: str
+    ltm_context: str
+    need_retrieval: bool
     question: str
     
     # Routing Decisions
-    query_type: Literal['SQL', 'MUTATION', 'RAG', 'CHAT', 'HYBRID']
-    need_retrieval: bool
+    query_type: Literal['SQL', 'MUTATION', 'RAG', 'CHAT', 'HYBRID', '']
     
     # Advanced RAG Configurations
     search_mode: Literal['dense', 'sparse', 'hybrid']
     top_k: int
     enable_hyde: bool
     enable_reranking: bool
+    enable_ragas: bool
     
     # HyDE Outputs
     hyde_used: bool
     hyde_hypotheses: List[str]
+    reranking_used: bool
     
     # RAG Chunks and Refinement
     retrieval_query: str
-    docs: List[Dict[str, Any]]
-    good_docs: List[Dict[str, Any]]
-    crag_verdict: Literal['CORRECT', 'AMBIGUOUS', 'INCORRECT']
+    rewrite_tries: int
+    docs: list[Document]
+    good_docs: list[Document]
+    crag_verdict: Literal['CORRECT', 'AMBIGUOUS', 'INCORRECT', '']
     crag_reason: str
     
     # Tavily Web Search Chunks
     web_query: str
-    web_docs: List[Dict[str, Any]]
+    web_docs: list[Document]
     
     # Context Refinement / Sentence Filtering
     strips: List[str]
@@ -61,37 +67,41 @@ class CSRAGState(TypedDict):
     
     # Output and Evaluation
     answer: str
-    reranking_used: bool
     
     # SRAG Support & Correctness
-    issup: Literal['fully_supported', 'partially_supported', 'no_support']
-    evidence: str
+    issup: Literal['fully_supported', 'partially_supported', 'no_support', 'skipped', '']
+    evidence: List[str]
     retries: int
     
     # SRAG Usefulness & Question Refinement
-    isuse: Literal['useful', 'not_useful']
+    isuse: Literal['useful', 'not_useful', '']
     use_reason: str
-    rewrite_tries: int
     
     # SQL Execution Pipeline
     sql_query: str
-    sql_results: List[Dict[str, Any]]
+    sql_results: list[dict]
     sql_query_id: str
     sql_explanation: str
-    sql_status: Literal['pending', 'approved', 'rejected', 'executed', 'failed']
+    sql_status: str  # pending_approval, executed, rejected, error
     
     # Mutation Execution Pipeline
     mutation_id: str
     mutation_table: str
-    mutation_op: Literal['INSERT', 'UPDATE', 'DELETE']
-    mutation_rows: List[Dict[str, Any]]
-    mutation_mapped_rows: List[Dict[str, Any]]
-    mutation_status: Literal['pending', 'approved', 'executed', 'failed']
+    mutation_op: Literal['INSERT', 'UPDATE', 'DELETE', '']
+    mutation_rows: list[dict]
+    mutation_mapped_rows: list[dict]
+    mutation_status: str  # pending_approval, executed, rejected, error
     mutation_error: str
     mutation_result_count: int
     
     # Human-In-The-Loop Approval Gates
     approval_token: str
+    
+    # SQL generation overrides
+    explain: bool
+    vanna_temperature: float
+    vanna_seed: int
+    vanna_top_p: float
 ```
 
 ---
@@ -165,7 +175,9 @@ The LangGraph compiler directs the execution flow dynamically using five custom 
 ### 1. `route_after_router`
 Classifies the raw input and directs the process to one of the five specific functional entrypoints. Note that the HYBRID path returns `"hybrid"` which is mapped to the registered `"hybrid_gen"` node name via the graph builder's edge configuration:
 ```python
-def route_after_router(state: CSRAGState) -> str:
+def route_after_router(
+    state: CSRAGState,
+) -> Literal["sql_gen", "mutation", "ltm_remember", "chat", "hybrid"]:
     """
     Route the query to the appropriate first pipeline node.
 
@@ -207,16 +219,18 @@ builder.add_conditional_edges(
 ### 2. `route_after_decide`
 Determines if RAG retrieval is required or if LTM memory contains sufficient context:
 ```python
-def route_after_decide(state: CSRAGState) -> str:
-    if state.get("need_retrieval", True):
-        return "retrieve_docs"
-    return "generate_direct"
+def route_after_decide(
+    state: CSRAGState,
+) -> Literal["generate_direct", "retrieve_docs"]:
+    return "retrieve_docs" if state["need_retrieval"] else "generate_direct"
 ```
 
 ### 3. `route_after_crag`
-Decides whether external internet queries are needed to rectify poor database context. Now handles three CRAG verdicts — for AMBIGUOUS docs, it goes directly to web search without an LLM query rewrite round-trip:
+Evaluates chunk relevance and decides whether external web search is needed. Handles three verdicts — for AMBIGUOUS docs, goes directly to web search without an LLM query rewrite round-trip:
 ```python
-def route_after_crag(state: CSRAGState) -> str:
+def route_after_crag(
+    state: CSRAGState,
+) -> Literal["refine_context", "rewrite_query", "web_search"]:
     verdict = state["crag_verdict"]
     if verdict == "CORRECT":
         return "refine_context"
@@ -230,10 +244,12 @@ def route_after_crag(state: CSRAGState) -> str:
 ### 4. `route_after_support`
 Triggers generation revision if facts are hallucinated or unsupported by source documents:
 ```python
-def route_after_support(state: CSRAGState) -> str:
-    verdict = state.get("issup", "fully_supported")
+def route_after_support(
+    state: CSRAGState,
+) -> Literal["revise_answer", "verify_usefulness"]:
+    issup = state.get("issup", "fully_supported")
     retries = state.get("retries", 0)
-    if verdict != "fully_supported" and retries < 2:
+    if issup != "fully_supported" and retries < get_settings().srag_max_retries:
         return "revise_answer"
     return "verify_usefulness"
 ```
@@ -241,10 +257,12 @@ def route_after_support(state: CSRAGState) -> str:
 ### 5. `route_after_usefulness`
 Forces reformulation of questions and repeats retrieval if the answer is evaluated as unhelpful:
 ```python
-def route_after_usefulness(state: CSRAGState) -> str:
-    verdict = state.get("isuse", "useful")
+def route_after_usefulness(
+    state: CSRAGState,
+) -> Literal["rewrite_question", "stm_summarize"]:
+    isuse = state.get("isuse", "useful")
     rewrite_tries = state.get("rewrite_tries", 0)
-    if verdict != "useful" and rewrite_tries < 2:
+    if isuse == "not_useful" and rewrite_tries < get_settings().max_rewrite_tries:
         return "rewrite_question"
     return "stm_summarize"
 ```
@@ -257,7 +275,9 @@ To compile the graph with persistent STM (Short-Term Session Memory) and LTM (Lo
 
 ```python
 # app/core/graph/builder.py
+import functools
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.graph import END, START, StateGraph
 from langgraph.store.postgres.aio import AsyncPostgresStore
 
 from app.core.graph.nodes import (
@@ -267,27 +287,35 @@ from app.core.graph.nodes import (
     refine_context_node, generate_answer_node, verify_support_node,
     revise_answer_node, verify_usefulness_node, rewrite_question_node,
     stm_summarize_node, hybrid_generation_node,
+    route_after_router, route_after_decide, route_after_crag,
+    route_after_support, route_after_usefulness,
 )
+from app.core.vector_store import VectorStoreService
 
-async def compile_idop_graph(conn_string: str, vector_store):
-    # Setup Persistent Stores
-    store = AsyncPostgresStore.from_conn_string(conn_string)
-    checkpointer = AsyncPostgresSaver.from_conn_string(conn_string)
 
-    # Initialize StateGraph
+def build_graph(
+    vector_store: VectorStoreService,
+    store: AsyncPostgresStore,
+    checkpointer: AsyncPostgresSaver,
+):
     builder = StateGraph(CSRAGState)
 
-    # Register all 18 nodes
+    retrieve_with_store = functools.partial(
+        retrieve_docs_node, vector_store=vector_store
+    )
+    hybrid_with_store = functools.partial(
+        hybrid_generation_node, vector_store=vector_store
+    )
+
+    # Register all 17 nodes
     builder.add_node("router", router_node)
     builder.add_node("sql_gen", sql_generation_node)
     builder.add_node("mutation", mutation_node)
-    # hybrid_gen wraps hybrid_generation_node with vector_store injection
-    hybrid_with_store = partial(hybrid_generation_node, vector_store=vector_store)
     builder.add_node("hybrid_gen", hybrid_with_store)
     builder.add_node("ltm_remember", ltm_remember_node)
     builder.add_node("decide_retrieval", decide_retrieval_node)
     builder.add_node("generate_direct", generate_direct_node)
-    builder.add_node("retrieve_docs", retrieve_docs_node)
+    builder.add_node("retrieve_docs", retrieve_with_store)
     builder.add_node("evaluate_docs", evaluate_docs_node)
     builder.add_node("rewrite_query", rewrite_query_node)
     builder.add_node("web_search", web_search_node)
@@ -300,8 +328,10 @@ async def compile_idop_graph(conn_string: str, vector_store):
     builder.add_node("stm_summarize", stm_summarize_node)
 
     # Edges with conditional routing
+    builder.add_edge(START, "router")
     builder.add_conditional_edges(
-        "router", route_after_router,
+        "router",
+        route_after_router,
         {
             "sql_gen": "sql_gen",
             "mutation": "mutation",
@@ -319,7 +349,7 @@ async def compile_idop_graph(conn_string: str, vector_store):
     return compiled_graph
 ```
 
-> **Note:** The `hybrid_gen` node uses `functools.partial` to inject the `vector_store` dependency at graph compilation time. This avoids creating a new `VectorStoreService` for every invocation.
+> **Note:** The `hybrid_gen` and `retrieve_docs` nodes use `functools.partial` to inject the `vector_store` dependency at graph compilation time. This avoids creating a new `VectorStoreService` for every invocation.
 
 > **Note:** An unreachable auto-execute SELECT block (~50 lines) and a duplicate `pending_approval` return (~25 lines) were removed from `sql_generation_node` in a refactoring pass. The function always returns `pending_approval` — execution happens via `/sql/approve`.
 

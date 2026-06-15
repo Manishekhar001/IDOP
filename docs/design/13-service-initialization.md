@@ -56,7 +56,9 @@ if not settings.OPENAI_API_KEY:
 ```
 
 ### Step 2: Structured Logging Setup
-`setup_logging()` is fired, initializing `loguru` stream interceptors. It intercepts standard library warning outputs and formats trace details into consistent JSON structures, outputting directly to stdout/stderr.
+`setup_logging()` is fired, configuring standard-library `logging` with a consistent `[timestamp] [name] [level] message` format. It sets the root logger to the configured `LOG_LEVEL`, removes duplicate handlers, and silences noisy third-party libraries (`httpx`, `httpcore`, `openai`, `qdrant_client`, `urllib3`, `groq`, `langgraph`) to `WARNING` level. All logs are written to stdout/stderr.
+
+Source: [logger.py](../../app/utils/logger.py)
 
 ### Step 3: Vector Store Registration
 The `VectorStoreService` connects to the Qdrant instance. It checks if the primary collection `idop_documents` exists. If the collection is missing, it executes automated schema creation, applying:

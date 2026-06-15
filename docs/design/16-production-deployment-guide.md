@@ -792,6 +792,12 @@ services:
     depends_on:
       checkpoint-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-o", "/dev/null", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - idop-net
 

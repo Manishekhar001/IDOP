@@ -15,9 +15,7 @@ psycopg[binary]>=3.1.0
 psycopg2-binary>=2.9.9  # Provides psycopg2 module used by approval_gate, executor, vanna_service, etc.
 boto3>=1.28.0
 numpy>=1.24.0
-python-docx>=1.0.0
 python-dotenv>=1.0.0
-loguru>=0.7.0
 voyageai==0.3.7
 langchain-voyageai==0.3.3
 nomic>=3.5.3
@@ -33,7 +31,6 @@ opik>=2.0.54    # py3-none-any wheel — Python 3.13 classifier confirmed
 moto[s3]>=5.0.0  # S3 storage backend mocking for tests
 python-multipart>=0.0.12
 langgraph-checkpoint-postgres>=3.0.5  # py3-none-any wheel — Python >= 3.10, 3.13 compatible
-watchtower>=3.0.0
 # Note: langgraph.store.postgres.aio (AsyncPostgresStore) is bundled in core langgraph —
 # no separate langgraph-store-postgres package exists on PyPI.
 

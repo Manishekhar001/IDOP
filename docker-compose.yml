@@ -51,6 +51,12 @@ services:
         condition: service_healthy
     networks:
       - idop-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-o", "/dev/null", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     # t2.micro has 1GB RAM — memory limits prevent OOM
     # docling + torch REMOVED (2026-06-07) — pypdf is lightweight (~30 MB)
