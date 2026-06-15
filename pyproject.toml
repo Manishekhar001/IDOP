@@ -1,0 +1,134 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idop"
+version = "0.1.1"
+description = "Intelligent Data Operations Platform — production-grade CSRAG with Text-to-SQL, spreadsheet mutations, and multi-level caching"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "IDOP Contributors" },
+]
+keywords = ["rag", "nl-to-sql", "langgraph", "fastapi", "ai", "data-operations"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.22.0",
+    "pydantic-settings>=2.0.0",
+    "langgraph>=0.1.0",
+    "qdrant-client>=1.7.0",
+    "langchain-core>=0.1.0",
+    "langchain-community>=0.0.30",
+    "langchain-text-splitters>=0.0.1",
+    "langchain-qdrant>=0.0.1",
+    "upstash-redis>=0.15.0",
+    "vanna>=0.2.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "psycopg[binary]>=3.1.0",
+    "psycopg2-binary>=2.9.9",
+    "boto3>=1.28.0",
+    "numpy>=1.24.0",
+    "python-dotenv>=1.0.0",
+    "voyageai==0.3.7",
+    "langchain-voyageai==0.3.3",
+    "nomic>=3.5.3",
+    "langchain-nomic==1.0.1",
+    "langchain-groq==1.1.2",
+    "langchain-litellm==0.6.6",
+    "openai>=1.0.0",
+    "litellm==1.87.1",
+    "tavily-python>=0.3.0",
+    "langchain-tavily>=0.2.0",
+    "pypdf>=3.0.0",
+    "opik>=2.0.54",
+    "moto[s3]>=5.0.0",
+    "python-multipart>=0.0.12",
+    "langgraph-checkpoint-postgres>=3.0.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "black>=24.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-mock>=3.0.0",
+    "pytest-timeout>=2.0.0",
+]
+lint = [
+    "ruff>=0.6.0",
+    "black>=24.0.0",
+]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-mock>=3.0.0",
+    "pytest-timeout>=2.0.0",
+]
+
+# ─── Tool Configuration ───────────────────────────────────────────────
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",  # line too long — handled by black/formatter
+    "N801",  # class names — allow non-CapWords for pydantic models
+    "N802",  # function names — allow lowercase for async wrappers
+    "UP007", # use X | Y instead of Optional[X] — too invasive for existing codebase
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+skip-magic-trailing-comma = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = [
+    "asyncio: mark test as async",
+]
+filterwarnings = [
+    'ignore::UserWarning:fastapi',
+    'ignore::DeprecationWarning:vanna',
+    'ignore::UserWarning:qdrant_client',
+    'ignore::UserWarning:app\\.core\\.vector_store',
+]
+
+[tool.setuptools.packages.find]
+include = ["app*", "scripts*"]
