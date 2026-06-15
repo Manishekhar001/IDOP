@@ -2,7 +2,7 @@
 
 **Module:** `app/core/vector_store.py` · `app/core/sparse_vector_service.py`
 **Qdrant Collection:** `idop_documents`
-**Embedding Model:** Nomic `nomic-embed-text-v1.5` (768-dim)
+**Embedding Model:** Nomic `nomic-embed-text-v1.5` (768-dim) or Voyage AI `voyage-3` (1024-dim) — configurable via `EMBEDDING_PROVIDER`
 
 ---
 
@@ -64,9 +64,9 @@ The collection is created in [VectorStoreService._ensure_collection](file:///c:/
 
 ### Dense Embeddings
 
-- **Model:** Nomic `nomic-embed-text-v1.5` via LangChain `NomicEmbeddings`
-- **Dimensions:** 768 floats
-- **Distance metric:** Cosine similarity
+- **Provider:** Configurable via `EMBEDDING_PROVIDER` env var (`nomic` or `voyage`)
+- **Nomic:** `nomic-embed-text-v1.5` via `NomicEmbeddings`, 768-dim, Cosine distance
+- **Voyage AI:** `voyage-3` via `VoyageAIEmbeddings`, 1024-dim, Cosine distance
 - **Source:** [app/core/embeddings.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/embeddings.py)
 
 ### Sparse Vectors (BM25)

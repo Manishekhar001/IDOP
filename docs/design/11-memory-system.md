@@ -2,7 +2,7 @@
 
 **Modules:** `app/core/memory/stm.py` · `app/core/memory/ltm.py` · `app/core/graph/nodes.py`
 **Database:** PostgreSQL 16 (Docker container on EC2)
-**LLM:** GPT-4o-mini (summarization + fact extraction)
+**LLM:** `get_memory_llm()` — defaults to `llama-3.3-70b-versatile` via LiteLLM Router (not `gpt-4o-mini`)
 
 ---
 
@@ -78,7 +78,7 @@ async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpo
 Defined in [stm.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/memory/stm.py):
 
 - **Threshold:** `stm_message_threshold = 6` (configurable in settings)
-- **LLM:** GPT-4o-mini for summarization
+- **LLM:** `get_memory_llm()` for summarization (defaults to `llama-3.3-70b-versatile` via LiteLLM Router)
 - **Trigger:** When `len(messages) > threshold`
 
 #### Summarization Logic
@@ -152,7 +152,7 @@ async with AsyncPostgresStore.from_conn_string(settings.database_url) as store:
 
 Defined in [ltm.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/memory/ltm.py):
 
-- **Extraction LLM:** GPT-4o-mini with structured output (`MemoryDecision`)
+- **Extraction LLM:** `get_memory_llm()` with structured output (`MemoryDecision`). Defaults to `llama-3.3-70b-versatile` via LiteLLM Router
 - **Deduplication:** Each extracted fact is marked `is_new=true` or `is_new=false` relative to existing memories
 - **Storage key:** UUID per fact, stored under `("user", user_id, "details")` namespace
 

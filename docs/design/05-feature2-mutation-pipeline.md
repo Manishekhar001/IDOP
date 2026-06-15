@@ -55,11 +55,11 @@ graph TD
 The mutation pipeline relies on seven specialized architectural layers:
 
 *   **FileParser (`app/core/feature2_mutation/file_parser.py`)**: Accepts Excel (`.xlsx`, `.xls`) or CSV uploads and parses them safely into high-performance `pandas` DataFrames, filtering out empty rows, bad encodings, and malicious macros.
-*   **OpClassifier (`app/core/feature2_mutation/op_classifier.py`)**: Uses a structured `GPT-4o-mini` call to evaluate the spreadsheet structure, sheet name, and user instruction to classify the overall operation type into exactly `INSERT`, `UPDATE`, or `DELETE`.
+*   **OpClassifier (`app/core/feature2_mutation/op_classifier.py`)**: Uses a structured LLM call (via `get_chat_llm()`, defaulting to LiteLLM Router with Groq `llama-3.3-70b-versatile`) to evaluate the spreadsheet structure, sheet name, and user instruction to classify the overall operation type into exactly `INSERT`, `UPDATE`, or `DELETE`.
 *   **ColumnMapper (`app/core/feature2_mutation/column_mapper.py`)**: Uses LLM-driven schema matching to dynamically align spreadsheet headers with database column names, outputting a precise JSON dictionary mapping user columns to physical database columns.
 *   **RuleValidator (`app/core/feature2_mutation/rule_validator.py`)**: Executes programmatic type, range, regex, and integrity checks against the validation dictionary specified in `business_rules/rules.json`.
 *   **MutationGenerator (`app/core/feature2_mutation/mutation_generator.py`)**: Translates the mapped and validated rows into standard parameterized PostgreSQL mutation queries, keeping data parameterized to prevent SQL injection.
-*   **MutationLLMJudge (`app/core/feature2_mutation/llm_judge.py`)**: Audits draft queries for logical validation (e.g. massive deletion scope or out-of-bounds update ranges).
+*   **MutationLLMJudge (`app/core/feature2_mutation/llm_judge.py`)**: Audits draft queries for logical validation (e.g. massive deletion scope or out-of-bounds update ranges) via `get_chat_llm()`.
 *   **MutationApprovalGate**: Uses the shared [ApprovalGate](../../app/core/approval_gate.py) class (instantiated as `mutation_approval_gate`), providing a single-use cryptographically secure hex token (`secrets.token_hex(32)`) and stores the pending transaction payload until the user signs off. The original `app/core/feature2_mutation/approval_gate.py` is now a thin re-export of the shared singleton.
 
 ---

@@ -186,13 +186,13 @@ Zero-downtime rollback if health-check fails
 | Layer | Technologies |
 |-------|-------------|
 | Orchestration | LangGraph, LangChain |
-| LLM | Groq (LLaMA 3), OpenAI GPT-4o, LiteLLM Router |
-| Embeddings | Nomic (dense), BM25 (sparse), Voyage AI (reranking) |
-| Vector Store | Qdrant |
-| Databases | PostgreSQL (Supabase + local), Redis |
+| LLM | LiteLLM Router (primary: Groq `llama-3.3-70b-versatile` w/ multi-key load balancing; fallback: OpenAI `gpt-4o-mini`) |
+| Embeddings | Configurable: Nomic `nomic-embed-text-v1.5` (768-dim) or Voyage AI `voyage-3` (1024-dim) via `EMBEDDING_PROVIDER`; Voyage AI `rerank-2.5` (reranking) |
+| Vector Store | Qdrant (hybrid: dense + sparse) |
+| Databases | PostgreSQL 16 (checkpointer + store) + Supabase (business data), Upstash Redis (cache) |
 | Backend | FastAPI, Pydantic |
-| RAG Evaluation | RAGAS |
-| Observability | Opik, LangSmith |
+| RAG Evaluation | RAGAS, In-house LLM-based evaluator |
+| Observability | Opik |
 | Cloud | AWS EC2, AWS ECR, AWS S3 |
 | DevOps | Docker Compose, GitHub Actions, Nginx |
 

@@ -1,7 +1,7 @@
 # 10 — Self-Reflective RAG (SRAG) Verification Pipeline
 
 **Module:** `app/core/srag/verifier.py` · `app/core/graph/nodes.py`
-**LLM:** GPT-4o-mini (verification / revision)
+**LLM:** `get_memory_llm()` — defaults to `llama-3.3-70b-versatile` via LiteLLM Router (not `gpt-4o-mini`)
 **Max retries:** Support revision = 2, Question rewrite = 2
 
 ---
@@ -61,7 +61,7 @@ flowchart TD
 
 Defined in [verifier.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/srag/verifier.py):
 
-- **LLM:** GPT-4o-mini with structured output
+- **LLM:** `get_memory_llm()` with structured output. Defaults to `llama-3.3-70b-versatile` via LiteLLM Router (Groq primary, OpenAI gpt-4o-mini fallback)
 - **Three chains:** `_support_chain`, `_usefulness_chain`, `_revise_chain`
 - **Error handling:** On failure, defaults to `fully_supported` / `useful` (fail-open to prevent blocking)
 
@@ -246,7 +246,7 @@ route_after_support
 
 | Metric | Value |
 |---|---|
-| **Verification LLM** | GPT-4o-mini (fast, cheap) |
+| **Verification LLM** | `get_memory_llm()` — defaults to `llama-3.3-70b-versatile` |
 | **Support check latency** | ~0.5–1.0s |
 | **Usefulness check latency** | ~0.3–0.8s |
 | **Answer revision latency** | ~0.8–1.5s |

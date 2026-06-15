@@ -2,17 +2,21 @@
 
 **Project:** Intelligent Data Operations Platform (IDOP)
 **Version:** 0.1.1
-**Last Updated:** 2026-05-25
+**Last Updated:** 2026-06-15
 
 ---
 
 ## Overview
 
-IDOP is an enterprise-grade agentic platform that replaces routine data analyst workflows with three AI-driven features:
+IDOP is an enterprise-grade agentic platform that replaces routine data analyst workflows with three core AI-driven features and two additional processing paths:
 
 1. **NL-to-SQL** — Natural language queries translated to validated SQL, executed after human approval
 2. **Document-Driven Mutations** — Excel/CSV uploads parsed, mapped, validated against business rules, and executed as parameterized SQL transactions
 3. **Advanced RAG** — Corrective Self-Reflective Retrieval-Augmented Generation with HyDE, hybrid search, reranking, CRAG, and SRAG
+
+**Plus two query-only paths:** CHAT (direct LLM with memory) and HYBRID (parallel SQL + RAG synthesis).
+
+All five paths (SQL / MUTATION / RAG / CHAT / HYBRID) are routed by a shared 5-class LLM semantic router and execute within the same LangGraph state machine.
 
 All three features share a single **LangGraph state machine**, a unified **memory system** (STM + LTM), and a **multi-tier caching layer** (Redis + S3/Local + Qdrant dedup).
 
@@ -44,11 +48,10 @@ graph TB
         Edges["5 Conditional Edge Functions"]
     end
 
-    subgraph LLMs["OpenAI LLM Layer"]
+    subgraph LLMs["LiteLLM LLM Layer"]
         style LLMs fill:#fce4ec,stroke:#E91E63,stroke-width:2px
-        GPT4o["GPT-4o<br/>Generation · SQL · Judge"]
-        GPT4oMini["GPT-4o-mini<br/>Routing · CRAG · Memory"]
-        Embed["nomic-embed-text-v1.5<br/>768-dim Embeddings"]
+        LiteLLM["LiteLLM Router<br/>Groq Llama 3.3 70B (primary)<br/>OpenAI gpt-4o-mini (fallback)"]
+        Embed["Nomic / Voyage<br/>768-1024 dim Embeddings"]
     end
 
     subgraph VectorDB["Qdrant Vector Database"]
@@ -70,7 +73,7 @@ graph TB
         style External fill:#fff9c4,stroke:#FFC107,stroke-width:2px
         Voyage["Voyage AI<br/>rerank-2.5"]
         Tavily["Tavily Search<br/>Web Fallback"]
-        Vanna["Vanna 2.0<br/>NL-to-SQL + ChromaDB"]
+        Vanna["Vanna 2.0<br/>NL-to-SQL + OpenAILlmService"]
     end
 
     UI -->|"HTTP/SSE"| API
@@ -86,8 +89,7 @@ graph TB
     Graph --> Nodes
     Graph --> Edges
 
-    Nodes -->|"Generation"| GPT4o
-    Nodes -->|"Classification"| GPT4oMini
+    Nodes -->|"All LLM calls"| LiteLLM
     Nodes -->|"Embed Query"| Embed
 
     Nodes -->|"Hybrid Search"| Dense
@@ -125,13 +127,17 @@ graph TB
 - **Health check** verifies graph compilation state
 - Source: [csrag_engine.py](../../app/core/csrag_engine.py)
 
-### OpenAI LLM Layer
+### LLM Layer (LiteLLM Router)
 
-| Model | Role | Temperature | Use Cases |
+IDOP uses a **LiteLLM Router** for intelligent multi-provider, multi-key LLM access with automatic failover:
+
+| Model / Provider | Role | Temperature | Use Cases |
 |---|---|---|---|
-| `gpt-4o` | Primary generation | 0.0 | Answer generation, SQL compilation, LLM Judge audits, HyDE hypotheses, SRAG verification |
-| `gpt-4o-mini` | Lightweight classification | 0.0 | 5-class routing, CRAG chunk scoring, memory extraction, retrieval decisions |
-| `nomic-embed-text-v1.5` | Dense embeddings | — | 768-dimensional vectors for document chunks and query embedding |
+| **LiteLLM Router** (primary: Groq `llama-3.3-70b-versatile` w/ multi-key load balancing; fallback: OpenAI `gpt-4o-mini`) | Primary generation & classification | 0.0 | Answer generation, 5-class routing, SQL LLM Judge, HyDE hypotheses, CRAG scoring, SRAG verification, context refinement |
+| **Vanna 2.0** (OpenAI `gpt-4o-mini` via `OpenAILlmService`) | SQL generation | 0.0 | NL-to-SQL via Vanna's internal LLM; falls back to direct LiteLLM SQL generation if Vanna unavailable |
+| **`get_memory_llm()`** (defaults to `llama-3.3-70b-versatile` via LiteLLM Router) | Memory & classification | 0.0 | STM summarization, LTM extraction, CRAG evaluation, SRAG verification |
+
+**Key design:** The single `get_chat_llm()` function powers routing, generation, and all classification tasks via the LiteLLM Router. It load-balances across up to 4 Groq API keys, detects `429` rate limits, cools down failed deployments, and falls back to OpenAI `gpt-4o-mini` if all Groq keys are exhausted. A separate `get_memory_llm()` function provides shared instances for memory summarization and extraction.
 
 ### Qdrant Vector Database
 
@@ -176,7 +182,7 @@ graph TB
 |---|---|---|
 | **Voyage AI** | Cross-encoder reranking of retrieved chunks | `rerank-2.5` (free tier) |
 | **Tavily** | Web search fallback when CRAG scores INCORRECT | Up to 5 results per query |
-| **Vanna 2.0** | NL-to-SQL generation with ChromaDB internal vectorstore | Schema-trained few-shot SQL |
+| **Vanna 2.0** | NL-to-SQL generation via `OpenAILlmService` + `PostgresRunner` + `DemoAgentMemory` | Schema-trained few-shot SQL with direct LLM fallback |
 
 ---
 
@@ -217,9 +223,10 @@ CSRAGEngine.aquery() / .astream()
     ▼
 LangGraph StateGraph.ainvoke()
     │
-    ├── OpenAI GPT-4o-mini (routing / classification)
-    ├── OpenAI GPT-4o (generation / SQL / judging)
-    ├── Nomic nomic-embed-text-v1.5 (embeddings)
+    ├── LiteLLM Router (Groq llama-3.3-70b-versatile primary, OpenAI gpt-4o-mini fallback)
+    ├── get_memory_llm() (memory/classification tasks — defaults to llama-3.3-70b-versatile)
+    ├── Vanna OpenAILlmService (gpt-4o-mini for SQL generation)
+    ├── Nomic / Voyage (configurable embeddings)
     ├── Qdrant (dual-vector hybrid search)
     ├── Supabase PostgreSQL (business data queries)
     ├── Docker PostgreSQL (STM checkpoints + LTM facts)

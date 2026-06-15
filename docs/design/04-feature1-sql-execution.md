@@ -1,8 +1,8 @@
 # 04 — Feature 1: NL-to-SQL Execution
 
 **Project:** Intelligent Data Operations Platform (IDOP)
-**Version:** 0.1.0
-**Last Updated:** 2026-06-12
+**Version:** 0.1.1
+**Last Updated:** 2026-06-15
 
 ---
 
@@ -84,12 +84,12 @@ graph TB
 
 ### TextToSQLService (Vanna 2.0)
 
-The primary SQL generation engine, backed by Vanna's ChromaDB-based vectorstore for schema context:
+The primary SQL generation engine, backed by Vanna 2.0's internal `OpenAILlmService` with `PostgresRunner` for schema context:
 
-- **Schema training:** Database schema DDL, table relationships, and few-shot examples are indexed in ChromaDB
-- **Generation:** `vanna.generate_sql(question)` produces SQL from natural language
+- **Schema training:** Schema is dynamically introspected from the actual database via `information_schema` queries; falls back to a static schema context if the database is unreachable
+- **Generation:** `vanna.generate_sql(question)` produces SQL from natural language via `OpenAILlmService` (model: `gpt-4o-mini`, configurable via `VANNA_LLM_MODEL`)
 - **Query ID:** Each generation is assigned a UUID for session tracking
-- **Fallback:** If Vanna fails, falls back to direct GPT-4o SQL generation
+- **Fallback:** If Vanna fails, falls back to direct LLM SQL generation via LiteLLM Router
 - Source: [vanna_service.py](../../app/core/feature1_sql/vanna_service.py)
 
 ### SQLValidator
@@ -124,7 +124,7 @@ Source: [sql_validator.py](../../app/core/feature1_sql/sql_validator.py)
 
 ### LLMJudge (Semantic Audit)
 
-A `GPT-4o-mini`-powered semantic evaluator that audits generated SQL for logical correctness:
+A LiteLLM-powered semantic evaluator (via `get_memory_llm()`, defaulting to `llama-3.3-70b-versatile`) that audits generated SQL for logical correctness:
 
 | Check | What It Verifies |
 |---|---|
@@ -355,9 +355,9 @@ The SQL pipeline uses **two Redis cache tiers**:
 
 | Stage | Typical Latency | Notes |
 |---|---|---|
-| **Vanna SQL generation** | 800–2000 ms | ChromaDB schema lookup + OpenAI generation |
+| **Vanna SQL generation** | 800–2000 ms | OpenAILlmService (gpt-4o-mini) + schema context |
 | **SQLValidator** | <1 ms | In-memory regex check |
-| **LLMJudge audit** | 300–800 ms | GPT-4o-mini structured output |
+| **LLMJudge audit** | 300–800 ms | `get_memory_llm()` — defaults to `llama-3.3-70b-versatile` |
 | **ApprovalGate token** | <1 ms | `secrets.token_hex(32)` |
 | **Total (generation)** | 1–3 s | End-to-end until pending_approval |
 | **SQLExecutor** | 50–500 ms | Depends on query complexity and data volume |

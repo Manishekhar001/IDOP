@@ -2,19 +2,21 @@
 
 **Project:** Intelligent Data Operations Platform (IDOP)
 **Version:** 0.1.1
-**Stack:** FastAPI · LangGraph · OpenAI GPT-4o · Qdrant · Supabase · PostgreSQL · Redis · S3 · Voyage AI · Nomic
+**Stack:** FastAPI · LangGraph · LiteLLM Router · Groq Llama 3.3 70B · Qdrant · Supabase · PostgreSQL · Redis · S3 · Voyage AI · Nomic
 
 ---
 
 ## What IDOP Is
 
-IDOP is a three-feature agentic platform that replaces the need for a data analyst for most routine data interactions:
+IDOP is a 5-path agentic platform with three core features and two additional processing modes that replaces the need for a data analyst for most routine data interactions:
 
 - **Feature 1 — NL-to-SQL:** Natural language → validated SQL → human approval → execution on Supabase
 - **Feature 2 — Document-Driven Mutations:** Upload Excel/CSV → AI maps columns → generates parameterised INSERT/UPDATE/DELETE → human approval → executes in a single transaction on Supabase
 - **Feature 3 — Advanced RAG:** Hybrid search + CRAG + SRAG + HyDE + Reranking + Context Enrichment against uploaded knowledge-base documents
+- **CHAT Mode:** Direct LLM response using STM + LTM memory (no retrieval)
+- **HYBRID Mode:** Parallel SQL execution + RAG pipeline → unified synthesis
 
-All three features share one LangGraph state machine, one memory system (STM + LTM), and one caching layer (Redis + S3 + Qdrant dedup).
+All five paths share one LangGraph state machine, one 5-class LLM semantic router, one memory system (STM + LTM), and one caching layer (Redis + S3 + Qdrant dedup).
 
 ---
 
@@ -46,19 +48,20 @@ All three features share one LangGraph state machine, one memory system (STM + L
 | Decision | Choice | Reason |
 |---|---|---|
 | Deployment | EC2 + Docker Compose | Human approval gate can be pending indefinitely — Lambda 15-min timeout breaks this |
-| LLM (generation, SQL, judge) | OpenAI `gpt-4o` | Highest quality for critical outputs |
-| LLM (routing, CRAG scoring, memory) | OpenAI `gpt-4o-mini` | 15× cheaper, quality gap negligible on classification tasks |
-| Embeddings | Nomic `nomic-embed-text-v1.5` (768-dim) | High performance, Matryoshka support, and low latency |
+| LLM (generation, SQL judge, routing, CRAG, SRAG, memory) | **LiteLLM Router** (primary: Groq `llama-3.3-70b-versatile` w/ multi-key load balancing; fallback: OpenAI `gpt-4o-mini`) | High performance on complex tasks with automatic Groq-to-OpenAI failover |
+| LLM (memory tasks) | **`get_memory_llm()`** — defaults to `llama-3.3-70b-versatile` via LiteLLM Router | Shared LLM instance for memory summarization and LTM extraction |
+| LLM (SQL generation) | **Vanna 2.0** with OpenAI `gpt-4o-mini` (configurable via `VANNA_LLM_MODEL`) | Vanna's internal `OpenAILlmService` for robust NL-to-SQL; falls back to direct LLM SQL generation if Vanna is unavailable |
+| Embeddings | Configurable: **Nomic** `nomic-embed-text-v1.5` (768-dim) or **Voyage AI** `voyage-3` (1024-dim) | `EMBEDDING_PROVIDER` env var controls the active provider; Nomic is default |
 | Vector store | Qdrant (dense + sparse dual-vector) | Native BM25 + dense + RRF fusion in single collection |
-| NL-to-SQL | Vanna 2.0 | Production-grade, handles schema training + few-shot internally |
+| NL-to-SQL | Vanna 2.0 | Production-grade NL-to-SQL using OpenAILlmService + PostgresRunner + DemoAgentMemory; falls back to direct LLM SQL generation |
 | Business data | Supabase | External, isolated from AI infrastructure |
 | Memory data | PostgreSQL Docker on EC2 | Keeps LangGraph STM/LTM internal |
 | Audit log | Supabase | Belongs with the data it audits |
 | RAG answer cache | Post-verification only (CORRECT + fully_supported + useful) | Never cache unverified answers |
 | Document cache | S3 (file-level SHA-256) | Works, already built in Text2SQL project |
 | Query cache | Redis (Upstash) | SQL gen 24h, SQL result 15min, embeddings 7d |
-| Reranking | Voyage AI `rerank-2.5` | Enterprise-grade, free plan sufficient |
-| Advanced RAG | HyDE + Hybrid Search + Reranking + Context Enrichment | All implemented in Notes project |
+| Reranking | Voyage AI `rerank-2.5` | Enterprise-grade cross-encoder reranking with generous free tier |
+| Advanced RAG | HyDE + Hybrid Search + Reranking + Context Enrichment + CRAG + SRAG | Full Corrective Self-Reflective RAG pipeline |
 
 ---
 

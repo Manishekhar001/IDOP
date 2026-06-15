@@ -62,7 +62,7 @@ Source: [logger.py](../../app/utils/logger.py)
 
 ### Step 3: Vector Store Registration
 The `VectorStoreService` connects to the Qdrant instance. It checks if the primary collection `idop_documents` exists. If the collection is missing, it executes automated schema creation, applying:
-*   Dense named vector payload configuration (Cosine, 768-dim).
+*   Dense named vector payload configuration (Cosine, configurable dimensions: 768 for Nomic, 1024 for Voyage).
 *   Sparse named vector payload configuration (BM25 keyword vectors).
 
 ### Step 4: Long-Term Memory (LTM) Setup

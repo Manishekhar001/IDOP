@@ -64,7 +64,7 @@ graph TD
 
 ### 1. Pre-Retrieval (LTM & Decider)
 *   **LTM Memory Injection**: The user's query is augmented with long-term background facts (loaded via `ltm_remember` node).
-*   **Decide Retrieval**: GPT-4o-mini checks if the question actually requires vector database lookups (e.g., "Hi, how are you?" goes straight to direct generation, whereas "What is our company's refund policy?" triggers retrieval).
+*   **Decide Retrieval**: `decide_retrieval_node` (via `get_chat_llm()`) checks if the question actually requires vector database lookups (e.g., "Hi, how are you?" goes straight to direct generation, whereas "What is our company's refund policy?" triggers retrieval).
 
 ### 2. Hypothetical Document Embeddings (HyDE)
 If `enable_hyde=True`, the engine prompts GPT-4o to generate three hypothetical documents containing answers to the user's question. These hypothetical answers are embedded and used as vectors to search the database. This bridges semantic gaps between questions and actual repository texts.
@@ -76,7 +76,7 @@ The system queries Qdrant using both dense vectors (nomic-embed-text-v1.5) and s
 *   **Context Enrichment**: Neighbor chunk windowing pulls the surrounding sentences (chunk indices $i-1$ and $i+1$) to ensure complete context.
 
 ### 4. Corrective RAG (CRAG) Guardrails
-The retrieved chunks undergo evaluation by a strict judge (`CRAGEvaluator` using GPT-4o-mini), resulting in one of three evaluation branches:
+The retrieved chunks undergo evaluation by a strict judge (`CRAGEvaluator` using `get_memory_llm()`, defaulting to `llama-3.3-70b-versatile`), resulting in one of three evaluation branches:
 
 > [!IMPORTANT]
 > **Branch 1: CORRECT (Avg Score > 0.7)**
@@ -92,7 +92,7 @@ The retrieved chunks undergo evaluation by a strict judge (`CRAGEvaluator` using
 Once an answer is drafted, it is subjected to a two-tier self-reflective feedback loop:
 
 #### Stage 5A: Support Verification (NLI check)
-*   **Prompt**: The SRAG Verifier evaluates the drafted answer against the refined context and classifies the grounding into `fully_supported`, `partially_supported`, or `no_support`.
+*   **Prompt**: The SRAG Verifier (via `get_memory_llm()`, defaulting to `llama-3.3-70b-versatile`) evaluates the drafted answer against the refined context and classifies the grounding into `fully_supported`, `partially_supported`, or `no_support`.
 *   **Action**: If the answer is `partially_supported` or `no_support`, the engine routes the state back to `revise_answer` node, which instructs GPT-4o to re-synthesize the answer strictly on the provided evidence. This loop is attempted up to 2 times.
 
 #### Stage 5B: Usefulness Verification

@@ -1,8 +1,8 @@
 # 03 — Document Upload Pipeline
 
 **Project:** Intelligent Data Operations Platform (IDOP)
-**Version:** 0.1.0
-**Last Updated:** 2026-05-25
+**Version:** 0.1.1
+**Last Updated:** 2026-06-15
 
 ---
 
@@ -152,10 +152,11 @@ Source: [document_processor.py](../../app/core/document_processor.py) (lines 90�
 
 ### Dense Embedding Generation
 
-- **Model:** Nomic `nomic-embed-text-v1.5`
-- **Dimensions:** 768
-- **Method:** `NomicEmbeddings.embed_documents(texts)` — batch embedding of all chunk texts
-- Returns one 768-dimensional float vector per chunk
+- **Provider:** Configurable via `EMBEDDING_PROVIDER` env var (`nomic` or `voyage`)
+- **Nomic:** `nomic-embed-text-v1.5`, 768-dim, via `NomicEmbeddings`
+- **Voyage AI:** `voyage-3`, 1024-dim, via `VoyageAIEmbeddings`
+- **Method:** `embed_documents(texts)` — batch embedding of all chunk texts
+- Returns float vectors at the configured dimensionality
 - Source: [embeddings.py](../../app/core/embeddings.py)
 
 ### Sparse Vector Generation (`SparseVectorService`)

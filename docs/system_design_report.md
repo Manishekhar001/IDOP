@@ -16,6 +16,14 @@ graph TD
 
     Client([REST Client / User Dashboards]) -->|Uvicorn / FastAPI| API[FastAPI Gateway]
     
+    subgraph LLM_Layer["LiteLLM Router (Groq llama-3.3-70b-versatile primary, OpenAI gpt-4o-mini fallback)"]
+        LLM1["get_chat_llm() — generation, routing,
+              CRAG, SRAG, SQL LLM Judge, HyDE"]
+        LLM2["get_memory_llm() — STM summarization,
+              LTM extraction, CRAG evaluation"]
+        LLM3["Vanna OpenAILlmService — SQL generation (gpt-4o-mini)"]
+    end
+
     subgraph Routing & Processing Layers
         API --> Router{5-Class LLM Router}
         Router -->|SQL| F1[Feature 1: NL-to-SQL]
@@ -23,6 +31,11 @@ graph TD
         Router -->|RAG| F3[Feature 3: Advanced CSRAG Engine]
         Router -->|CHAT| F4[Direct Chat & Memory Nodes]
         Router -->|HYBRID| F5[Parallel SQL + RAG Synthesis]
+        F1 -.->|Vanna uses| LLM3
+        F2 -.->|OpClass uses| LLM1
+        F3 -.->|CRAG/SRAG uses| LLM2
+        F4 -.->|Memory uses| LLM2
+        F5 -.->|Generation uses| LLM1
     end
 
     subgraph Memory & Caching Infrastructure

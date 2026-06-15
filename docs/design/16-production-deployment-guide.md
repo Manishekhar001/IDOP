@@ -2,7 +2,7 @@
 
 This manual provides a detailed, production-grade guide for system administrators to provision, configure, secure, and deploy the IDOP platform onto a clean AWS EC2 instance — including a complete reference for every GitHub Secret, environment variable, and integration key required by the CI/CD pipeline.
 
-**Last Updated:** 2026-05-30
+**Last Updated:** 2026-06-15
 **Target Architecture:** AWS EC2 (Ubuntu 22.04 LTS, x86-64/AMD64) + Docker Compose + Nginx + Let's Encrypt
 **Deployment Method:** GitHub Actions CI/CD (ci.yml + cd.yml)
 **Audience:** Intermediate AWS users familiar with CLI, console, and GitHub Actions
@@ -226,8 +226,18 @@ echo "S3 Bucket: $S3_BUCKET_NAME"
 
 ## 4. External Services Configuration
 
-### 4.1 OpenAI API Key
+### 4.1 LLM Provider: LiteLLM Router (Groq Primary)
 
+The IDOP primary LLM is a **LiteLLM Router** that load-balances across up to 4 **Groq** API keys (model: `llama-3.3-70b-versatile`) with automatic failover to OpenAI `gpt-4o-mini` if all Groq keys are exhausted.
+
+**Required (at least one):**
+1. Go to https://console.groq.com/keys
+2. Click **Create API Key**
+3. Name it: `IDOP Production`
+4. Copy the key (starts with `gsk_...`)
+5. Repeat to create up to 4 keys for load balancing
+
+**Fallback (recommended):**
 1. Go to https://platform.openai.com/api-keys
 2. Click **Create new secret key**
 3. Name it: `IDOP Production`
@@ -235,7 +245,7 @@ echo "S3 Bucket: $S3_BUCKET_NAME"
 
 **Expected Monthly Cost:** ~$5-50/month depending on usage
 
-> **Vanna Text-to-SQL Model:** Vanna's internal `OpenAILlmService` uses `gpt-4o-mini` by default (configurable via `VANNA_LLM_MODEL` env var). This model must be an actual OpenAI model name since Vanna only supports OpenAI as its LLM backend. The Groq-based `get_chat_llm()` fallback is used if OpenAI is unavailable.
+> **Vanna Text-to-SQL Model:** Vanna's internal `OpenAILlmService` uses `gpt-4o-mini` by default (configurable via `VANNA_LLM_MODEL` env var). This model must be an actual OpenAI model name since Vanna only supports OpenAI as its LLM backend. The LiteLLM Router-based `get_chat_llm()` is used for all other LLM operations (routing, generation, CRAG, SRAG, memory).
 
 ### 4.2 Qdrant Cloud Setup
 
@@ -466,10 +476,6 @@ These keys configure the LLM router for query processing. The LiteLLM Router loa
 ---
 
 #### 🔐 Category 6: Optional Caching Secrets
-
----
-
-#### 🔐 Category 5: Optional Caching Secrets
 
 These are optional. If not set, the application will run without caching (slightly slower on repeated queries).
 

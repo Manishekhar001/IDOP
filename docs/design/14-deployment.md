@@ -31,7 +31,7 @@ graph TD
     FastAPI -->|File Storage Cache| AWSS3[AWS S3 Document Buckets]
     
     %% API Services
-    FastAPI -->|REST API calls| OpenAI[OpenAI API GPT-4o / GPT-4o-mini]
+    FastAPI -->|REST API calls| LiteLLMRouter[LiteLLM Router<br/>Groq Llama 3.3 70B (primary)<br/>OpenAI gpt-4o-mini (fallback)]
     FastAPI -->|REST API calls| VoyageAI[Voyage AI Reranking API]
     FastAPI -->|REST API calls| Tavily[Tavily Search API]
 

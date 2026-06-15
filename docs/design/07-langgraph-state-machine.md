@@ -351,7 +351,7 @@ def build_graph(
 
 > **Note:** The `hybrid_gen` and `retrieve_docs` nodes use `functools.partial` to inject the `vector_store` dependency at graph compilation time. This avoids creating a new `VectorStoreService` for every invocation.
 
-> **Note:** An unreachable auto-execute SELECT block (~50 lines) and a duplicate `pending_approval` return (~25 lines) were removed from `sql_generation_node` in a refactoring pass. The function always returns `pending_approval` — execution happens via `/sql/approve`.
+> **LLM Architecture Note:** All graph nodes (`router_node`, `decide_retrieval_node`, `generate_answer_node`, `evaluate_docs_node`, `verify_support_node`, `verify_usefulness_node`, `stm_summarize_node`, etc.) use `get_chat_llm()` or `get_memory_llm()` from `app.core.llm_factory`. These default to the **LiteLLM Router** with Groq `llama-3.3-70b-versatile` as primary and OpenAI `gpt-4o-mini` as fallback. SQL generation within Vanna uses `OpenAILlmService` with `gpt-4o-mini`.
 
 > [!TIP]
 > The recursion limit is set to a high value of **80** in execution scripts to comfortably accommodate dual support-revision and usefulness-rewrite feedback loops without hitting LangGraph's safety limits.

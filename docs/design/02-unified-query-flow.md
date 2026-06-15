@@ -1,8 +1,8 @@
 # 02 — Unified Query Flow
 
 **Project:** Intelligent Data Operations Platform (IDOP)
-**Version:** 0.1.0
-**Last Updated:** 2026-05-25
+**Version:** 0.1.1
+**Last Updated:** 2026-06-15
 
 ---
 
@@ -113,7 +113,7 @@ If any service fails to initialize, the application will not start. The `/health
 
 ### 5-Class LLM Semantic Router
 
-The `QueryRouter` uses `GPT-4o-mini` with `temperature=0.0` and `response_format={"type": "json_object"}` to classify queries:
+The `QueryRouter` uses the LiteLLM Router (primary: Groq `llama-3.3-70b-versatile`, fallback: OpenAI `gpt-4o-mini`) with `temperature=0.0` and structured JSON output to classify queries:
 
 ```mermaid
 graph LR
@@ -145,6 +145,8 @@ graph LR
 
 **Fallback behavior:** If the router call fails (network error, parsing failure), the system defaults to `CHAT` — the safest fallback that cannot modify data.
 
+> **Note on LLM architecture:** All classification (routing, decide_retrieval, CRAG, SRAG support/usefulness) uses `get_chat_llm()` or `get_memory_llm()`, both of which default to the LiteLLM Router with Groq `llama-3.3-70b-versatile`. OpenAI `gpt-4o-mini` serves only as a fallback when all Groq keys are exhausted. SQL generation uses Vanna 2.0's internal `OpenAILlmService` with `gpt-4o-mini`, with a fallback to direct LiteLLM SQL generation.
+
 Source: [router.py](../../app/core/graph/router.py)
 
 ---
@@ -157,9 +159,9 @@ Source: [router.py](../../app/core/graph/router.py)
 router → sql_gen → END
 ```
 
-- **Vanna 2.0** generates SQL from natural language
-- **SQLValidator** checks for forbidden commands (DROP, TRUNCATE, ALTER, etc.)
-- **LLMJudge** performs semantic audit of join correctness and filter accuracy
+- **Vanna 2.0** (via `OpenAILlmService` with `gpt-4o-mini`) generates SQL from natural language; falls back to direct LiteLLM SQL generation
+- **SQLValidator** checks for forbidden commands (DROP, TRUNCATE, ALTER, INSERT, UPDATE, DELETE, etc.)
+- **LLMJudge** (via `get_memory_llm()` — defaults to `llama-3.3-70b-versatile`) performs semantic audit of join correctness and filter accuracy
 - **ApprovalGate** generates a cryptographic token (`secrets.token_hex(32)`)
 - Returns `status: "pending_approval"` with `approval_token`
 - User must call `/sql/approve` with the token to execute
@@ -276,7 +278,7 @@ The unified `ChatResponse` model returns:
 |---|---|---|---|
 | **CHAT** | 200–600 ms | 1 (router) + 1 (generate) | Fastest path — no retrieval |
 | **SQL** | 1–3 s | 1 (router) + 1 (Vanna) + 1 (Judge) | Blocks at approval gate |
-| **MUTATION** | <500 ms | 1 (router) | Graph node only sets state; processing at route level |
+| **MUTATION** | <500 ms | 1 (router via `get_chat_llm()`) | Graph node only sets state; processing at route level |
 | **RAG** (no retrieval) | 400–800 ms | 1 (router) + 1 (decide) + 1 (generate) | LTM context included |
 | **RAG** (full CSRAG) | 3–8 s | 1 (router) + 1 (decide) + 1–3 (HyDE) + 1 (CRAG) + 1 (refine) + 1 (generate) + 1 (SRAG support) + 1 (SRAG useful) | Worst case with retries: +2–4 s |
 | **HYBRID** | 5–12 s | Router + SQL chain + RAG chain + synthesis | Most expensive path |

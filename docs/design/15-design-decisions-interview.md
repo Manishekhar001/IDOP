@@ -21,15 +21,19 @@ Enterprise data ecosystems are notoriously fragmented. Analysts and business dec
 *   **Problem**: Simple sequential LangChain chains are linear and fragile. They lack self-correction, cannot route dynamically, and are unable to execute human-in-the-loop approvals without losing state.
 *   **Rationale**: **LangGraph** models the platform as a stateful, cyclic directed graph. If the generated SQL fails validation, it loops back to the generation node. If the RAG answer is unsupported by evidence, it loops back to the re-generation node. Checkpoints are automatically persisted inside PostgreSQL checkpointers (`AsyncPostgresSaver`), enabling sessions to survive service restarts and scale horizontally.
 
-### Decision 2.2: Voyage AI Rerank-2.5 vs. Raw Vector Scores
+### Decision 2.2: LiteLLM Router vs. Single-Provider LLM
+*   **Problem**: Relying on a single LLM provider creates a single point of failure. If the provider experiences an outage, rate limits, or degraded performance, the entire platform becomes unavailable.
+*   **Rationale**: **LiteLLM Router** with multi-key Groq load balancing and automatic OpenAI fallback ensures high availability. The router detects `429` rate limits, cools down failed deployments, and seamlessly fails over to OpenAI `gpt-4o-mini` if all Groq keys are exhausted. This provides enterprise-grade reliability without vendor lock-in.
+
+### Decision 2.3: Voyage AI Rerank-2.5 vs. Raw Vector Scores
 *   **Problem**: Dense vector scores represent raw semantic proximity but struggle with fine-grained context relevance. They often rank minor semantic hits above highly relevant paragraphs containing slightly different wording.
 *   **Rationale**: **Voyage AI Rerank-2.5** acts as a cross-encoder, comparing the precise syntax of the query and documents simultaneously. This ensures the absolute highest relevance context is pushed to the first 500 tokens of the context window, drastically reducing LLM hallucinations.
 
-### Decision 2.3: Dual-Vector Hybrid Search vs. Single Vector
+### Decision 2.4: Dual-Vector Hybrid Search vs. Single Vector
 *   **Problem**: Dense embeddings (e.g. Nomic `nomic-embed-text-v1.5`) excel at capturing high-level intent but perform poorly on exact keyword lookups (serial numbers, email patterns, SKU codes). Sparse algorithms (BM25) capture keywords but miss semantic meaning.
 *   **Rationale**: **Qdrant Dual-Vector Search** implements both. High-dimensional dense vectors represent abstract intent, while sparse BM25 indices capture alphanumeric exactness. Results are fused using **Reciprocal Rank Fusion (RRF)**, offering the best of both worlds.
 
-### Decision 2.4: Redis Upstash vs. Disk Storage Cache
+### Decision 2.5: Redis Upstash vs. Disk Storage Cache
 *   **Problem**: Document caching (chunks, embeddings) belongs in persistent storage, but query-level caching requires extremely low latency (under 10ms). Disk caches are slow and difficult to scale across clustered instances.
 *   **Rationale**: We implement a **Four-Tier Caching System**. Upstash Redis acts as a distributed cache for transient queries, SQL generations, and SQL results with dynamic TTLs. Disk/S3 acts as a static document chunk cache. If Redis is severed, the system gracefully degrades to a thread-safe LRU Local Cache, preserving uptime.
 
@@ -46,7 +50,7 @@ This section acts as a study guide and defense framework for technical architect
 > **Answer**: Redis is an excellent caching layer, but it is not designed to act as a system-of-record. LangGraph checkpointers store the absolute state of multi-step reasoning runs. In corporate environments, if a user takes 2 hours to approve an Excel mutation, the container could restart or scale down. PostgreSQL checkpointers provide ACID compliance and persistence guarantees, ensuring that pending sessions and state snapshots are never lost.
 
 ### Q3: Explain how the SQLValidator prevents SQL injections. Isn't Vanna or GPT-4o smart enough to avoid them?
-> **Answer**: Relying on an LLM to prevent security breaches is a major vulnerability (prompt injections can bypass system rules). The `SQLValidator` acts as a deterministic, programmatic firewall. It parses the generated SQL and checks for forbidden tokens (`DROP`, `TRUNCATE`, `ALTER`, etc.) as distinct words. Furthermore, when the user executes mutations, the queries are parameterized before reaching Supabase Postgres, ensuring raw user inputs never interact with the database engine directly.
+> **Answer**: Relying on an LLM to prevent security breaches is a major vulnerability (prompt injections can bypass system rules). The `SQLValidator` acts as a deterministic, programmatic firewall. It parses the generated SQL and checks for forbidden tokens (`DROP`, `TRUNCATE`, `ALTER`, `INSERT`, `UPDATE`, `DELETE`, etc.) as distinct words. Furthermore, when the user executes mutations, the queries are parameterized before reaching Supabase Postgres, ensuring raw user inputs never interact with the database engine directly.
 
 ### Q4: How does the system handle "hallucinations" during RAG retrieval?
 > **Answer**: IDOP uses a two-tier **Self-Reflective RAG (SRAG)** guardrail:

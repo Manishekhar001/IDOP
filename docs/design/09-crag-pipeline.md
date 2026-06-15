@@ -1,7 +1,7 @@
 # 09 — Corrective RAG (CRAG) Evaluation Pipeline
 
 **Module:** `app/core/crag/evaluator.py` · `app/core/crag/web_search.py`
-**LLM:** GPT-4o-mini (classification / scoring)
+**LLM:** `get_memory_llm()` — defaults to `llama-3.3-70b-versatile` via LiteLLM Router (not `gpt-4o-mini`)
 **Thresholds:** upper = 0.7, lower = 0.3
 
 ---
@@ -57,14 +57,14 @@ flowchart TD
 
 Defined in [evaluator.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/crag/evaluator.py):
 
-- **Scoring LLM:** GPT-4o-mini with structured output (`DocEvalScore`)
+- **Scoring LLM:** `get_memory_llm()` with structured output (`DocEvalScore`). Defaults to `llama-3.3-70b-versatile` via the LiteLLM Router (Groq primary, OpenAI gpt-4o-mini fallback)
 - **Per-chunk evaluation:** Each chunk is scored independently via `asyncio.gather` for parallel execution
 - **Score schema:** `DocEvalScore(score: float [0.0–1.0], reason: str)`
 - **Thresholds:** Configurable via `settings.crag_upper_threshold` and `settings.crag_lower_threshold`
 
 ### Scoring Guide
 
-The prompt instructs GPT-4o-mini to score conservatively:
+The prompt instructs the scoring LLM to score conservatively:
 
 | Score | Meaning |
 |---|---|
@@ -198,7 +198,7 @@ Hybrid Search Results (4 docs)
 
 | Metric | Value |
 |---|---|
-| **Scoring LLM** | GPT-4o-mini (~15× cheaper than GPT-4o) |
+| **Scoring LLM** | `get_memory_llm()` — defaults to `llama-3.3-70b-versatile` |
 | **Parallel scoring** | All chunks evaluated concurrently via `asyncio.gather` |
 | **Typical latency** | 0.5–1.5s for 4 chunks (parallel) |
 | **Web search latency** | Additional 1–3s when triggered |
