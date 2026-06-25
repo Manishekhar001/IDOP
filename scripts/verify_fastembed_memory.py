@@ -72,7 +72,7 @@ def main():
 
     # --- Import fastembed ---
     print("\n2. Importing fastembed...")
-    from fastembed import SparseTextEmbedding  # noqa: E402
+    from fastembed import SparseTextEmbedding
 
     rss_after_import = get_rss_mb()
     print(f"   RSS after import:              {rss_after_import:.1f} MB")

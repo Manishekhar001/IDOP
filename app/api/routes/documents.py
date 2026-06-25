@@ -4,6 +4,7 @@ import os
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
+from app.api.auth import get_current_user
 from app.api.schemas import (
     CollectionInfoResponse,
     DocumentUploadResponse,
@@ -65,6 +66,7 @@ async def upload_document(
     ),
     chunk_overlap: int | None = Form(None, description="Custom chunk overlap"),
     vector_store: VectorStoreService = Depends(get_vector_store),
+    _user: dict = Depends(get_current_user),
 ) -> DocumentUploadResponse:
     """
     Upload and process a document through the ingestion pipeline.
@@ -296,6 +298,7 @@ async def upload_document(
 @track(name="collection_info")
 async def collection_info(
     vector_store: VectorStoreService = Depends(get_vector_store),
+    _user: dict = Depends(get_current_user),
 ) -> CollectionInfoResponse:
     try:
         info = vector_store.get_collection_info()
@@ -319,6 +322,7 @@ async def collection_info(
 @track(name="delete_collection")
 async def delete_collection(
     vector_store: VectorStoreService = Depends(get_vector_store),
+    _user: dict = Depends(get_current_user),
 ) -> dict:
     logger.warning("Collection deletion requested")
     try:

@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.api.auth import get_current_user
 from app.opik import track
 from app.services.cache_init import get_doc_cache, get_query_cache
 from app.utils.logger import get_logger
@@ -64,7 +65,9 @@ class CacheTestResponse(BaseModel):
     description="Returns detailed statistics including hit rates, sizes, and backend information for all cache layers.",
 )
 @track(name="get_cache_stats")
-async def get_cache_stats() -> CacheStatsResponse:
+async def get_cache_stats(
+    _user: dict = Depends(get_current_user),
+) -> CacheStatsResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
     try:
@@ -104,6 +107,7 @@ async def clear_cache(
     doc_id: str | None = None,
     file_extension: str | None = None,
     clear_query_cache: bool = True,
+    _user: dict = Depends(get_current_user),
 ) -> CacheClearResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
@@ -147,7 +151,9 @@ async def clear_cache(
     description="Performs connectivity checks on both document storage and query cache backends.",
 )
 @track(name="cache_health")
-async def cache_health() -> CacheHealthResponse:
+async def cache_health(
+    _user: dict = Depends(get_current_user),
+) -> CacheHealthResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
 
@@ -200,7 +206,9 @@ async def cache_health() -> CacheHealthResponse:
     ),
 )
 @track(name="test_cache")
-async def test_cache() -> CacheTestResponse:
+async def test_cache(
+    _user: dict = Depends(get_current_user),
+) -> CacheTestResponse:
     query_cache = get_query_cache()
     if not query_cache:
         return CacheTestResponse(

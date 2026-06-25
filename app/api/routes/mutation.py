@@ -1,8 +1,9 @@
 import asyncio
 import uuid
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.api.auth import get_current_user
 from app.api.schemas import (
     ErrorResponse,
     MutationApprovalRequest,
@@ -81,6 +82,7 @@ async def upload_mutation(
     skip_validation: str | None = Form(
         "false", description="Skip business rules validation checks"
     ),
+    _user: dict = Depends(get_current_user),
 ) -> MutationResponse:
     """
     Upload and process a spreadsheet for database mutation (INSERT, UPDATE, or DELETE).
@@ -274,7 +276,10 @@ async def upload_mutation(
     ),
 )
 @track(name="approve_mutation")
-async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResponse:
+async def approve_mutation(
+    body: MutationApprovalRequest,
+    _user: dict = Depends(get_current_user),
+) -> MutationExecuteResponse:
     """
     Approve or reject a pending database mutation with cryptographic token verification.
 
@@ -374,7 +379,9 @@ async def approve_mutation(body: MutationApprovalRequest) -> MutationExecuteResp
     description="Returns all spreadsheet mutations awaiting human approval. Each entry includes the mutation ID, target table, and operation type for the approval workflow.",
 )
 @track(name="get_pending_mutations")
-async def get_pending() -> list[dict]:
+async def get_pending(
+    _user: dict = Depends(get_current_user),
+) -> list[dict]:
     """
     Retrieve all pending database mutations awaiting human approval.
 

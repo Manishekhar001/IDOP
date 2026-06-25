@@ -17,8 +17,13 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver  # noqa: E402
 from langgraph.store.postgres.aio import AsyncPostgresStore  # noqa: E402
 from qdrant_client import QdrantClient  # noqa: E402
+from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
 
+from app.api.auth import create_users_table  # noqa: E402
 from app.api.routes import (  # noqa: E402
+    auth_routes,
     cache,
     chat,
     documents,
@@ -140,6 +145,10 @@ async def lifespan(app: FastAPI):
     app.state.vector_store = VectorStoreService()
     logger.info("VectorStoreService ready")
 
+    # Create users table for JWT authentication
+    logger.info("Ensuring idop_users table exists...")
+    create_users_table()
+
     # Run both Postgres inits in parallel — they're independent and this cuts
     # worst-case startup from ~34s to ~17s (exponential backoff: 1s, 2s, 4s, 8s).
     # EC2 cold start (t2.micro) can take up to 115s for Postgres to be healthy.
@@ -221,6 +230,12 @@ else:
         allow_headers=["*"],
     )
 
+# ── Rate Limiting ─────────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_limit])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+app.include_router(auth_routes.router)
 app.include_router(health.router)
 app.include_router(documents.router)
 app.include_router(chat.router)

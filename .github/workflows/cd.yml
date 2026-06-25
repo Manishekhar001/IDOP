@@ -322,8 +322,8 @@ jobs:
           GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
           GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
           GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
-          # Opik observability — hardcoded directly (no GitHub secret)
-          OPIK_API_KEY: muDw2J5DzTHuSVKvpOWGWiAP3
+          # Opik observability
+          OPIK_API_KEY: ${{ secrets.OPIK_API_KEY }}
           OPIK_PROJECT_NAME: idop-Project
           OPIK_WORKSPACE: idop-workspace
           RESOLVED_ECR_REGISTRY: ${{ env.RESOLVED_ECR_REGISTRY }}

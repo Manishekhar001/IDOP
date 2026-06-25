@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     allowed_origins: str = "*"
+    # JWT Authentication
+    jwt_secret_key: str = "CHANGE-ME-IN-PRODUCTION"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 1440  # 24 hours
+    # Rate Limiting
+    rate_limit: str = "60/minute"
     git_commit_sha: str = "unknown"
 
     # LLM Provider Configuration
@@ -169,6 +175,11 @@ class Settings(BaseSettings):
     opik_api_key: str | None = None
     opik_workspace: str | None = None
     opik_project_name: str | None = None
+
+    # JWT / Authentication Configuration
+    jwt_secret_key: str = "CHANGE-ME-IN-PRODUCTION"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
 
 
 @lru_cache

@@ -67,9 +67,9 @@ def test_vanna_import_fallback():
         )
 
         # Verify it gracefully degrades
-        assert (
-            not wrapper._available
-        ), "Expected _available to be False when vanna is missing"
+        assert not wrapper._available, (
+            "Expected _available to be False when vanna is missing"
+        )
         assert wrapper.agent is None, "Expected agent to be None when vanna is missing"
         assert wrapper.postgres_runner is None, "Expected postgres_runner to be None"
 

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.api.auth import get_current_user
 from app.api.schemas import (
     ChatHistoryResponse,
     ChatMessage,
@@ -44,7 +45,9 @@ def get_checkpointer(request: Request):
 )
 @track(name="chat")
 async def chat(
-    body: ChatRequest, engine: CSRAGEngine = Depends(get_engine)
+    body: ChatRequest,
+    engine: CSRAGEngine = Depends(get_engine),
+    _user: dict = Depends(get_current_user),
 ) -> ChatResponse:
     logger.info(
         f"Chat — thread={body.thread_id}, user={body.user_id}, q='{body.question[:80]}'"
@@ -150,7 +153,9 @@ async def chat(
 )
 @track(name="chat_stream")
 async def chat_stream(
-    body: ChatRequest, engine: CSRAGEngine = Depends(get_engine)
+    body: ChatRequest,
+    engine: CSRAGEngine = Depends(get_engine),
+    _user: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     logger.info(
         f"Chat stream — thread={body.thread_id}, user={body.user_id}, "
@@ -191,7 +196,11 @@ async def chat_stream(
     summary="Get conversation history",
 )
 @track(name="get_chat_history")
-async def get_chat_history(thread_id: str, request: Request) -> ChatHistoryResponse:
+async def get_chat_history(
+    thread_id: str,
+    request: Request,
+    _user: dict = Depends(get_current_user),
+) -> ChatHistoryResponse:
     logger.info(f"History request — thread={thread_id}")
     checkpointer = get_checkpointer(request)
 

@@ -209,9 +209,9 @@ class TestEnhancedApiEndpoints:
             form_data = {"chunk_size": "512", "chunk_overlap": "50"}
 
             response = client.post("/documents/upload", files=file_data, data=form_data)
-            assert (
-                response.status_code == 200
-            ), f"Expected 200, got {response.status_code}: {response.text}"
+            assert response.status_code == 200, (
+                f"Expected 200, got {response.status_code}: {response.text}"
+            )
             data = response.json()
             assert data["filename"] == "test.txt"
             assert data["chunk_size_applied"] == 512
