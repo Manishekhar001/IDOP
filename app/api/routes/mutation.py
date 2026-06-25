@@ -277,8 +277,7 @@ async def upload_mutation(
 )
 @track(name="approve_mutation")
 async def approve_mutation(
-    body: MutationApprovalRequest,
-    _user: dict = Depends(get_current_user),
+    body: MutationApprovalRequest, _user: dict = Depends(get_current_user)
 ) -> MutationExecuteResponse:
     """
     Approve or reject a pending database mutation with cryptographic token verification.
@@ -379,9 +378,7 @@ async def approve_mutation(
     description="Returns all spreadsheet mutations awaiting human approval. Each entry includes the mutation ID, target table, and operation type for the approval workflow.",
 )
 @track(name="get_pending_mutations")
-async def get_pending(
-    _user: dict = Depends(get_current_user),
-) -> list[dict]:
+async def get_pending(_user: dict = Depends(get_current_user)) -> list[dict]:
     """
     Retrieve all pending database mutations awaiting human approval.
 

@@ -60,8 +60,7 @@ def register(body: RegisterRequest):
     if existing is not None:
         logger.warning("Registration attempt with existing email: %s", body.email)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
     try:
         user = create_user(body.email, body.password, body.role)
@@ -92,9 +91,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = create_access_token(
-        data={"sub": user["email"], "role": user["role"]},
-    )
+    token = create_access_token(data={"sub": user["email"], "role": user["role"]})
     logger.info("User logged in: %s", user["email"])
     return TokenResponse(access_token=token)
 
@@ -102,7 +99,4 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: dict = Depends(get_current_user)):
     """Return the currently authenticated user."""
-    return UserResponse(
-        email=current_user["sub"],
-        role=current_user["role"],
-    )
+    return UserResponse(email=current_user["sub"], role=current_user["role"])

@@ -40,8 +40,7 @@ executor = SQLExecutor()
 )
 @track(name="generate_sql")
 async def generate_sql(
-    body: SQLGenerationRequest,
-    _user: dict = Depends(get_current_user),
+    body: SQLGenerationRequest, _user: dict = Depends(get_current_user)
 ) -> SQLResponse:
     """
     Generate a SQL query from natural language using Vanna and cache-aware generation.
@@ -117,8 +116,7 @@ async def generate_sql(
 )
 @track(name="approve_sql")
 async def approve_sql(
-    body: SQLApprovalRequest,
-    _user: dict = Depends(get_current_user),
+    body: SQLApprovalRequest, _user: dict = Depends(get_current_user)
 ) -> SQLExecuteResponse:
     """
     Approve or reject a pending SQL query with cryptographic token verification.
@@ -200,9 +198,7 @@ async def approve_sql(
     description="Returns all SQL queries awaiting human approval. Each entry includes the query ID, original question, SQL statement, and approval status.",
 )
 @track(name="get_pending_sql")
-async def get_pending(
-    _user: dict = Depends(get_current_user),
-) -> list[dict]:
+async def get_pending(_user: dict = Depends(get_current_user)) -> list[dict]:
     """
     Retrieve all pending SQL queries awaiting human approval.
 

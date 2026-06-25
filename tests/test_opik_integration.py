@@ -42,13 +42,13 @@ def test_app_opik_module_imports():
 
     opik_disabled = os.environ.get("OPIK_TRACK_DISABLE", "").lower() in ("true", "1")
     if opik_disabled:
-        assert OPIK_AVAILABLE is False, (
-            "OPIK_AVAILABLE should be False when OPIK_TRACK_DISABLE=true"
-        )
+        assert (
+            OPIK_AVAILABLE is False
+        ), "OPIK_AVAILABLE should be False when OPIK_TRACK_DISABLE=true"
     else:
-        assert OPIK_AVAILABLE is True, (
-            "OPIK_AVAILABLE should be True when opik package is installed and not disabled"
-        )
+        assert (
+            OPIK_AVAILABLE is True
+        ), "OPIK_AVAILABLE should be True when opik package is installed and not disabled"
     assert callable(app_track)
 
 
@@ -213,9 +213,9 @@ ROUTE_FILES = [
 def test_all_route_modules_import_track():
     """Verify every API route module imports @track from app.opik."""
     for rfile in ROUTE_FILES:
-        assert _check_module_has_track_import(rfile), (
-            f"{rfile} is missing 'from app.opik import track'"
-        )
+        assert _check_module_has_track_import(
+            rfile
+        ), f"{rfile} is missing 'from app.opik import track'"
 
 
 def test_route_module_syntax_is_valid():
@@ -273,17 +273,17 @@ SERVICE_FILES_WITHOUT_TRACK = [
 def test_service_modules_with_track():
     """Verify core service modules import @track."""
     for sfile in SERVICE_FILES_WITH_TRACK:
-        assert _check_module_has_track_import(sfile), (
-            f"{sfile} is missing 'from app.opik import track'"
-        )
+        assert _check_module_has_track_import(
+            sfile
+        ), f"{sfile} is missing 'from app.opik import track'"
 
 
 def test_service_modules_without_track():
     """Verify storage/cache backends do NOT import @track (they don't need it)."""
     for sfile in SERVICE_FILES_WITHOUT_TRACK:
-        assert not _check_module_has_track_import(sfile), (
-            f"{sfile} should NOT import track — it's a low-level utility"
-        )
+        assert not _check_module_has_track_import(
+            sfile
+        ), f"{sfile} should NOT import track — it's a low-level utility"
 
 
 # ─── Test 6: @track decorators syntactically valid ───────────────────

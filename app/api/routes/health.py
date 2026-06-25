@@ -166,9 +166,7 @@ async def health_check(request: Request) -> dict[str, Any]:
     health_status = (
         "healthy"
         if (postgres_connected and supabase_connected and qdrant_connected)
-        else "degraded"
-        if any_service_available
-        else "unhealthy"
+        else "degraded" if any_service_available else "unhealthy"
     )
 
     return {

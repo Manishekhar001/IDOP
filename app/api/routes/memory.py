@@ -41,9 +41,7 @@ def get_store(request: Request):
 )
 @track(name="list_memories")
 async def list_memories(
-    user_id: str,
-    request: Request,
-    _user: dict = Depends(get_current_user),
+    user_id: str, request: Request, _user: dict = Depends(get_current_user)
 ) -> MemoryListResponse:
     """
     Retrieve all long-term memory facts for a specific user.
@@ -91,9 +89,7 @@ async def list_memories(
 )
 @track(name="delete_memories")
 async def delete_memories(
-    user_id: str,
-    request: Request,
-    _user: dict = Depends(get_current_user),
+    user_id: str, request: Request, _user: dict = Depends(get_current_user)
 ) -> DeleteMemoryResponse:
     """
     Delete all long-term memory facts for a specific user.

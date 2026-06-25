@@ -151,9 +151,7 @@ async def clear_cache(
     description="Performs connectivity checks on both document storage and query cache backends.",
 )
 @track(name="cache_health")
-async def cache_health(
-    _user: dict = Depends(get_current_user),
-) -> CacheHealthResponse:
+async def cache_health(_user: dict = Depends(get_current_user)) -> CacheHealthResponse:
     doc_cache = get_doc_cache()
     query_cache = get_query_cache()
 
@@ -206,9 +204,7 @@ async def cache_health(
     ),
 )
 @track(name="test_cache")
-async def test_cache(
-    _user: dict = Depends(get_current_user),
-) -> CacheTestResponse:
+async def test_cache(_user: dict = Depends(get_current_user)) -> CacheTestResponse:
     query_cache = get_query_cache()
     if not query_cache:
         return CacheTestResponse(

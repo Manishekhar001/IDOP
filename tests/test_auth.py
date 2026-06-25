@@ -167,7 +167,7 @@ class TestDevMode:
     @patch("app.api.auth.get_settings")
     async def test_dev_mode_returns_dev_user(self, mock_settings):
         mock_settings.return_value = _make_settings(
-            jwt_secret_key="CHANGE-ME-IN-PRODUCTION",
+            jwt_secret_key="CHANGE-ME-IN-PRODUCTION"
         )
         user = await get_current_user(token=None)
         assert user["sub"] == "dev@localhost"
@@ -177,7 +177,7 @@ class TestDevMode:
     @patch("app.api.auth.get_settings")
     async def test_dev_mode_ignores_token(self, mock_settings):
         mock_settings.return_value = _make_settings(
-            jwt_secret_key="CHANGE-ME-IN-PRODUCTION",
+            jwt_secret_key="CHANGE-ME-IN-PRODUCTION"
         )
         # Even a garbage token is ignored in dev mode
         user = await get_current_user(token="garbage-token")

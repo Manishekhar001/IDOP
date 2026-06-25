@@ -54,8 +54,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
 def create_access_token(
-    data: dict[str, Any],
-    expires_delta: timedelta | None = None,
+    data: dict[str, Any], expires_delta: timedelta | None = None
 ) -> str:
     """Create a signed JWT containing *data*.
 
@@ -71,9 +70,7 @@ def create_access_token(
     )
     to_encode["exp"] = expire
     return jwt.encode(
-        to_encode,
-        settings.jwt_secret_key,
-        algorithm=settings.jwt_algorithm,
+        to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
     )
 
 
@@ -111,9 +108,7 @@ async def get_current_user(
 
     try:
         payload = jwt.decode(
-            token,
-            settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
+            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
         email: str | None = payload.get("sub")
         role: str = payload.get("role", "user")
@@ -193,11 +188,7 @@ def get_user_by_email(email: str) -> dict[str, Any] | None:
         conn.close()
 
 
-def create_user(
-    email: str,
-    password: str,
-    role: str = "user",
-) -> dict[str, Any]:
+def create_user(email: str, password: str, role: str = "user") -> dict[str, Any]:
     """Insert a new user and return the created row as a dict."""
     hashed = hash_password(password)
     conn = _get_connection()

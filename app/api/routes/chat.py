@@ -197,9 +197,7 @@ async def chat_stream(
 )
 @track(name="get_chat_history")
 async def get_chat_history(
-    thread_id: str,
-    request: Request,
-    _user: dict = Depends(get_current_user),
+    thread_id: str, request: Request, _user: dict = Depends(get_current_user)
 ) -> ChatHistoryResponse:
     logger.info(f"History request — thread={thread_id}")
     checkpointer = get_checkpointer(request)
