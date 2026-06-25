@@ -1,94 +1,45 @@
-import re
-from collections import Counter
-from typing import ClassVar
+"""Sparse vector generation via fastembed Qdrant/BM25.
 
+Delegates to ``fastembed.SparseTextEmbedding`` with the ``Qdrant/bm25``
+model.  This replaces the previous ``hash()``-based approach which was
+**non-deterministic** across Python processes (``PYTHONHASHSEED``).
+
+The BM25 model is a statistical model (IDF lookup + tokenization), *not*
+a neural forward pass, so memory footprint is minimal (~30-50 MB).
+"""
+
+from fastembed import SparseTextEmbedding
 from qdrant_client.models import SparseVector
 
 
 class SparseVectorService:
     """Service for generating sparse vectors for BM25-style search."""
 
-    STOP_WORDS: ClassVar[set[str]] = {
-        "a",
-        "an",
-        "and",
-        "are",
-        "as",
-        "at",
-        "be",
-        "by",
-        "for",
-        "from",
-        "has",
-        "he",
-        "in",
-        "is",
-        "it",
-        "its",
-        "of",
-        "on",
-        "that",
-        "the",
-        "to",
-        "was",
-        "will",
-        "with",
-        "this",
-        "but",
-        "they",
-        "have",
-        "had",
-        "what",
-        "when",
-        "where",
-        "who",
-        "which",
-        "why",
-        "how",
-        "or",
-        "if",
-        "each",
-        "other",
-        "some",
-        "such",
-        "no",
-        "nor",
-        "not",
-        "only",
-        "own",
-        "same",
-        "so",
-        "than",
-        "too",
-        "very",
-        "can",
-        "just",
-        "should",
-        "now",
-    }
+    # Default model — Qdrant's BM25 implementation via fastembed
+    MODEL_NAME = "Qdrant/bm25"
 
-    def tokenize(self, text: str) -> list[str]:
-        text = text.lower()
-        tokens = re.findall(r"\b[a-z0-9]+(?:-[a-z0-9]+)*\b", text)
-        tokens = [t for t in tokens if t not in self.STOP_WORDS]
-        return tokens
-
-    def _hash_token(self, token: str) -> int:
-        return abs(hash(token)) % (2**32)
+    def __init__(self, model_name: str | None = None) -> None:
+        self._model = SparseTextEmbedding(model_name=model_name or self.MODEL_NAME)
 
     def generate_sparse_vector(self, text: str) -> SparseVector:
-        tokens = self.tokenize(text)
-        term_frequencies = Counter(tokens)
+        """Generate a sparse vector for a single text.
 
-        indices = []
-        values = []
-
-        for token, freq in term_frequencies.items():
-            index = self._hash_token(token)
-            indices.append(index)
-            values.append(float(freq))
-
-        return SparseVector(indices=indices, values=values)
+        Returns a ``qdrant_client.models.SparseVector`` — the same type
+        the old implementation returned, so callers need no changes.
+        """
+        # embed() returns a generator; we only need the first (and only) result
+        embedding = next(self._model.embed([text]))
+        return SparseVector(
+            indices=embedding.indices.tolist(),
+            values=embedding.values.tolist(),
+        )
 
     def generate_sparse_vectors_batch(self, texts: list[str]) -> list[SparseVector]:
-        return [self.generate_sparse_vector(text) for text in texts]
+        """Generate sparse vectors for a batch of texts."""
+        return [
+            SparseVector(
+                indices=embedding.indices.tolist(),
+                values=embedding.values.tolist(),
+            )
+            for embedding in self._model.embed(texts)
+        ]
