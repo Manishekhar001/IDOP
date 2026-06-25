@@ -32,7 +32,7 @@ def get_rss_mb() -> float:
         with open("/proc/self/status") as f:
             for line in f:
                 if line.startswith("VmRSS:"):
-                    return int(line.split()[1]) / 1024  # kB → MB
+                    return int(line.split()[1]) / 1024  # kB -> MB
     elif sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
