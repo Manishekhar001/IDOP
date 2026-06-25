@@ -337,16 +337,12 @@ class DetailedReadinessResponse(BaseModel):
 class SystemInfoResponse(BaseModel):
     """
     Comprehensive system layout and documentation information model.
-    Returns application metadata, implementation phases, feature descriptions,
+    Returns application metadata, feature descriptions,
     Python runtime version, and full endpoint mapping documentation.
     """
 
     application: dict[str, str] = Field(
         ..., description="Application metadata: name, version, and environment."
-    )
-    phases: dict[str, str] = Field(
-        ...,
-        description="IDOP implementation phases mapped to completion status strings.",
     )
     features: dict[str, Any] = Field(
         ...,

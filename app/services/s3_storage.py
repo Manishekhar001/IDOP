@@ -1,14 +1,14 @@
 import io
 import json
-import logging
 from pathlib import Path
 
 import numpy as np
 
 from app.config import get_settings
 from app.services.storage_backend import StorageBackend
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class S3StorageBackend(StorageBackend):

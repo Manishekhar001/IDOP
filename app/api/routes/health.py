@@ -18,6 +18,13 @@ from app.services.cache_init import get_doc_cache, get_query_cache
 
 router = APIRouter(tags=["System Diagnostics"])
 
+_COST_ESTIMATES = {
+    "rag": 0.05,
+    "embeddings": 0.0001,
+    "sql_gen": 0.08,
+    "sql_result": 0.01,
+}
+
 
 def _format_redis_cache(query_cache) -> dict:
     """Format query cache stats into RedisCacheStatus-compatible dict."""
@@ -36,14 +43,9 @@ def _format_redis_cache(query_cache) -> dict:
     hit_rate = f"{(total_hits / max(total_queries, 1)) * 100:.1f}%"
 
     # Estimate cost savings (same logic as /stats route)
-    cost_estimates = {
-        "rag": 0.05,
-        "embedding": 0.0001,
-        "sql_gen": 0.08,
-        "sql_result": 0.01,
-    }
     total_savings = sum(
-        ct.get("hits", 0) * cost_estimates.get(ct_name, 0)
+        ct.get("hits", 0)
+        * _COST_ESTIMATES.get("embeddings" if ct_name == "embedding" else ct_name, 0)
         for ct_name, ct in cache_types.items()
     )
 
@@ -160,13 +162,13 @@ async def health_check(request: Request) -> dict[str, Any]:
         "document_cache_error": doc_cache_error,
     }
 
-    # Only check boolean values — string entries like "disabled" or "local" are always truthy
-    boolean_statuses = [v for v in services_status.values() if isinstance(v, bool)]
-    any_service_available = any(boolean_statuses)
+    core_services_up = [postgres_connected, supabase_connected, qdrant_connected]
+    all_core_healthy = all(core_services_up)
+    any_core_available = any(core_services_up)
     health_status = (
         "healthy"
-        if (postgres_connected and supabase_connected and qdrant_connected)
-        else "degraded" if any_service_available else "unhealthy"
+        if all_core_healthy
+        else "degraded" if any_core_available else "unhealthy"
     )
 
     return {
@@ -181,6 +183,11 @@ async def health_check(request: Request) -> dict[str, Any]:
             "excel_mutations": True,
             "advanced_rag": qdrant_connected,
             "query_routing": True,
+        },
+        "feature_availability": {
+            "rag": qdrant_connected,
+            "sql": supabase_connected,
+            "mutations": supabase_connected,
         },
         "configuration": {
             "openai_configured": bool(settings.openai_api_key),
@@ -278,14 +285,6 @@ async def get_info() -> dict[str, Any]:
             "version": settings.app_version,
             "environment": settings.environment,
         },
-        "phases": {
-            "Phase 1: Foundation": "Completed - Configs, Logging, and Dual-Tier Cache",
-            "Phase 2: Text-to-SQL": "Completed - Schema preparation, SQLValidator, LLMJudge, and single-use ApprovalGate",
-            "Phase 3: Spreadsheet Mutations": "Completed - OpClassifier, pandas parsing, RuleValidator confirmation gates, and transaction executors",
-            "Phase 4: Advanced CSRAG": "Completed - QdrantBM25 hybrid search, HyDE hypothetical query expansion, Reranking, CRAG relevance evaluating, and SRAG verifiers",
-            "Phase 5: State Machine Graph": "Completed - 5-path router compilation compiled with local Postgres Saver (STM) and Postgres Store (LTM)",
-            "Phase 6: Deployment & Monitoring": "Completed - Production-grade Docker Compose, zero-touch CD orchestration, dynamic Nginx proxying, and Auto-SSL Certbot mapping",
-        },
         "features": {
             "router_pathways": ["SQL", "MUTATION", "RAG", "CHAT", "HYBRID"],
             "cache_tier_1": "Upstash Redis query-level caching",
@@ -356,17 +355,9 @@ async def get_stats(request: Request) -> dict[str, Any]:
             stats = query_cache.get_stats()
             total_cost_saved = 0.0
 
-            # Dynamic retail cost estimations
-            cost_estimates = {
-                "rag": 0.05,  # $0.05 per GPT-4/RAG query
-                "embeddings": 0.0001,  # $0.0001 per embedding check
-                "sql_gen": 0.08,  # $0.08 per Golden Text-to-SQL query
-                "sql_result": 0.01,  # $0.01 database transaction cost
-            }
-
             for cache_type, cache_data in stats.get("cache_types", {}).items():
-                if cache_type in cost_estimates:
-                    savings = cache_data.get("hits", 0) * cost_estimates[cache_type]
+                if cache_type in _COST_ESTIMATES:
+                    savings = cache_data.get("hits", 0) * _COST_ESTIMATES[cache_type]
                     cache_data["estimated_cost_saved"] = f"${savings:.4f}"
                     total_cost_saved += savings
 

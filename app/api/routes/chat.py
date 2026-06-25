@@ -29,6 +29,44 @@ def get_checkpointer(request: Request):
     return request.app.state.checkpointer
 
 
+def _build_chat_response(
+    body: ChatRequest,
+    result: dict,
+    sources: list[SourceDocument] | None,
+    processing_time: float,
+    answer_text: str,
+) -> ChatResponse:
+    """Build a ChatResponse from graph execution results."""
+    return ChatResponse(
+        question=body.question,
+        answer=answer_text,
+        sources=sources,
+        processing_time_ms=round(processing_time, 2),
+        crag_verdict=result.get("crag_verdict", ""),
+        crag_reason=result.get("crag_reason", ""),
+        issup=result.get("issup", ""),
+        evidence=result.get("evidence", []),
+        isuse=result.get("isuse", ""),
+        use_reason=result.get("use_reason", ""),
+        retries=result.get("retries", 0),
+        rewrite_tries=result.get("rewrite_tries", 0),
+        sql_query=result.get("sql_query") or None,
+        sql_results=result.get("sql_results") or None,
+        hyde_used=result.get("hyde_used", False),
+        hyde_hypotheses=result.get("hyde_hypotheses") or None,
+        reranking_used=result.get("reranking_used", False),
+        query_type=result.get("query_type") or None,
+        ltm_context=result.get("ltm_context") or None,
+        mutation_id=result.get("mutation_id") or None,
+        mutation_table=result.get("mutation_table") or None,
+        mutation_op=result.get("mutation_op") or None,
+        mutation_status=result.get("mutation_status") or None,
+        mutation_error=result.get("mutation_error") or None,
+        mutation_result_count=result.get("mutation_result_count") or None,
+        ragas_scores=result.get("ragas_scores") or None,
+    )
+
+
 @router.post(
     "",
     response_model=ChatResponse,
@@ -94,48 +132,7 @@ async def chat(
     if result.get("sql_status") == "pending_approval":
         answer_text = f"Generated approved SQL Session: {result.get('sql_query_id')}\nQuery: {result.get('sql_query')}\nStatus: {result.get('sql_status')}\n\nTo approve this SQL, use POST /sql/approve with the approval token from POST /sql/generate or GET /sql/pending."
 
-    return ChatResponse(
-        question=body.question,
-        answer=answer_text,
-        sources=sources,
-        processing_time_ms=round(processing_time, 2),
-        crag_verdict=result.get("crag_verdict", ""),
-        crag_reason=result.get("crag_reason", ""),
-        issup=result.get("issup", ""),
-        evidence=result.get("evidence", []),
-        isuse=result.get("isuse", ""),
-        use_reason=result.get("use_reason", ""),
-        retries=result.get("retries", 0),
-        rewrite_tries=result.get("rewrite_tries", 0),
-        sql_query=result.get("sql_query") if result.get("sql_query") else None,
-        sql_results=result.get("sql_results") if result.get("sql_results") else None,
-        hyde_used=result.get("hyde_used", False),
-        hyde_hypotheses=(
-            result.get("hyde_hypotheses") if result.get("hyde_hypotheses") else None
-        ),
-        reranking_used=result.get("reranking_used", False),
-        # New rich operational detail fields
-        query_type=result.get("query_type") if result.get("query_type") else None,
-        ltm_context=result.get("ltm_context") if result.get("ltm_context") else None,
-        mutation_id=result.get("mutation_id") if result.get("mutation_id") else None,
-        mutation_table=(
-            result.get("mutation_table") if result.get("mutation_table") else None
-        ),
-        mutation_op=result.get("mutation_op") if result.get("mutation_op") else None,
-        mutation_status=(
-            result.get("mutation_status") if result.get("mutation_status") else None
-        ),
-        mutation_error=(
-            result.get("mutation_error") if result.get("mutation_error") else None
-        ),
-        mutation_result_count=(
-            result.get("mutation_result_count")
-            if result.get("mutation_result_count")
-            else None
-        ),
-        # approval_token intentionally excluded from chat response for security — use POST /sql/generate or GET /sql/pending
-        ragas_scores=result.get("ragas_scores") if result.get("ragas_scores") else None,
-    )
+    return _build_chat_response(body, result, sources, processing_time, answer_text)
 
 
 @router.post(

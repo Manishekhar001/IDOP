@@ -1,12 +1,12 @@
 import fnmatch
 import hashlib
 import json
-import logging
 from typing import Any, ClassVar
 
 from app.config import get_settings
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class QueryCacheService:

@@ -11,6 +11,7 @@ from qdrant_client.models import (
     FusionQuery,
     MatchValue,
     Prefetch,
+    Range,
     SparseVectorParams,
     VectorParams,
 )
@@ -383,6 +384,41 @@ class VectorStoreService:
         except Exception as e:
             logger.error(f"Failed to fetch chunk by index: {e}")
             return None
+
+    def get_chunks_by_index_range(
+        self, source: str, start_idx: int, end_idx: int
+    ) -> dict[int, Document]:
+        """Fetch multiple chunks by index range in a single Qdrant call.
+
+        Returns a dict mapping chunk index -> Document.
+        """
+        filter_cond = Filter(
+            must=[
+                FieldCondition(key="source", match=MatchValue(value=source)),
+                FieldCondition(key="index", range=Range(gte=start_idx, lte=end_idx)),
+            ]
+        )
+        try:
+            res = self._ensure_and_retry(
+                self.client.scroll,
+                collection_name=self.collection_name,
+                scroll_filter=filter_cond,
+                limit=end_idx - start_idx + 1,
+                with_payload=True,
+            )
+            results = res[0] if res else []
+            chunks = {}
+            for point in results:
+                payload = point.payload or {}
+                idx = payload.get("index")
+                content = payload.get("content", "")
+                metadata = {k: v for k, v in payload.items() if k != "content"}
+                if idx is not None:
+                    chunks[int(idx)] = Document(page_content=content, metadata=metadata)
+            return chunks
+        except Exception as e:
+            logger.warning("Batch chunk fetch failed for source=%s: %s", source, e)
+            return {}
 
     @track(name="vector_store_delete_collection")
     def delete_collection(self) -> None:

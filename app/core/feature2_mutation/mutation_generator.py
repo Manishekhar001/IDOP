@@ -1,9 +1,9 @@
-import logging
 from typing import Any
 
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.mutation_generator")
+logger = get_logger(__name__)
 
 
 class MutationGenerator:

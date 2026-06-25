@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     rate_limit: str = "60/minute"
     git_commit_sha: str = "unknown"
 
+    # Context refinement (D6)
+    enable_context_refinement: bool = True
+    # LiteLLM Router RPM limits (D9)
+    groq_rpm: int = 30
+    openai_rpm: int = 50
+    # Logging format (D16)
+    log_format: str = "text"  # "text" or "json"
+
     # LLM Provider Configuration
     openai_api_key: str
     groq_api_key: str | None = None

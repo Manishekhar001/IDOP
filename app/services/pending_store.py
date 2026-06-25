@@ -19,12 +19,12 @@ Usage:
 """
 
 import json
-import logging
 from typing import Any
 
 from app.config import get_settings
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ─── Constants ─────────────────────────────────────────────────────────
 _PENDING_TTL = 3600  # 1 hour — pending items auto-expire
@@ -48,6 +48,7 @@ class PendingStore(dict):
         self.table_name = table_name
         self._redis: Any = None
         self._redis_available = False
+        self._table_ensured = False
         self._init_redis()
 
     # ------------------------------------------------------------------
@@ -116,6 +117,8 @@ class PendingStore(dict):
 
     def _ensure_table(self, conn) -> bool:
         """Create the pending store table if it does not exist."""
+        if self._table_ensured:
+            return True
         create_sql = f"""
         CREATE TABLE IF NOT EXISTS {self.table_name} (
             id VARCHAR(100) PRIMARY KEY,
@@ -127,6 +130,7 @@ class PendingStore(dict):
             with conn.cursor() as cur:
                 cur.execute(create_sql)
             conn.commit()
+            self._table_ensured = True
             return True
         except Exception as e:
             logger.warning(f"Could not create table {self.table_name}: {e}")

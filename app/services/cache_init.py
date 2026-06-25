@@ -10,12 +10,11 @@ Usage:
     cache = get_query_cache()          # returns the singleton or None
 """
 
-import logging
-
 from app.services.cache_service import CacheService
 from app.services.query_cache_service import QueryCacheService
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _doc_cache: CacheService | None = None
 _query_cache: QueryCacheService | None = None

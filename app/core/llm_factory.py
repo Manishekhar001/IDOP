@@ -36,15 +36,15 @@ Configuration (in .env):
 
 """
 
-import logging
 from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.config import get_settings
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.llm_factory")
+logger = get_logger(__name__)
 
 # ── Groq model name aliases (shorthand → full API name) ──────────────
 GROQ_MODEL_ALIASES: dict[str, str] = {
@@ -96,7 +96,7 @@ def _build_litellm_router() -> Any:
             {
                 "model_name": model_group,
                 "litellm_params": {"model": groq_model, "api_key": key},
-                "rpm": 30,  # Groq free tier: 30 req/min per key
+                "rpm": settings.groq_rpm,  # Groq free tier configured RPM
             }
         )
         logger.info(f"  Groq deployment {i + 1}: groq/{model}")
@@ -114,7 +114,7 @@ def _build_litellm_router() -> Any:
                     "model": f"openai/{fallback_model}",
                     "api_key": openai_api_key,
                 },
-                "rpm": 50,  # OpenAI gpt-4o-mini: tier-1 is 50 RPM
+                "rpm": settings.openai_rpm,  # OpenAI fallback configured RPM
             }
         )
         logger.info(f"  Fallback deployment: openai/{fallback_model}")

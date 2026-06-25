@@ -1,12 +1,11 @@
-import logging
-
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from app.core.llm_factory import get_memory_llm
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.op_classifier")
+logger = get_logger(__name__)
 
 
 class OpVerdict(BaseModel):

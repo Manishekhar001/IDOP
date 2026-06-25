@@ -43,6 +43,84 @@ def _validate_file_size(file_bytes: bytes) -> None:
         )
 
 
+def _validate_upload(file: UploadFile, file_bytes: bytes) -> None:
+    """Validate filename, extension, and file size."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required.")
+    try:
+        FileValidator.validate_file(file)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    _validate_file_size(file_bytes)
+
+
+async def _handle_cache_hit(
+    doc_cache,
+    cache_id: str,
+    file_ext: str,
+    filename: str,
+    parsed_chunk_size: int | None,
+    parsed_chunk_overlap: int | None,
+    vector_store: VectorStoreService,
+    loop: asyncio.AbstractEventLoop,
+) -> DocumentUploadResponse | None:
+    """Check cache and index documents if cache hit. Returns response or None."""
+    if doc_cache is None:
+        return None
+
+    cache_hit = False
+    try:
+        cache_hit = doc_cache.cache_exists(cache_id, file_ext)
+    except Exception as e:
+        logger.warning(f"Cache exists check failed: {e}")
+
+    if not cache_hit:
+        return None
+
+    logger.info(f"Cache HIT for {filename} (cache_id={cache_id[:12]}...)")
+    cached = None
+    try:
+        cached = doc_cache.load_chunks_and_embeddings(cache_id, file_ext)
+    except Exception as e:
+        logger.warning(f"Cache load failed: {e}")
+
+    if cached is None:
+        logger.warning(
+            f"Cache load returned None for cache_id={cache_id[:12]}... despite cache_exists=True — re-processing"
+        )
+        return None
+
+    embeddings = cached["embeddings"]
+    expected_dim = vector_store.embedding_dimension
+    if embeddings and len(embeddings) > 0 and len(embeddings[0]) != expected_dim:
+        logger.warning(
+            f"Cached embedding dimension ({len(embeddings[0])}) doesn't match "
+            f"expected ({expected_dim}). Ignoring cache and re-embedding..."
+        )
+        return None
+
+    chunks = [DocumentProcessor._dict_to_document(chunk) for chunk in cached["chunks"]]
+
+    document_ids = await loop.run_in_executor(
+        None, vector_store.add_documents_with_embeddings, chunks, embeddings
+    )
+
+    logger.info(
+        f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs"
+    )
+    return DocumentUploadResponse(
+        message="Document uploaded and indexed successfully (from cache)",
+        filename=filename,
+        chunks_created=len(chunks),
+        document_ids=document_ids,
+        chunk_size_applied=cached["metadata"].get("chunk_size", parsed_chunk_size),
+        chunk_overlap_applied=cached["metadata"].get(
+            "chunk_overlap", parsed_chunk_overlap
+        ),
+        cache_hit=True,
+    )
+
+
 @router.post(
     "/upload",
     response_model=DocumentUploadResponse,
@@ -93,102 +171,50 @@ async def upload_document(
         f"Document upload: {file.filename} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})"
     )
 
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Filename is required.")
-
-    # Validate file extension early using FileValidator
-    try:
-        FileValidator.validate_file(file)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    # FastAPI handles int parsing and validation via the Optional[int] type hint
     parsed_chunk_size = chunk_size
     parsed_chunk_overlap = chunk_overlap
 
     try:
         file_bytes = await file.read()
-        filename = file.filename
+        filename = file.filename or "file.bin"
         file_ext = _get_extension(filename)
 
-        # Validate file size before any processing
-        _validate_file_size(file_bytes)
+        # Validate filename, extension and size
+        _validate_upload(file, file_bytes)
 
         # Compute document ID (SHA-256 of file content)
         doc_id = hashlib.sha256(file_bytes).hexdigest()
+
+        # Incorporate chunking params into the cache key to avoid parameter collision
+        cache_key_input = (
+            f"{doc_id}:{file_ext}:cs{parsed_chunk_size}:co{parsed_chunk_overlap}"
+        )
+        cache_id = hashlib.sha256(cache_key_input.encode()).hexdigest()
+
         logger.info(
-            f"Computed doc_id={doc_id[:12]}... for {filename} ({len(file_bytes) / 1024:.1f} KB)"
+            f"Computed doc_id={doc_id[:12]}..., cache_id={cache_id[:12]}... for {filename} ({len(file_bytes) / 1024:.1f} KB)"
         )
 
         loop = asyncio.get_running_loop()
 
         # --- Cache Check ---
         doc_cache = get_doc_cache()
-        cache_hit = False
-        cached = None
-        if doc_cache is not None:
-            try:
-                cache_hit = doc_cache.cache_exists(doc_id, file_ext)
-            except Exception as e:
-                logger.warning(f"Cache exists check failed: {e}")
-        if cache_hit:
-            logger.info(f"Cache HIT for {filename} (doc_id={doc_id[:12]}...)")
-            try:
-                cached = doc_cache.load_chunks_and_embeddings(doc_id, file_ext)
-            except Exception as e:
-                logger.warning(f"Cache load failed: {e}")
-            if cached is not None:
-                embeddings = cached["embeddings"]
-                # Validate cached embedding dimension matches current config
-                # Prevents dimension mismatch (e.g., old OpenAI 1536-dim vs Nomic 768-dim)
-                expected_dim = vector_store.embedding_dimension
-                if (
-                    embeddings
-                    and len(embeddings) > 0
-                    and len(embeddings[0]) != expected_dim
-                ):
-                    logger.warning(
-                        f"Cached embedding dimension ({len(embeddings[0])}) doesn't match "
-                        f"expected ({expected_dim}). Ignoring cache and re-embedding..."
-                    )
-                else:
-                    # Reconstruct Document objects from cached chunks
-                    chunks = [
-                        DocumentProcessor._dict_to_document(chunk)
-                        for chunk in cached["chunks"]
-                    ]
-
-                    document_ids = await loop.run_in_executor(
-                        None,
-                        vector_store.add_documents_with_embeddings,
-                        chunks,
-                        embeddings,
-                    )
-
-                    logger.info(
-                        f"Cache HIT - Indexed {filename}: {len(chunks)} chunks (from cache), {len(document_ids)} IDs"
-                    )
-                    return DocumentUploadResponse(
-                        message="Document uploaded and indexed successfully (from cache)",
-                        filename=filename,
-                        chunks_created=len(chunks),
-                        document_ids=document_ids,
-                        chunk_size_applied=cached["metadata"].get(
-                            "chunk_size", parsed_chunk_size
-                        ),
-                        chunk_overlap_applied=cached["metadata"].get(
-                            "chunk_overlap", parsed_chunk_overlap
-                        ),
-                        cache_hit=True,
-                    )
-            else:
-                logger.warning(
-                    f"Cache load returned None for doc_id={doc_id[:12]}... despite cache_exists=True — re-processing"
-                )
+        cached_response = await _handle_cache_hit(
+            doc_cache,
+            cache_id,
+            file_ext,
+            filename,
+            parsed_chunk_size,
+            parsed_chunk_overlap,
+            vector_store,
+            loop,
+        )
+        if cached_response is not None:
+            return cached_response
 
         # --- Cache MISS: Process document normally ---
         logger.info(
-            f"Cache MISS for {filename} (doc_id={doc_id[:12]}...) — processing from scratch"
+            f"Cache MISS for {filename} (cache_id={cache_id[:12]}...) — processing from scratch"
         )
 
         processor = DocumentProcessor(
@@ -238,7 +264,7 @@ async def upload_document(
                 await loop.run_in_executor(
                     None,
                     doc_cache.save_chunks_and_embeddings,
-                    doc_id,
+                    cache_id,
                     file_ext,
                     chunk_dicts,
                     embeddings,

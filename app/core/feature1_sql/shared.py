@@ -55,3 +55,9 @@ class _LazyTextToSQLService:
 sql_service = _LazyTextToSQLService()
 
 logger.info("Lazy TextToSQLService proxy ready (instance not yet created)")
+
+
+def reset_sql_service() -> None:
+    """Reset the lazy SQL service singleton for test isolation."""
+    global sql_service
+    sql_service = _LazyTextToSQLService()

@@ -1,5 +1,4 @@
 import hashlib
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +8,9 @@ from app.config import get_settings
 from app.services.local_storage import LocalStorageBackend
 from app.services.s3_storage import S3StorageBackend
 from app.services.storage_backend import StorageBackend
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.cache_service")
+logger = get_logger(__name__)
 
 
 class CacheService:

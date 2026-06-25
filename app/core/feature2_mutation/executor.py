@@ -1,4 +1,3 @@
-import logging
 from typing import Any
 
 import psycopg2
@@ -6,8 +5,9 @@ import psycopg2
 from app.config import get_settings
 from app.core.audit_logger import AuditLogger
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.mutation_executor")
+logger = get_logger(__name__)
 
 
 class MutationExecutor:

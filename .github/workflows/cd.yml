@@ -580,7 +580,6 @@ jobs:
             VOYAGE_EMBEDDING_MODEL=${VOYAGE_EMBEDDING_MODEL:-voyage-3}
             NOMIC_EMBEDDING_MODEL=${NOMIC_EMBEDDING_MODEL:-nomic-embed-text-v1.5}
             NOMIC_EMBEDDING_DIMENSION=${NOMIC_EMBEDDING_DIMENSION:-768}
-            EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-768}
 
             # Groq API Keys for LiteLLM Router
             # Set as GitHub secrets (GROQ_API_KEY_1 through GROQ_API_KEY_4) to provide keys.

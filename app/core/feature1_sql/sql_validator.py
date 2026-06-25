@@ -1,10 +1,10 @@
-import logging
 import re
 from typing import ClassVar
 
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.sql_validator")
+logger = get_logger(__name__)
 
 
 class SQLValidator:

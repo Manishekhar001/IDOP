@@ -1,12 +1,12 @@
 import json
-import logging
 import re
 from pathlib import Path
 from typing import Any
 
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.rule_validator")
+logger = get_logger(__name__)
 
 
 class RuleValidator:

@@ -1,12 +1,12 @@
-import logging
 from io import BytesIO
 from typing import Any
 
 import pandas as pd
 
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.file_parser")
+logger = get_logger(__name__)
 
 
 class FileParser:

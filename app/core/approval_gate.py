@@ -54,8 +54,9 @@ class ApprovalGate:
         self.table_name = table_name
         self.session_column = session_column
         self.logger = logging.getLogger(logger_name)
-        # Maps session_id -> session_token (always kept up to date for fast lookups)
+        # Ephemeral fallback for tests
         self.active_sessions: dict[str, str] = {}
+        self._table_ensured: bool = False
 
     def _get_connection(self):
         """Get connection to the Supabase database for token persistence."""
@@ -79,6 +80,8 @@ class ApprovalGate:
         match the original schema (``query_id`` for SQL, ``mutation_id``
         for mutations).
         """
+        if self._table_ensured:
+            return True
         create_sql = f"""
         CREATE TABLE IF NOT EXISTS {self.table_name} (
             {self.session_column} VARCHAR(100) PRIMARY KEY,
@@ -90,6 +93,7 @@ class ApprovalGate:
             with conn.cursor() as cur:
                 cur.execute(create_sql)
             conn.commit()
+            self._table_ensured = True
             return True
         except Exception as e:
             self.logger.warning(f"Could not create {self.table_name} table: {e}")

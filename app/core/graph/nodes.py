@@ -160,15 +160,14 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
 @track(name="graph_mutation")
 async def mutation_node(state: CSRAGState) -> dict:
-    """
-    Processes mutation requests through the Feature 2 pipeline.
+    """Process mutation requests through the full validation pipeline.
 
-    When mutation context (table, rows) is available in state from a prior
-    upload or direct input, this node runs the full pipeline: classify op →
-    validate rules → generate SQL → LLM audit → store pending → return token.
-
-    When no file/row context is available, the node classifies the intent from
-    the question and provides structured instructions for the upload API.
+    .. note::
+        In the /chat flow, ``mutation_table`` and ``mutation_rows`` are never
+        populated by the ChatRequest, so this node **always** returns
+        ``requires_file_upload``.  The actual mutation pipeline is driven
+        entirely by the ``POST /mutation/upload`` REST endpoint.
+        See issue D17 for discussion.
     """
     question = state.get("question", "")
     logger.info(f"Feature 2 Mutation Node triggered: '{question}'")
@@ -202,6 +201,9 @@ async def mutation_node(state: CSRAGState) -> dict:
 
         # Guide user for bulk operations that need file upload
         if not table_name or not rows:
+            logger.info(
+                "mutation_node: no mutation data in state, returning file-upload instructions"
+            )
             return {
                 "mutation_status": "requires_file_upload",
                 "mutation_op": op_type or "",
@@ -548,6 +550,11 @@ async def refine_context_node(state: CSRAGState) -> dict:
         docs_to_use = good_docs + web_docs
 
     raw_context = "\n\n".join(d.page_content for d in docs_to_use).strip()
+
+    settings = get_settings()
+    if not settings.enable_context_refinement:
+        strips = _decompose_to_sentences(raw_context) if raw_context else []
+        return {"refined_context": raw_context, "strips": strips, "kept_strips": strips}
 
     if not raw_context:
         return {"strips": [], "kept_strips": [], "refined_context": ""}

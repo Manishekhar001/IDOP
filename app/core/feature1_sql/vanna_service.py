@@ -1,4 +1,3 @@
-import logging
 import uuid
 from typing import Any
 
@@ -8,8 +7,9 @@ import pandas as pd
 # when vanna 2.0 submodules are not available.
 from app.config import get_settings
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.vanna_service")
+logger = get_logger(__name__)
 
 
 class VannaAgentWrapper:
@@ -148,27 +148,10 @@ class VannaAgentWrapper:
 
         logger.info(f"Executing SQL directly: {sql[:100]}...")
         try:
-            import socket
-            from urllib.parse import urlparse
-
             import psycopg2
             import psycopg2.extras
 
             conn_str = self.postgres_runner.connection_string
-            parsed = urlparse(conn_str)
-            hostname = parsed.hostname
-
-            try:
-                logger.debug(f"Resolving hostname {hostname} to IPv4...")
-                addr_info = socket.getaddrinfo(hostname, None, socket.AF_INET)
-                ipv4_address = addr_info[0][4][0]
-                logger.info(f"Resolved {hostname} to IPv4: {ipv4_address}")
-                conn_str = conn_str.replace(hostname, ipv4_address)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to resolve hostname to IPv4: {e}, using original hostname"
-                )
-
             conn = psycopg2.connect(conn_str)
             try:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

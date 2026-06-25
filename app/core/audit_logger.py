@@ -17,14 +17,17 @@ Usage:
     logger.log_failure(conn, query_id, question, sql, error)
 """
 
-import logging
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.audit_logger")
+logger = get_logger(__name__)
 
 
 class AuditLogger:
     """Manages the ``idop_audit_logs`` table and provides helpers for
     writing success and failure audit entries."""
+
+    def __init__(self) -> None:
+        self._table_ensured = False
 
     CREATE_TABLE_SQL = """
         CREATE TABLE IF NOT EXISTS idop_audit_logs (
@@ -48,10 +51,13 @@ class AuditLogger:
         Call this *before* disabling autocommit so the DDL commits on its
         own and doesn't break transaction atomicity.
         """
+        if self._table_ensured:
+            return
         try:
             with conn.cursor() as cur:
                 cur.execute(self.CREATE_TABLE_SQL)
             conn.commit()
+            self._table_ensured = True
         except Exception as e:
             logger.warning(f"Could not create audit logs table: {e}")
             conn.rollback()

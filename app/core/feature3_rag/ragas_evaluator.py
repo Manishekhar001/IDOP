@@ -6,7 +6,6 @@ existing OpenAI LLM — no extra library dependencies required.
 Mirrors the pattern used by CRAG (evaluator.py) and SRAG (verifier.py).
 """
 
-import logging
 from functools import lru_cache
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -14,8 +13,9 @@ from pydantic import BaseModel, Field
 
 from app.core.llm_factory import get_memory_llm
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.ragas_evaluator")
+logger = get_logger(__name__)
 
 
 # ──────────────────────────────────────────────

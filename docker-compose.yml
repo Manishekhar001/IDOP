@@ -60,8 +60,8 @@ services:
     restart: unless-stopped
     # t2.micro has 1GB RAM — memory limits prevent OOM
     # docling + torch REMOVED (2026-06-07) — pypdf is lightweight (~30 MB)
-    # so these limits are conservative insurance, not critical
-    mem_limit: 768m
+    # so these limits leave ~44MB headroom for OS/kernel on t2.micro (1GB)
+    mem_limit: 700m
     mem_reservation: 512m
 
 networks:

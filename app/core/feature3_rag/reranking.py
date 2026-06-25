@@ -1,11 +1,10 @@
-import logging
-
 from langchain_core.documents import Document
 
 from app.config import get_settings
 from app.opik import track
+from app.utils.logger import get_logger
 
-logger = logging.getLogger("idop_app.reranking")
+logger = get_logger(__name__)
 
 
 class RerankingService:

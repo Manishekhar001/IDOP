@@ -53,7 +53,6 @@ _TEST_ENV = {
     "QDRANT_API_KEY": "test-qdrant-key",
     "COLLECTION_NAME": "idop_test_documents",
     "EMBEDDING_PROVIDER": "nomic",
-    "EMBEDDING_DIMENSION": "768",
     # Database
     "DATABASE_URL": "postgresql://test:test@localhost:5432/idop_test",
     "SUPABASE_DB_URL": "",
@@ -122,12 +121,15 @@ def mock_settings():
     # None (no DB available in tests), avoiding a ~30s TCP timeout per call.
     with (
         patch("app.core.approval_gate.ApprovalGate._get_connection", return_value=None),
-        patch("app.core.approval_gate.ApprovalGate._get_connection", return_value=None),
+        patch("app.api.auth._get_connection", return_value=None),
         patch(
             "app.services.pending_store.PendingStore._get_connection", return_value=None
         ),
     ):
         reset_pending_store()
+        from app.core.feature1_sql.shared import reset_sql_service
+
+        reset_sql_service()
         yield _get_settings()
     reset_caches()  # also clears QueryCacheService._local_cache_shared
     # reset_pending_store() is called after patching ends but PendingStore now

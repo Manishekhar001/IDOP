@@ -1,11 +1,10 @@
 import asyncio
 import sys
-from typing import Any
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from dotenv import load_dotenv
 
@@ -39,17 +38,7 @@ from app.utils.logger import get_logger, setup_logging  # noqa: E402
 
 settings = get_settings()
 
-# Stores async context managers (from from_conn_string) indexed by resource id.
-# We MUST keep these alive until shutdown — otherwise Python's async generator GC
-# closes the Postgres connection mid-query (between two awaits in setup()).
-_resource_cms: dict[int, Any] = {}
-
-
-async def _close_resource(resource: Any) -> None:
-    """Close a Postgres resource's connection/pool via its stored context manager."""
-    cm = _resource_cms.pop(id(resource), None)
-    if cm:
-        await cm.__aexit__(None, None, None)
+_exit_stack = AsyncExitStack()
 
 
 async def _retry_init(
@@ -90,27 +79,11 @@ async def _retry_init(
 async def _connect_pg_resource(cls):
     """
     Create a Postgres resource and run migrations.
-
-    CRITICAL: cls.from_conn_string() is an @asynccontextmanager generator.
-    We MUST keep a reference to the context manager (cm) alive through
-    setup(), otherwise Python's GC will schedule aclose() on the event
-    loop, closing the connection mid-query (between two awaits in setup).
-
-    On failure we call cm.__aexit__() to properly close the pool/connection.
-    On success we stash cm in _resource_cms (module-level dict) so lifespan
-    shutdown can close it properly. We avoid stashing on the resource object
-    because AsyncPostgresStore uses __slots__, which would prevent attribute
-    assignment.
     """
     cm = cls.from_conn_string(settings.database_url)
-    resource = await cm.__aenter__()
-    try:
-        await resource.setup()
-        _resource_cms[id(resource)] = cm
-        return resource
-    except BaseException:
-        await cm.__aexit__(None, None, None)
-        raise
+    resource = await _exit_stack.enter_async_context(cm)
+    await resource.setup()
+    return resource
 
 
 @asynccontextmanager
@@ -149,6 +122,32 @@ async def lifespan(app: FastAPI):
     logger.info("Ensuring idop_users table exists...")
     create_users_table()
 
+    # ---- D3: ensure all business tables exist at startup ----
+    logger.info("Ensuring business tables exist...")
+    try:
+        import psycopg2
+
+        _startup_conn = psycopg2.connect(
+            settings.supabase_db_url or settings.database_url
+        )
+        try:
+            from app.core.approval_gate import approval_gate, mutation_approval_gate
+            from app.core.audit_logger import AuditLogger
+            from app.services.pending_store import pending_mutations, pending_queries
+
+            approval_gate._ensure_table(_startup_conn)
+            mutation_approval_gate._ensure_table(_startup_conn)
+            AuditLogger().ensure_table(_startup_conn)
+            pending_queries._ensure_table(_startup_conn)
+            pending_mutations._ensure_table(_startup_conn)
+            logger.info("All business tables verified")
+        except Exception as inner_exc:
+            logger.warning("Could not run business tables verification: %s", inner_exc)
+        finally:
+            _startup_conn.close()
+    except Exception as exc:
+        logger.warning("Could not verify business tables at startup: %s", exc)
+
     # Run both Postgres inits in parallel — they're independent and this cuts
     # worst-case startup from ~34s to ~17s (exponential backoff: 1s, 2s, 4s, 8s).
     # EC2 cold start (t2.micro) can take up to 115s for Postgres to be healthy.
@@ -181,10 +180,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("Shutting down services...")
-    if hasattr(app.state, "checkpointer") and app.state.checkpointer:
-        await _close_resource(app.state.checkpointer)
-    if hasattr(app.state, "store") and app.state.store:
-        await _close_resource(app.state.store)
+    await _exit_stack.aclose()
     logger.info("Shutdown complete")
 
 
