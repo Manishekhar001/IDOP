@@ -119,13 +119,21 @@ async def lifespan(app: FastAPI):
     # across processes.  Delete the collection so all vectors (dense + sparse)
     # are re-ingested with the new deterministic fastembed BM25 model.
     # TODO: Remove this block after the first successful deploy.
-    logger.warning("ONE-TIME: Deleting Qdrant collection to purge stale hash()-based sparse vectors")
+    logger.warning(
+        "ONE-TIME: Deleting Qdrant collection to purge stale hash()-based sparse vectors"
+    )
     try:
-        _temp_client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
+        _temp_client = QdrantClient(
+            url=settings.qdrant_url, api_key=settings.qdrant_api_key
+        )
         _temp_client.delete_collection(collection_name=settings.collection_name)
-        logger.info(f"ONE-TIME: Deleted collection '{settings.collection_name}' — will be recreated by VectorStoreService")
+        logger.info(
+            f"ONE-TIME: Deleted collection '{settings.collection_name}' — will be recreated by VectorStoreService"
+        )
     except Exception as _del_err:
-        logger.info(f"ONE-TIME: Collection delete skipped (may not exist yet): {_del_err}")
+        logger.info(
+            f"ONE-TIME: Collection delete skipped (may not exist yet): {_del_err}"
+        )
     # ── END ONE-TIME ──────────────────────────────────────────────────────────
 
     logger.info("Initializing VectorStoreService (Qdrant)...")

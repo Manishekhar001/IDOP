@@ -11,7 +11,6 @@ import pytest
 
 from app.core.sparse_vector_service import SparseVectorService
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -44,12 +43,12 @@ class TestSparseDeterminism:
         vec_a = svc_a.generate_sparse_vector(text)
         vec_b = svc_b.generate_sparse_vector(text)
 
-        assert vec_a.indices == vec_b.indices, (
-            f"Indices differ:\n  A={vec_a.indices}\n  B={vec_b.indices}"
-        )
-        assert vec_a.values == vec_b.values, (
-            f"Values differ:\n  A={vec_a.values}\n  B={vec_b.values}"
-        )
+        assert (
+            vec_a.indices == vec_b.indices
+        ), f"Indices differ:\n  A={vec_a.indices}\n  B={vec_b.indices}"
+        assert (
+            vec_a.values == vec_b.values
+        ), f"Values differ:\n  A={vec_a.values}\n  B={vec_b.values}"
 
     def test_identical_vectors_complex(self, svc_a, svc_b):
         """Determinism with punctuation, numbers, and mixed case."""
@@ -94,9 +93,7 @@ class TestSparseDeterminism:
         vec = svc_a.generate_sparse_vector("hello world")
         assert len(vec.indices) > 0, "Sparse vector has no indices"
         assert len(vec.values) > 0, "Sparse vector has no values"
-        assert len(vec.indices) == len(vec.values), (
-            "indices and values length mismatch"
-        )
+        assert len(vec.indices) == len(vec.values), "indices and values length mismatch"
 
     def test_different_texts_different_vectors(self, svc_a):
         """Sanity: different texts must produce different vectors."""
@@ -104,6 +101,6 @@ class TestSparseDeterminism:
         vec_b = svc_a.generate_sparse_vector("chocolate cake baking recipe")
 
         # At minimum, the index sets should differ
-        assert set(vec_a.indices) != set(vec_b.indices), (
-            "Completely different texts produced identical index sets"
-        )
+        assert set(vec_a.indices) != set(
+            vec_b.indices
+        ), "Completely different texts produced identical index sets"

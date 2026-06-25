@@ -76,14 +76,18 @@ def main():
 
     rss_after_import = get_rss_mb()
     print(f"   RSS after import:              {rss_after_import:.1f} MB")
-    print(f"   Delta (import):                +{rss_after_import - rss_baseline:.1f} MB")
+    print(
+        f"   Delta (import):                +{rss_after_import - rss_baseline:.1f} MB"
+    )
 
     # --- Load model ---
     print("\n3. Loading Qdrant/bm25 model...")
     model = SparseTextEmbedding(model_name="Qdrant/bm25")
     rss_after_model = get_rss_mb()
     print(f"   RSS after model load:          {rss_after_model:.1f} MB")
-    print(f"   Delta (model load):            +{rss_after_model - rss_after_import:.1f} MB")
+    print(
+        f"   Delta (model load):            +{rss_after_model - rss_after_import:.1f} MB"
+    )
 
     # --- Run inference ---
     print("\n4. Running sample inference...")
@@ -95,7 +99,9 @@ def main():
     results = list(model.embed(sample_texts))
     rss_after_inference = get_rss_mb()
     print(f"   RSS after inference:           {rss_after_inference:.1f} MB")
-    print(f"   Delta (inference):             +{rss_after_inference - rss_after_model:.1f} MB")
+    print(
+        f"   Delta (inference):             +{rss_after_inference - rss_after_model:.1f} MB"
+    )
 
     # --- Summary ---
     total_delta = rss_after_inference - rss_baseline

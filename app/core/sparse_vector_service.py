@@ -30,16 +30,14 @@ class SparseVectorService:
         # embed() returns a generator; we only need the first (and only) result
         embedding = next(self._model.embed([text]))
         return SparseVector(
-            indices=embedding.indices.tolist(),
-            values=embedding.values.tolist(),
+            indices=embedding.indices.tolist(), values=embedding.values.tolist()
         )
 
     def generate_sparse_vectors_batch(self, texts: list[str]) -> list[SparseVector]:
         """Generate sparse vectors for a batch of texts."""
         return [
             SparseVector(
-                indices=embedding.indices.tolist(),
-                values=embedding.values.tolist(),
+                indices=embedding.indices.tolist(), values=embedding.values.tolist()
             )
             for embedding in self._model.embed(texts)
         ]
