@@ -19,6 +19,7 @@ from app.api.auth import (
     create_user,
     get_current_user,
     get_user_by_email,
+    require_admin,
     verify_password,
 )
 from app.utils.logger import get_logger
@@ -99,4 +100,10 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: dict = Depends(get_current_user)):
     """Return the currently authenticated user."""
+    return UserResponse(email=current_user["sub"], role=current_user["role"])
+
+
+@router.get("/admin-only", response_model=UserResponse)
+async def admin_only(current_user: dict = Depends(require_admin)):
+    """Admin-only endpoint example."""
     return UserResponse(email=current_user["sub"], role=current_user["role"])

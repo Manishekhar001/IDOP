@@ -453,6 +453,7 @@ These secrets are injected as environment variables into the production `.env` f
 | Secret Name | Example Value | Where to Get It | Used By |
 |:---|:---|:---|:---|
 | `OPENAI_API_KEY` | `sk-proj-abc123...` | https://platform.openai.com/api-keys (Section 4.1) | `cd.yml` |
+| `JWT_SECRET_KEY` | ` HYcurdc8xv...` | `python -c "import secrets; print(secrets.token_urlsafe(32))"` | `cd.yml` |
 | `NOMIC_API_KEY` | `your-nomic-api-key` | https://atlas.nomic.ai/ → API Keys (Section 4.7) | `cd.yml` |
 | `VOYAGE_API_KEY` | `pa-abc123...` | https://dash.voyageai.com/ → API Keys (Section 4.3) | `cd.yml` |
 | `TAVILY_API_KEY` | `tvly-abc123...` | https://tavily.com/ → API Keys (Section 4.4) | `cd.yml` |
@@ -494,7 +495,7 @@ These are optional. If not set, the application will run without caching (slight
 After adding all secrets, your GitHub **Settings → Secrets → Actions** page should look like this:
 
 ```
-✅ Required Secrets (12 total):
+✅ Required Secrets (13 total):
 ┌─────────────────────────────┬──────────────────────────────────────┐
 │ Secret Name                 │ Status                               │
 ├─────────────────────────────┼──────────────────────────────────────┤
@@ -504,6 +505,7 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ EC2_HOST                    │ ● Added                              │
 │ EC2_SSH_KEY                 │ ● Added                              │
 │ OPENAI_API_KEY              │ ● Added                              │
+│ JWT_SECRET_KEY              │ ● Added                              │
 │ NOMIC_API_KEY               │ ● Added                              │
 │ VOYAGE_API_KEY              │ ● Added                              │
 │ TAVILY_API_KEY              │ ● Added                              │
@@ -512,7 +514,7 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ SUPABASE_DB_URL             │ ● Added                              │
 └─────────────────────────────┴──────────────────────────────────────┘
 
-⬜ Required Secrets (16 total):
+⬜ Required Secrets (17 total):
 ┌─────────────────────────────┬──────────────────────────────────────┐
 │ Secret Name                 │ Status                               │
 ├─────────────────────────────┼──────────────────────────────────────┤
@@ -522,6 +524,7 @@ After adding all secrets, your GitHub **Settings → Secrets → Actions** page 
 │ EC2_HOST                    │ ● Added                              │
 │ EC2_SSH_KEY                 │ ● Added                              │
 │ OPENAI_API_KEY              │ ● Added                              │
+│ JWT_SECRET_KEY              │ ● Added                              │
 │ NOMIC_API_KEY               │ ● Added                              │
 │ VOYAGE_API_KEY              │ ● Added                              │
 │ TAVILY_API_KEY              │ ● Added                              │
@@ -588,6 +591,7 @@ GitHub Repository Secrets
 │   Contains:                      │
 │   ├── ENVIRONMENT=production     │
 │   ├── ECR_REGISTRY=...          │
+│   ├── JWT_SECRET_KEY=...        │
 │   ├── POSTGRES_PASSWORD=       │
 │   │   idop_checkpoint_2026       │
 │   ├── DATABASE_URL=            │

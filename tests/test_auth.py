@@ -24,6 +24,8 @@ from app.api.auth import (
     create_access_token,
     get_current_user,
     hash_password,
+    require_admin,
+    require_role,
     verify_password,
 )
 
@@ -183,3 +185,50 @@ class TestDevMode:
         user = await get_current_user(token="garbage-token")
         assert user["sub"] == "dev@localhost"
         assert user["role"] == "admin"
+
+
+# ---------------------------------------------------------------------------
+# Role-based access control tests
+# ---------------------------------------------------------------------------
+
+
+class TestRBAC:
+    """Test role-based access control dependencies."""
+
+    @pytest.mark.asyncio
+    @patch("app.api.auth.get_settings")
+    async def test_require_admin_allows_admin(self, mock_settings):
+        mock_settings.return_value = _make_settings()
+        admin_user = {"sub": "admin@example.com", "role": "admin"}
+        result = await require_admin(user=admin_user)
+        assert result == admin_user
+
+    @pytest.mark.asyncio
+    @patch("app.api.auth.get_settings")
+    async def test_require_admin_rejects_user(self, mock_settings):
+        mock_settings.return_value = _make_settings()
+        normal_user = {"sub": "user@example.com", "role": "user"}
+        with pytest.raises(HTTPException) as exc_info:
+            await require_admin(user=normal_user)
+        assert exc_info.value.status_code == 403
+        assert "Admin access required" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    @patch("app.api.auth.get_settings")
+    async def test_require_role_allows_allowed(self, mock_settings):
+        mock_settings.return_value = _make_settings()
+        user = {"sub": "editor@example.com", "role": "editor"}
+        checker = await require_role("editor", "admin")
+        result = await checker(user)
+        assert result == user
+
+    @pytest.mark.asyncio
+    @patch("app.api.auth.get_settings")
+    async def test_require_role_rejects_disallowed(self, mock_settings):
+        mock_settings.return_value = _make_settings()
+        user = {"sub": "viewer@example.com", "role": "viewer"}
+        checker = await require_role("editor", "admin")
+        with pytest.raises(HTTPException) as exc_info:
+            await checker(user)
+        assert exc_info.value.status_code == 403
+        assert "editor, admin" in exc_info.value.detail

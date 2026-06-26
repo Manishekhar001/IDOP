@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.auth import get_current_user
 from app.api.schemas import SQLResponse
 from app.main import app
 
@@ -54,45 +55,51 @@ class TestSQLApiEndpoints:
         self, mock_shared_pending, mock_gate, mock_sql_service, client
     ):
         """Test that /sql/generate creates a session, returns the token, and updates pending_queries."""
-        # Setup mocks
-        mock_query_id = "test-query-id-123"
-        mock_sql_service.generate_sql_for_approval = AsyncMock(
-            return_value={
-                "query_id": mock_query_id,
+        # Override auth to return a test user
+        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
+
+        try:
+            # Setup mocks
+            mock_query_id = "test-query-id-123"
+            mock_sql_service.generate_sql_for_approval = AsyncMock(
+                return_value={
+                    "query_id": mock_query_id,
+                    "question": "Show all customers",
+                    "sql": "SELECT * FROM customers;",
+                    "explanation": "Selects all customers",
+                    "status": "pending_approval",
+                    "cache_hit": False,
+                }
+            )
+
+            # Pre-populate shared pending with the query_id (mimicking what sql_service would have returned)
+            mock_shared_pending[mock_query_id] = {
                 "question": "Show all customers",
                 "sql": "SELECT * FROM customers;",
-                "explanation": "Selects all customers",
                 "status": "pending_approval",
                 "cache_hit": False,
             }
-        )
 
-        # Pre-populate shared pending with the query_id (mimicking what sql_service would have returned)
-        mock_shared_pending[mock_query_id] = {
-            "question": "Show all customers",
-            "sql": "SELECT * FROM customers;",
-            "status": "pending_approval",
-            "cache_hit": False,
-        }
+            mock_token = "mock-crypto-approval-token-999"
+            mock_gate.generate_session.return_value = mock_token
 
-        mock_token = "mock-crypto-approval-token-999"
-        mock_gate.generate_session.return_value = mock_token
+            # Call the endpoint with the new Pydantic body
+            response = client.post(
+                "/sql/generate",
+                json={"question": "Show all customers", "vanna_temperature": 0.0},
+            )
 
-        # Call the endpoint with the new Pydantic body
-        response = client.post(
-            "/sql/generate",
-            json={"question": "Show all customers", "vanna_temperature": 0.0},
-        )
+            assert response.status_code == 200
+            data = response.json()
 
-        assert response.status_code == 200
-        data = response.json()
+            # Verify the returned values
+            assert data["query_id"] == mock_query_id
+            assert data["token"] == mock_token
 
-        # Verify the returned values
-        assert data["query_id"] == mock_query_id
-        assert data["token"] == mock_token
+            # Verify gate was called with query_id
+            mock_gate.generate_session.assert_called_once_with(mock_query_id)
 
-        # Verify gate was called with query_id
-        mock_gate.generate_session.assert_called_once_with(mock_query_id)
-
-        # Verify the shared pending queries entry was updated with the token
-        assert mock_shared_pending[mock_query_id]["token"] == mock_token
+            # Verify the shared pending queries entry was updated with the token
+            assert mock_shared_pending[mock_query_id]["token"] == mock_token
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)

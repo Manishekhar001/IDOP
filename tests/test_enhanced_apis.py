@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.auth import get_current_user
 from app.api.schemas import ChatResponse, MutationResponse
 from app.main import app
 
@@ -131,6 +132,8 @@ class TestEnhancedApiEndpoints:
 
         from app.api.routes.chat import get_engine
 
+        # Override auth to return a test user
+        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
         app.dependency_overrides[get_engine] = lambda: mock_engine
 
         try:
@@ -178,6 +181,7 @@ class TestEnhancedApiEndpoints:
             assert data["mutation_status"] == "pending_approval"
         finally:
             app.dependency_overrides.pop(get_engine, None)
+            app.dependency_overrides.pop(get_current_user, None)
 
     @patch("app.api.routes.documents.DocumentProcessor")
     def test_documents_upload_with_options(self, mock_processor_class, client):
@@ -202,6 +206,8 @@ class TestEnhancedApiEndpoints:
 
         from app.api.routes.documents import get_vector_store
 
+        # Override auth to return a test user
+        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
         app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
 
         try:
@@ -243,23 +249,29 @@ class TestEnhancedApiEndpoints:
         mock_judge.audit_mutation = AsyncMock(return_value=(True, "Approved"))
         mock_gate.generate_session.return_value = "gate-token-xyz"
 
-        file_data = {"file": ("mut.csv", b"id,name\n1,Prod1", "text/csv")}
-        form_data = {
-            "table_name": "products",
-            "request_intent": "Insert some products",
-            "max_bulk_rows": "5",
-            "primary_key": "prod_id",
-            "auto_map": "false",
-            "skip_validation": "true",
-        }
+        # Override auth to return a test user
+        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
 
-        response = client.post("/mutation/upload", files=file_data, data=form_data)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["table_name"] == "products"
-        assert data["token"] == "gate-token-xyz"
+        try:
+            file_data = {"file": ("mut.csv", b"id,name\n1,Prod1", "text/csv")}
+            form_data = {
+                "table_name": "products",
+                "request_intent": "Insert some products",
+                "max_bulk_rows": "5",
+                "primary_key": "prod_id",
+                "auto_map": "false",
+                "skip_validation": "true",
+            }
 
-        # Verify skip_validation was respected (validate_rows should not be called)
-        mock_validator.validate_rows.assert_not_called()
-        # Verify auto_map was false (semantic mapping should not be called)
-        mock_mapper.get_semantic_mapping.assert_not_called()
+            response = client.post("/mutation/upload", files=file_data, data=form_data)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["table_name"] == "products"
+            assert data["token"] == "gate-token-xyz"
+
+            # Verify skip_validation was respected (validate_rows should not be called)
+            mock_validator.validate_rows.assert_not_called()
+            # Verify auto_map was false (semantic mapping should not be called)
+            mock_mapper.get_semantic_mapping.assert_not_called()
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)

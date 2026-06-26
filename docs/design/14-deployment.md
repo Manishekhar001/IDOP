@@ -63,6 +63,7 @@ Production configurations must be maintained as secrets. A templates file (`.env
 | Environment Variable | Required | Production Value Mapping |
 | :--- | :--- | :--- |
 | **ENV_STATE** | Yes | `production` |
+| **JWT_SECRET_KEY** | Yes | Cryptographic signing secret (generate via `python -c "import secrets; print(secrets.token_urlsafe(32))"`) |
 | **OPENAI_API_KEY** | Yes | Production Enterprise OpenAI Key |
 | **NOMIC_API_KEY** | Yes | Nomic API key for default embeddings |
 | **VOYAGE_API_KEY** | Yes | Voyage API key for reranking |
