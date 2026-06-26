@@ -23,6 +23,9 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
 from app.config import get_settings
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Password hashing
@@ -164,11 +167,19 @@ CREATE TABLE IF NOT EXISTS idop_users (
 
 
 def _get_connection() -> psycopg2.extensions.connection | None:
-    """Return a psycopg2 connection or ``None`` on failure."""
+    """Return a psycopg2 connection or ``None`` on failure.
+
+    Tries supabase_db_url first, falls back to database_url (internal Postgres).
+    """
     settings = get_settings()
+    db_url = settings.supabase_db_url or settings.database_url
+    if not db_url:
+        logger.warning("No database URL configured (supabase_db_url or database_url)")
+        return None
     try:
-        return psycopg2.connect(settings.supabase_db_url)
-    except Exception:
+        return psycopg2.connect(db_url)
+    except Exception as exc:
+        logger.warning("Database connection failed: %s", exc)
         return None
 
 
@@ -179,11 +190,17 @@ def create_users_table() -> None:
     """
     conn = _get_connection()
     if conn is None:
+        logger.warning(
+            "Unable to connect to database for users table creation; skipping"
+        )
         return None
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(_CREATE_TABLE_SQL)
+        logger.info("idop_users table created or already exists")
+    except Exception as exc:
+        logger.error("Failed to create idop_users table: %s", exc)
     finally:
         conn.close()
     return None
