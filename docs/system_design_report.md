@@ -63,7 +63,8 @@ graph TD
 *   **Decision**: Deploying dense + sparse named vector indexing inside Qdrant and fusing scores with Reciprocal Rank Fusion (RRF), followed by Voyage AI cross-encoder reranking.
 *   **Rationale**: 
     - **Dense vectors** (Nomic `nomic-embed-text-v1.5`) capture conceptual meaning but miss exact identifiers (SKU codes, serial numbers, email strings).
-    - **Sparse vectors** (BM25 keyword tokens) catch alphanumeric exact matches. Fusing them via RRF ($k=60$) guarantees high-precision document extraction.
+    - **Sparse vectors** (BM25 via fastembed `Qdrant/bm25` model) catch alphanumeric exact matches. Fusing them via RRF ($k=60$) guarantees high-precision document extraction.
+    - **Migration note:** The previous Python `hash()`-based sparse vector implementation was non-deterministic across processes. A one-time Qdrant collection deletion triggers automatically on first startup to purge stale vectors.
     - **Voyage AI Rerank-2.5** analyzes raw query-document syntax cross-relations, ensuring that the highest-context paragraphs are fed into the prompt's first 500 tokens (minimizing LLM context degradation).
 
 ### 3. Four-Tier Caching with Graceful Degradation
@@ -79,7 +80,7 @@ graph TD
 > Relying on LLM system instructions to avoid security breaches is a known vulnerability. IDOP implements a programmatic, regex-based SQL validator in [sql_validator.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/feature1_sql/sql_validator.py). It acts as an absolute firewall blocking SQL injections or destructive operations (`DROP`, `TRUNCATE`, `ALTER`, etc.) before any query reaches execution.
 >
 > **2. Human-In-The-Loop Approval Gates**
-> High-risk operations (such as SQL writes or sheet mutations) are intercepted. The platform generates a unique cryptographic hex token, persists the session in **Redis** (with 1-hour auto-expiry), and puts the session in a `pending` state. If Redis is unavailable, it falls back to an in-memory cache with PostgreSQL persistence. Execution only proceeds when the secure token is verified via `/sql/approve/{token}`.
+> High-risk operations (such as SQL writes or sheet mutations) are intercepted. The platform generates a unique cryptographic hex token, persists the session in a **`PendingStore`** (Redis-primary, Postgres-fallback, with 1-hour auto-expiry), and puts the session in a `pending` state. Execution only proceeds when the secure token is verified via `/sql/approve` or `/mutation/approve`.
 >
 > **3. All-or-Nothing Mutation Transactions**
 > In bulk Excel/CSV employee mutations, any single-row business rules failure (e.g. out-of-bounds salary limit in `rules.json`) will throw an exception. The system runs everything inside an isolated transactional database block (`async with db_session.begin():`), ensuring immediate rollbacks and preventing corrupted partial writes.

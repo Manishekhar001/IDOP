@@ -63,8 +63,8 @@ This section acts as a study guide and defense framework for technical architect
 ### Q6: What happens if a bulk spreadsheet upload contains 100 rows, and row 99 fails business rules?
 > **Answer**: The entire operation is rolled back immediately. In enterprise database systems, partial mutations create dirty states (e.g. inserting 98 employees but failing on the 99th, leaving the database out of sync). The `MutationExecutor` runs the entire batch inside an isolated transaction block (`async with db_session.begin():`). If a single row fails a business rule or database constraint, an exception is thrown, the transaction is rolled back, and the database remains untouched.
 
-### Q7: Why are approval sessions stored in-memory rather than database tables?
-> **Answer**: In-memory caching for pending sessions (via a thread-safe dict or Redis with short TTLs) minimizes database pollution. Pending queries and mutations are transient—they are either approved within minutes or expire. Storing them in a fast cache ensures extremely low lookup times when the `/approve` endpoint is called.
+### Q7: How are pending approval sessions stored across multiple workers?
+> **Answer**: Pending approval sessions use a layered **`PendingStore`** class that prioritizes **Redis** as the canonical store so all uvicorn workers see the same data. Each entry auto-expires after 1 hour TTL. If Redis is unavailable, the store falls back to PostgreSQL persistence, with an in-memory dict serving as the local cache. This ensures cross-worker consistency while keeping lookup times low for the `/approve` endpoint.
 
 ---
 

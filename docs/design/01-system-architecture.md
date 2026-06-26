@@ -114,8 +114,11 @@ graph TB
 ### FastAPI Gateway
 
 - **Entry point** for all client interactions — serves REST endpoints on port `8000`
-- **CORS middleware** with configurable allowed origins
-- **Lifespan manager** initializes Qdrant, PostgreSQL (LTM store + STM checkpointer), and compiles the LangGraph engine at startup
+- **CORS middleware** with configurable allowed origins (wildcard `*` support, credentials handling)
+- **Rate limiting** via `slowapi.Limiter` (default: 60 requests/minute)
+- **JWT authentication** with bcrypt password hashing; dev mode bypass when using default secret key
+- **Lifespan manager** initializes Qdrant, PostgreSQL (LTM store + STM checkpointer), JWT users table, business tables verification, and compiles the LangGraph engine at startup
+- **One-time Qdrant collection deletion** at startup to purge stale hash()-based sparse vectors (migrating to fastembed BM25)
 - **Global exception handler** catches unhandled errors and returns standardized JSON error responses
 - Source: [main.py](../../app/main.py)
 
@@ -143,7 +146,7 @@ IDOP uses a **LiteLLM Router** for intelligent multi-provider, multi-key LLM acc
 
 - **Dual-vector collection** (`idop_documents`) with both dense and sparse vector spaces
 - **Dense vectors:** 768-dim cosine similarity via Nomic `nomic-embed-text-v1.5`
-- **Sparse vectors:** BM25-style term-frequency hashing via `SparseVectorService`
+- **Sparse vectors:** BM25-style via `SparseVectorService` using fastembed's `Qdrant/bm25` model (deterministic, unlike previous Python `hash()` approach)
 - **RRF Fusion:** Reciprocal Rank Fusion merges dense and sparse result lists at query time
 - **Three search modes:** `dense`, `sparse`, `hybrid` — configurable per request
 - Source: [vector_store.py](../../app/core/vector_store.py)
@@ -166,7 +169,7 @@ IDOP uses a **LiteLLM Router** for intelligent multi-provider, multi-key LLM acc
 - **SQL generation cache:** Question → generated SQL (TTL: 24 hours)
 - **SQL result cache:** Normalized SQL → execution results (TTL: 15 minutes)
 - **Embedding cache:** Text hash → embedding vector (TTL: 7 days)
-- Falls back to in-memory `dict` if Redis is unavailable
+- Falls back to local in-memory dictionary if Redis is unavailable (class-level shared cache)
 - Source: [query_cache_service.py](../../app/services/query_cache_service.py)
 
 ### S3 / Local Storage
@@ -190,6 +193,9 @@ IDOP uses a **LiteLLM Router** for intelligent multi-provider, multi-key LLM acc
 
 | Route Group | Endpoint | Method | Description |
 |---|---|---|---|
+| **Auth** | `/auth/register` | POST | Create a new user account |
+| **Auth** | `/auth/login` | POST | Obtain a JWT access token |
+| **Auth** | `/auth/me` | GET | Return the current authenticated user |
 | **Chat** | `/chat` | POST | Primary query endpoint — routes through LangGraph |
 | **Chat** | `/chat/stream` | POST | SSE streaming variant of `/chat` |
 | **Chat** | `/chat/history/{thread_id}` | GET | Retrieve conversation history |
@@ -198,14 +204,20 @@ IDOP uses a **LiteLLM Router** for intelligent multi-provider, multi-key LLM acc
 | **Documents** | `/documents/collection` | DELETE | Delete and recreate the Qdrant collection |
 | **SQL** | `/sql/generate` | POST | Generate SQL from natural language (Feature 1) |
 | **SQL** | `/sql/approve` | POST | Approve and execute a pending SQL query |
+| **SQL** | `/sql/pending` | GET | List all pending SQL queries |
 | **Mutation** | `/mutation/upload` | POST | Upload Excel/CSV for mutation processing (Feature 2) |
 | **Mutation** | `/mutation/approve` | POST | Approve and execute a pending mutation |
+| **Mutation** | `/mutation/pending` | GET | List all pending mutations |
 | **Cache** | `/cache/stats` | GET | Redis + document cache statistics |
 | **Cache** | `/cache/clear` | DELETE | Invalidate cache entries |
+| **Cache** | `/cache/health` | GET | Check health of all cache layers |
+| **Cache** | `/cache/test` | POST | Run a cache round-trip test |
 | **Memory** | `/memory/{user_id}` | GET | Retrieve LTM facts for a user |
 | **Memory** | `/memory/{user_id}` | DELETE | Clear all LTM facts for a user |
-| **Health** | `/health` | GET | Basic liveness check |
-| **Health** | `/health/ready` | GET | Deep readiness check (Qdrant + PostgreSQL) |
+| **Health** | `/health` | GET | Detailed per-service health check (Qdrant, PostgreSQL, Redis, S3) |
+| **Health** | `/health/ready` | GET | Deep readiness check (Qdrant + PostgreSQL + Supabase) |
+| **Health** | `/info` | GET | System layout and endpoint documentation |
+| **Health** | `/stats` | GET | Platform statistics and query cache savings |
 
 ---
 

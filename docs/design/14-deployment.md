@@ -46,53 +46,13 @@ graph TD
 
 The standard virtual runtime uses Docker Compose to orchestrate local infrastructure alongside managed cloud clusters:
 
-```yaml
-# docker-compose.yml
-version: '3.8'
+See the actual [docker-compose.yml](../../docker-compose.yml) at the project root for the current configuration. Key features:
 
-services:
-  idop:
-    build: .
-    container_name: idop-app
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql://postgres:secure_passwd@postgres:5432/postgres
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "-o", "/dev/null", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16
-    container_name: idop-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secure_passwd
-      POSTGRES_DB: postgres
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
-      start_period: 40s
-
-volumes:
-  pgdata:
-```
+- **Docker networking:** Both services communicate over a shared `idop-net` network.
+- **Memory limits:** Postgres limited to 256 MB; app limited to 700 MB (prevents OOM on t2.micro 1 GB instances).
+- **Postgres idle timeout prevention:** `idle_in_transaction_session_timeout=0` and `statement_timeout=0` to keep LangGraph connection pools alive.
+- **Health checks:** Postgres uses `pg_isready` + `SELECT 1`; app uses `GET /health` endpoint.
+- **Start period:** App has 60s `start_period` to accommodate LangGraph graph compilation.
 
 ---
 
@@ -131,35 +91,15 @@ During architectural design planning, serverless options like AWS Lambda were ev
 The build, test, and release cycle is split into two specialized, automated GitHub Actions workflows, mirroring the decoupled layout of high-governance enterprise projects:
 
 ### 1. Continuous Integration (`ci.yml`)
-Triggered on any `push` or `pull_request` to the `main` branch to validate code health without deploying:
-```mermaid
-graph TD
-    A[Push / Pull Request] --> B[Runner Disk Space Cleanup]
-    B --> C[Setup Python 3.13 & Magic Libs]
-    C --> D[Run Linter & Formatter: Ruff & Black]
-    D --> E[Run Unit Tests: Pytest Offline]
-    E --> F[Verify Dockerfile Syntax: Local amd64 Build]
-    F --> G([CI Validation Green Success])
-```
+Triggered on any `push` or `pull_request` to the `main` branch to validate code health without deploying. See [ci.yml](../../.github/workflows/ci.yml) for the current configuration.
 
 ### 2. Continuous Deployment (`cd.yml`)
-Triggered strictly on `push` to the `main` branch (such as a pull request merge) to orchestrate ECR publication and EC2 VM provisioning:
-```mermaid
-graph TD
-    A[Merge / Push to main] --> B[Runner Disk Space Cleanup]
-    B --> C[Configure AWS & STS Caller Identity Check]
-    C --> D[Authenticate & Login to ECR]
-    D --> E[Docker Buildx: Compile & Multi-tag Image]
-    E --> F[Push Container tags latest & git-SHA to ECR]
-    F --> G[Establish SSH Connection with EC2 Host]
-    G --> H[Dynamically Write Secured .env File: chmod 600]
-    H --> I[Authenticate & Login to ECR on Host]
-    I --> J[Pull ECR Image & Trigger Compose Restart]
-    J --> K{Multi-Iteration Health Checks Passed?}
-    K -->|Yes| L([Deploy Complete & Active])
-    K -->|No| M[Trigger Automated Container Rollback]
-    M --> N([Exit Pipeline with Fail status])
-```
+Triggered strictly on `push` to the `main` branch to orchestrate ECR publication and EC2 VM provisioning. See [cd.yml](../../.github/workflows/cd.yml) for the current configuration. The CD pipeline:
+1. Builds and pushes multi-tagged Docker image to ECR
+2. SSH's into EC2, writes `.env` from secrets, tags current image as `stable` for rollback
+3. Pulls new image and runs `docker compose up -d`
+4. Performs health check with 5 retries
+5. Auto-rollbacks to `stable` tag on health check failure
 
 ---
 

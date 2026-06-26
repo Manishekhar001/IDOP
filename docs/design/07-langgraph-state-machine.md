@@ -102,6 +102,8 @@ class CSRAGState(TypedDict):
     vanna_temperature: float
     vanna_seed: int
     vanna_top_p: float
+
+    # (omitted for brevity — view full CSRAGState in app/core/graph/state.py)
 ```
 
 ---
@@ -350,6 +352,8 @@ def build_graph(
 ```
 
 > **Note:** The `hybrid_gen` and `retrieve_docs` nodes use `functools.partial` to inject the `vector_store` dependency at graph compilation time. This avoids creating a new `VectorStoreService` for every invocation.
+
+> **Graph count:** The graph has **17 nodes** (not 18 as previously documented). The `sql_gen` and `mutation` nodes now route through `stm_summarize`, and the `hybrid_gen` node routes through `verify_support` (not directly to `stm_summarize`), so the hybrid answer gets the same SRAG verification as the RAG pipeline.
 
 > **LLM Architecture Note:** All graph nodes (`router_node`, `decide_retrieval_node`, `generate_answer_node`, `evaluate_docs_node`, `verify_support_node`, `verify_usefulness_node`, `stm_summarize_node`, etc.) use `get_chat_llm()` or `get_memory_llm()` from `app.core.llm_factory`. These default to the **LiteLLM Router** with Groq `llama-3.3-70b-versatile` as primary and OpenAI `gpt-4o-mini` as fallback. SQL generation within Vanna uses `OpenAILlmService` with `gpt-4o-mini`.
 

@@ -13,7 +13,7 @@ IDOP implements a **dual memory architecture** that gives the LangGraph agent bo
 - **Short-Term Memory (STM):** Conversation-scoped checkpoints stored via `AsyncPostgresSaver`. Preserves message history within a thread and automatically summarizes older messages to prevent context window overflow.
 - **Long-Term Memory (LTM):** User-scoped factual preferences stored via `AsyncPostgresStore`. Persists user identity, preferences, and context across all conversations.
 
-Both memory systems share the same PostgreSQL Docker instance (configured via `DATABASE_URL`) but use separate LangGraph table schemas. Both use GPT-4o-mini for their LLM operations, keeping memory management costs minimal.
+Both memory systems share the same PostgreSQL Docker instance (configured via `DATABASE_URL`) but use separate LangGraph table schemas. Both use `get_memory_llm()` (defaulting to `llama-3.3-70b-versatile` via LiteLLM Router) for their LLM operations.
 
 ---
 
@@ -118,16 +118,17 @@ Defined in [nodes.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/
 
 ```python
 async def stm_summarize_node(state: CSRAGState) -> dict:
+    answer = state.get("answer", "")
     ai_msg = AIMessage(content=answer, id=str(uuid.uuid4()))
     summarizer = get_stm_summarizer()
-    all_messages = list(state["messages"]) + [ai_msg]
+    all_messages = [*list(state["messages"]), ai_msg]
 
     if summarizer.should_summarize(all_messages):
         new_summary, remove_ops = await summarizer.summarize(
             messages=all_messages,
             existing_summary=state.get("summary", ""),
         )
-        return {"messages": [ai_msg] + remove_ops, "summary": new_summary}
+        return {"messages": [ai_msg, *remove_ops], "summary": new_summary}
 
     return {"messages": [ai_msg]}
 ```
@@ -187,9 +188,15 @@ The LTM extraction prompt specifies:
 Defined in [nodes.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/graph/nodes.py#L173-L192):
 
 ```python
-async def ltm_remember_node(state, config, *, store) -> dict:
+async def ltm_remember_node(state: CSRAGState, config: RunnableConfig, *, store) -> dict:
     user_id = config.get("configurable", {}).get("user_id", "default")
     ltm = get_ltm_service()
+
+    # Extract the latest human message from state
+    last_human = next(
+        (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None
+    )
+    user_message = last_human.content if last_human else ""
 
     # Extract new facts from latest user message
     await ltm.extract_and_store(store, user_id, user_message)
@@ -208,13 +215,21 @@ Both memory types contribute to the system prompt via [_build_system_prompt](fil
 
 ```python
 def _build_system_prompt(ltm_context: str, summary: str) -> str:
-    base = "You are a knowledgeable and helpful assistant..."
+    base = (
+        "You are a knowledgeable and helpful assistant with memory capabilities.\n"
+        "Answer questions clearly and concisely using the provided context.\n"
+        "If no context is available, use your general knowledge.\n"
+        "If you don't know the answer, say so clearly.\n"
+        "Do not make up information."
+    )
     sections = []
     if ltm_context and ltm_context != "(empty)":
         sections.append(f"Long-term user memory:\n{ltm_context}")
     if summary:
         sections.append(f"Recent conversation summary:\n{summary}")
-    return base + "\n\n" + "\n\n".join(sections)
+    if sections:
+        return base + "\n\n" + "\n\n".join(sections)
+    return base
 ```
 
 ### Example Constructed System Prompt
@@ -286,7 +301,7 @@ Request 4 (same user, same thread):
 |---|---|---|
 | **Storage backend** | PostgreSQL (checkpoints) | PostgreSQL (key-value store) |
 | **Scope** | Per thread (conversation) | Per user (cross-conversation) |
-| **LLM model** | GPT-4o-mini | GPT-4o-mini |
+| **LLM model** | `get_memory_llm()` (defaults to `llama-3.3-70b-versatile`) | `get_memory_llm()` (defaults to `llama-3.3-70b-versatile`) |
 | **Trigger** | Messages > 6 | Every user message |
 | **LLM call cost** | ~$0.001 per summarization | ~$0.001 per extraction |
 | **Latency** | 0.5–1.0s (summarization) | 0.3–0.8s (extraction) |

@@ -86,11 +86,15 @@ graph TB
 
 The primary SQL generation engine, backed by Vanna 2.0's internal `OpenAILlmService` with `PostgresRunner` for schema context:
 
+- **Lazy initialization:** The `TextToSQLService` is wrapped in a `_LazyTextToSQLService` proxy that defers Vanna import until first use, keeping app startup fast
 - **Schema training:** Schema is dynamically introspected from the actual database via `information_schema` queries; falls back to a static schema context if the database is unreachable
-- **Generation:** `vanna.generate_sql(question)` produces SQL from natural language via `OpenAILlmService` (model: `gpt-4o-mini`, configurable via `VANNA_LLM_MODEL`)
+- **Generation:** Vanna 2.0 `Agent.send_message()` generates SQL from natural language via `OpenAILlmService` (model: `gpt-4o-mini`, configurable via `VANNA_LLM_MODEL`)
+- **Deterministic generation:** Temperature, seed, and top_p are dynamically configurable per request
 - **Query ID:** Each generation is assigned a UUID for session tracking
+- **SQL generation cache:** Caches generated SQL by question hash (TTL: 24 hours, cache type: `sql_gen`)
 - **Fallback:** If Vanna fails, falls back to direct LLM SQL generation via LiteLLM Router
-- Source: [vanna_service.py](../../app/core/feature1_sql/vanna_service.py)
+- **Shared singleton:** Both the graph node (`sql_generation_node`) and the API route (`/sql/generate`) import from `app.core.feature1_sql.shared` to ensure shared schema training and cache state
+- Source: [vanna_service.py](../../app/core/feature1_sql/vanna_service.py) | [shared.py](../../app/core/feature1_sql/shared.py)
 
 ### SQLValidator
 
@@ -147,7 +151,7 @@ A shared, parameterized `ApprovalGate` class provides cryptographic session toke
 The class is instantiated with different table names and session column names for each use case:
 
 ```python
-# Shared singleton in app/core/approval_gate.py
+# Shared singletons in app/core/approval_gate.py
 approval_gate = ApprovalGate(
     table_name="idop_approval_tokens",
     session_column="query_id",
@@ -178,7 +182,8 @@ pending_queries[query_id] = {
 
 - Tokens are single-use — consumed on first approval/rejection
 - Tokens are persisted in PostgreSQL (table: `idop_approval_tokens`) with an in-memory fallback for local/offline testing
-- Sessions persist in memory on the EC2 instance (not Lambda, which would lose state)
+- Pending query sessions use the shared `PendingStore` class which uses **Redis** as primary store (with auto-expiry), Postgres as fallback, and in-memory dict as local cache
+- Sessions persist via Redis/Postgres across all uvicorn workers (not just on the instance)
 - Source: [approval_gate.py](../../app/core/approval_gate.py)
 
 ### AuditLogger (Shared)
@@ -188,8 +193,8 @@ Audit logging logic that was previously duplicated in both `SQLExecutor` and `Mu
 ```python
 # Shared service (app/core/audit_logger.py)
 audit = AuditLogger()
-audit.ensure_table(conn)                          # CREATE TABLE IF NOT EXISTS
-audit.log(conn, query_id, question, sql, status)  # INSERT INTO idop_audit_logs
+audit.ensure_table(conn)                                 # CREATE TABLE IF NOT EXISTS
+audit.log(conn, query_id, question, sql_query, status)  # INSERT INTO idop_audit_logs
 ```
 
 Source: [audit_logger.py](../../app/core/audit_logger.py)
@@ -198,10 +203,10 @@ Source: [audit_logger.py](../../app/core/audit_logger.py)
 
 Executes approved SQL queries against Supabase PostgreSQL and logs the results:
 
-- **Connection:** Direct PostgreSQL connection to Supabase
+- **Connection:** Direct PostgreSQL connection to Supabase (uses `psycopg2` with `RealDictCursor`)
 - **Execution:** Parameterized query execution
-- **Audit logging:** Uses the shared `AuditLogger` to record `query_id`, `question`, `sql`, `status`, `timestamp`
-- **Error handling:** Database errors are caught and returned as structured error responses
+- **Audit logging:** Uses the shared `AuditLogger` class to record `query_id`, `question`, `sql`, `status`, `timestamp`
+- **Error handling:** Database errors are caught, logged, and returned as structured error responses
 - Source: [executor.py](../../app/core/feature1_sql/executor.py)
 
 ---
@@ -212,32 +217,53 @@ The `sql_generation_node` in LangGraph orchestrates the full pipeline:
 
 ```python
 async def sql_generation_node(state: CSRAGState) -> dict:
-    # 1. Generate SQL via Vanna
-    gen_res = await sql_service.generate_sql_for_approval(question)
-    
-    # 2. Validate against forbidden commands
-    is_safe, error_msg = validator.validate(sql)
-    if not is_safe:
-        return {"sql_status": "error", "sql_explanation": error_msg}
-    
-    # 3. Run LLM Judge semantic audit
-    is_correct, explanation = judge.judge_sql(question, sql)
-    if not is_correct:
-        explanation = f"⚠️ LLM Judge Warning: {explanation}"
-    
-    # 4. Generate cryptographic approval token
-    token = gate.generate_session(query_id)
-    
-    # 5. Store pending session in shared pending store
-    shared_pending_queries[query_id] = { ... }
-    
-    return {
-        "sql_query": sql,
-        "sql_query_id": query_id,
-        "sql_status": "pending_approval",
-        "sql_explanation": explanation,
-        "approval_token": token
-    }
+    question = state["question"]
+    sql_service = shared_sql_service
+    validator = SQLValidator()
+    judge = LLMJudge()
+    from app.services.pending_store import pending_queries as shared_pending_queries
+
+    try:
+        # 1. Generate SQL via Vanna
+        gen_res = await sql_service.generate_sql_for_approval(
+            question=question,
+            explain=state.get("explain", True),
+            vanna_temperature=state.get("vanna_temperature", None),
+        )
+        sql = gen_res["sql"]
+        query_id = gen_res["query_id"]
+
+        # 2. Validate against forbidden commands
+        is_safe, error_msg = validator.validate(sql)
+        if not is_safe:
+            return {"sql_query": sql, "sql_status": "error", "sql_explanation": error_msg}
+
+        # 3. Run LLM Judge semantic audit (async)
+        is_correct, explanation = await judge.judge_sql(question, sql)
+        if not is_correct:
+            explanation = f"Warning: {explanation}"
+
+        # 4. Generate cryptographic approval token (offloaded to thread)
+        token = await asyncio.to_thread(gate.generate_session, query_id)
+
+        # 5. Store pending session in shared pending store
+        shared_pending_queries[query_id] = {
+            "question": question,
+            "sql": sql,
+            "status": "pending_approval",
+            "token": token,
+        }
+
+        return {
+            "sql_query": sql,
+            "sql_query_id": query_id,
+            "sql_status": "pending_approval",
+            "sql_explanation": explanation,
+            "approval_token": token,
+            "answer": f"SQL query generated for: '{question[:80]}'.",
+        }
+    except Exception as e:
+        return {"sql_status": "error", "sql_explanation": f"Generation failed: {e!s}"}
 ```
 
 **Graph edge:** `sql_gen → END` — the pipeline terminates at the approval gate. Execution happens via a separate `/sql/approve` API call.

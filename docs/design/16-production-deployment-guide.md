@@ -394,6 +394,8 @@ These secrets allow the CD pipeline to SSH into your EC2 instance and deploy con
 | `EC2_HOST` | `13.233.14.23` | EC2 Console → Instances → Copy **Public IPv4 address** | `cd.yml` |
 | `EC2_SSH_KEY` | `-----BEGIN RSA PRIVATE KEY-----\nMIIEow...` | The **entire contents** of your `.pem` key file | `cd.yml` |
 
+⚠️ **New secret:** `GIT_COMMIT_SHA` is no longer sourced from a secret — it is baked into the Docker image at build time via `--build-arg` and also set in the `.env` file on EC2 as a runtime fallback.
+
 **How to get EC2_HOST:**
 ```bash
 # From AWS CLI:

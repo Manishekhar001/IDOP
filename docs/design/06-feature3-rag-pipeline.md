@@ -111,6 +111,7 @@ The entire engine is dynamically configurable per-request via the `ChatRequest` 
 | **top_k** | `int` | `4` | Number of document chunks to retrieve (range: 1–20) |
 | **enable_hyde** | `bool` | `False` | Toggles Hypothetical Document Embeddings generation |
 | **enable_reranking** | `bool` | `False` | Toggles Voyage AI Rerank-2.5 step |
+| **enable_ragas** | `bool` | `False` | Toggles RAGAS-style evaluation (answer_relevancy, faithfulness, context_precision) computed via LLM after generation |
 
 ---
 

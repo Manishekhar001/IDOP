@@ -8,7 +8,7 @@
 
 ## Overview
 
-Every user interaction with IDOP enters through a single `/chat` endpoint and is classified by a **5-class LLM semantic router** into one of five processing paths: **SQL**, **MUTATION**, **RAG**, **CHAT**, or **HYBRID**. The router uses `GPT-4o-mini` with structured JSON output to perform zero-shot classification, then dispatches execution to the appropriate LangGraph subgraph.
+Every user interaction with IDOP enters through a single `/chat` endpoint and is classified by a **5-class LLM semantic router** into one of five processing paths: **SQL**, **MUTATION**, **RAG**, **CHAT**, or **HYBRID**. The router uses the LiteLLM Router (primary: Groq `llama-3.3-70b-versatile`, fallback: OpenAI `gpt-4o-mini`) with structured JSON output to perform zero-shot classification, then dispatches execution to the appropriate LangGraph subgraph.
 
 This unified entry point ensures consistent request validation, memory integration, and response formatting regardless of which feature handles the query.
 
@@ -27,7 +27,7 @@ graph TB
 
     subgraph Router["5-Class LLM Semantic Router"]
         style Router fill:#fff3e0,stroke:#FF9800,stroke-width:2px
-        Classify["GPT-4o-mini<br/>Structured JSON Output"]
+        Classify["LiteLLM Router<br/>(Groq Llama 3.3 / GPT-4o-mini fallback)<br/>Structured JSON Output"]
         Decision{"RouteDecision<br/>query_type?"}
     end
 
@@ -46,7 +46,7 @@ graph TB
     subgraph PathRAG["RAG Path"]
         style PathRAG fill:#f3e5f5,stroke:#9C27B0,stroke-width:2px
         LTM["ltm_remember<br/>Load User Facts"]
-        Decide["decide_retrieval<br/>GPT-4o-mini"]
+        Decide["decide_retrieval<br/>(LiteLLM Router)"]
         Direct["generate_direct<br/>No Retrieval"]
         CSRAG["Full CSRAG Pipeline<br/>HyDE → Search → Rerank<br/>→ CRAG → Refine → SRAG"]
         STM["stm_summarize<br/>Compress Conversation"]
@@ -97,8 +97,13 @@ All queries are validated against the `ChatRequest` Pydantic model before reachi
 | `top_k` | `int` | `ge=1`, `le=20` (default: `4`) | Number of documents to retrieve |
 | `enable_hyde` | `bool` | Default: `false` | Enable HyDE query expansion |
 | `enable_reranking` | `bool` | Default: `false` | Enable Voyage AI cross-encoder reranking |
+| `enable_ragas` | `bool` | Default: `false` | Enable RAGAS-style evaluation metrics (answer_relevancy, faithfulness, context_precision) |
+| `explain` | `bool` | Default: `true` | Enable SQL LLM Judge semantic audit explanation |
+| `vanna_temperature` | `float` | Default: `0.0` | Temperature for SQL generation LLM |
+| `vanna_seed` | `int` | Default: `42` | Random seed for deterministic SQL generation |
+| `vanna_top_p` | `float` | Default: `0.1` | Top-p sampling for SQL generation LLM |
 
-Source: [schemas.py](../../app/api/schemas.py) (lines 141–197)
+Source: [schemas.py](../../app/api/schemas.py)
 
 ### Service Availability Check
 
@@ -203,16 +208,17 @@ router → generate_direct → END
 - Uses `GPT-4o` with system prompt that includes LTM context and STM summary
 - Handles greetings, help questions, system status inquiries
 
-### Path 5: HYBRID → `hybrid_gen` → `stm_summarize` → END
+### Path 5: HYBRID → `hybrid_gen` → `verify_support` → `verify_usefulness` → `stm_summarize` → END
 
 ```
-router → hybrid_gen → stm_summarize → END
+router → hybrid_gen → verify_support → verify_usefulness → stm_summarize → END
 ```
 
 - **Parallel execution:** SQL generation + RAG retrieval run concurrently
 - SQL path: Vanna → Validator → Judge → Direct SELECT execution (read-only, no approval gate)
 - RAG path: HyDE (optional) → Hybrid search → Reranking (optional) → CRAG → Sentence refinement
-- **Synthesis:** GPT-4o merges database results and document context into a unified business report
+- **Synthesis:** LiteLLM Router merges database results and document context into a unified business report
+- Hybrid path also goes through SRAG `verify_support` and `verify_usefulness` checks
 - Only `SELECT` queries execute automatically in hybrid mode — non-SELECT queries are skipped with a safety error
 
 ---
@@ -233,7 +239,7 @@ LangGraph StateGraph.ainvoke(initial_state, config)
     │  config = { thread_id, user_id, recursion_limit: 80 }
     │
     ▼
-router_node → GPT-4o-mini classifies → { query_type: "SQL"|"MUTATION"|"RAG"|"CHAT"|"HYBRID" }
+router_node → LiteLLM Router classifies → { query_type: "SQL"|"MUTATION"|"RAG"|"CHAT"|"HYBRID" }
     │
     ├── SQL      → sql_gen → END → { sql_query, sql_query_id, approval_token, status }
     ├── MUTATION → mutation → END → { mutation_status, mutation_error }
@@ -260,15 +266,28 @@ The unified `ChatResponse` model returns:
 | `sources` | `list[SourceDocument]` | RAG, HYBRID |
 | `processing_time_ms` | `float` | All paths |
 | `crag_verdict` | `str` | RAG, HYBRID |
+| `crag_reason` | `str` | RAG, HYBRID |
 | `issup` | `str` | RAG (fully_supported / partially_supported / no_support / skipped) |
+| `evidence` | `list[str]` | RAG (evidence quotes from context) |
 | `isuse` | `str` | RAG (useful / not_useful) |
+| `use_reason` | `str` | RAG (justification of usefulness verdict) |
 | `retries` | `int` | RAG (SRAG revision count) |
 | `rewrite_tries` | `int` | RAG (question rewrite count) |
 | `sql_query` | `str` | SQL, HYBRID |
 | `sql_results` | `list[dict]` | HYBRID (auto-executed SELECTs only) |
 | `hyde_used` | `bool` | RAG, HYBRID |
+| `hyde_hypotheses` | `list[str]` | RAG, HYBRID |
 | `reranking_used` | `bool` | RAG, HYBRID |
-| `approval_token` | `str` | SQL (pending approval) |
+| `ragas_scores` | `dict` | RAG, HYBRID (when enable_ragas=True) |
+| `query_type` | `str` | All paths |
+| `ltm_context` | `str` | All paths (loaded LTM context) |
+| `mutation_id` | `str` | MUTATION |
+| `mutation_table` | `str` | MUTATION |
+| `mutation_op` | `str` | MUTATION |
+| `mutation_status` | `str` | MUTATION |
+| `mutation_error` | `str` | MUTATION |
+| `mutation_result_count` | `int` | MUTATION |
+| `approval_token` | `str` | SQL, MUTATION (pending approval) |
 
 ---
 

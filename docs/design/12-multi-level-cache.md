@@ -64,12 +64,23 @@ Before initiating parsing or dual-vector indexing:
 2.  **Point Search**: If they exist, parsing, chunking, and embedding calculations are completely bypassed. Chunks and embeddings are loaded straight from the storage cache into Qdrant or directly into the RAG engine context.
 
 ```python
-# app/services/query_cache_service.py
-import hashlib
+# app/services/query_cache_service.py (simplified key generation)
+def _compute_hash(self, text: str) -> str:
+    return hashlib.sha256(text.strip().encode()).hexdigest()
 
-def generate_cache_key(prefix: str, payload: str) -> str:
-    sha = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return f"{prefix}:{sha}"
+# Individual key builders:
+def get_embedding_key(self, text: str) -> str:
+    return f"embedding:{self._compute_hash(text)}"
+
+def get_rag_key(self, question: str, top_k: int) -> str:
+    return f"rag:{self._compute_hash(question.lower())}:{top_k}"
+
+def get_sql_gen_key(self, question: str) -> str:
+    return f"sql_gen:{self._compute_hash(question.lower())}"
+
+def get_sql_result_key(self, sql_query: str) -> str:
+    normalized = " ".join(sql_query.strip().lower().split())
+    return f"sql_result:{self._compute_hash(normalized)}"
 ```
 
 ---
@@ -84,32 +95,53 @@ If a connection timeout occurs:
 3.  Metrics tracking marks `redis_status: "disconnected"` and updates health checks.
 
 ```python
-# app/services/query_cache_service.py
+# app/services/query_cache_service.py (simplified)
 class QueryCacheService:
-    def __init__(self, redis_client=None):
-        self.redis = redis_client
-        self._local_cache = {}
-        self.hits = 0
-        self.misses = 0
+    _local_cache_shared: ClassVar[dict[str, str]] = {}  # shared across instances
 
-    async def get(self, key: str) -> bytes:
-        if self.redis:
+    def __init__(self, redis_url=None, redis_token=None):
+        self.enabled = False
+        self.client = None
+        self.use_local = False
+        self._local_cache = self._local_cache_shared
+
+        if redis_url and redis_token:
             try:
-                val = await self.redis.get(key)
-                if val:
-                    self.hits += 1
-                    return val
-            except RedisError:
-                logger.warning("Redis cache failed, falling back to local memory.")
-        
-        # Local Fallback lookup
-        val = self._local_cache.get(key)
-        if val:
-            self.hits += 1
-            return val
-        
-        self.misses += 1
-        return None
+                from upstash_redis import Redis
+                self.client = Redis(url=redis_url, token=redis_token)
+                self.client.ping()
+                self.enabled = True
+            except Exception:
+                self.use_local = True  # fall back to local in-memory
+        else:
+            self.use_local = True
+
+    def get(self, key: str, cache_type: str = "rag") -> dict | None:
+        # Local in-memory fallback
+        if self.use_local:
+            if key in self._local_cache:
+                return self._deserialize(self._local_cache[key])
+            return None
+
+        # Redis (synchronous — Upstash Redis uses REST API, not async)
+        try:
+            result = self.client.get(key)
+            if result is not None:
+                return self._deserialize(result)
+            return None
+        except Exception:
+            return None
+
+    def set(self, key: str, value: dict, ttl: int, cache_type: str = "rag") -> bool:
+        serialized = self._serialize(value)
+        if self.use_local:
+            self._local_cache[key] = serialized
+            return True
+        try:
+            self.client.setex(key, ttl, serialized)
+            return True
+        except Exception:
+            return False
 ```
 
 ---
@@ -118,9 +150,25 @@ class QueryCacheService:
 
 Administrative operations or content updates can enforce cache sweeps using the `/cache/clear` API:
 
-*   **`/cache/clear`**: Clear all four tiers of Redis caching globally.
-*   **`/cache/clear?prefix=sql_result`**: Selectively invalidate only Tier 4 SQL results to reflect sudden backend modifications.
-*   **`/cache/clear?document_id=doc_hash`**: Erases a document's cache blocks from storage, forcing re-parsing and re-indexing.
+*   **`DELETE /cache/clear`**: Clear all four tiers of Redis caching globally.
+*   **`DELETE /cache/clear?doc_id=hash&file_extension=pdf`**: Clear a specific document's chunk cache.
+*   **`DELETE /cache/clear?clear_query_cache=false`**: Clear document cache without flushing Redis query cache.
+
+Additional cache endpoints:
+*   **`GET /cache/stats`**: Returns statistics for both document and query caches (hit rates, sizes, backend info).
+*   **`GET /cache/health`**: Performs connectivity checks on both document storage and query cache backends.
+*   **`POST /cache/test`**: Runs a write-read-delete round-trip test to validate cache backend functionality.
+
+### PendingStore (Cross-Worker Pending Operations)
+
+The `pending_queries` and `pending_mutations` stores (used for approval workflow) now use a **`PendingStore`** class backed by **Redis** as the canonical store, with Postgres and in-memory dict as fallbacks. This ensures all uvicorn workers see the same pending data:
+
+```python
+from app.services.pending_store import pending_queries, pending_mutations
+
+# Redis-first, with auto-expiry (1 hour TTL)
+pending_queries[query_id] = {"sql": "...", "status": "pending_approval"}
+```
 
 ---
 

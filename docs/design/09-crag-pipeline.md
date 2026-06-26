@@ -8,7 +8,7 @@
 
 ## Overview
 
-The **Corrective RAG (CRAG)** pipeline is a post-retrieval quality gate that evaluates whether the retrieved document chunks actually answer the user's question. Each chunk is scored independently by GPT-4o-mini, and the aggregate score determines one of three verdicts: **CORRECT**, **AMBIGUOUS**, or **INCORRECT**. Based on the verdict, the pipeline either proceeds with the good documents, supplements them with web search results, or discards them entirely and falls back to web search via the Tavily API.
+The **Corrective RAG (CRAG)** pipeline is a post-retrieval quality gate that evaluates whether the retrieved document chunks actually answer the user's question. Each chunk is scored independently by `get_memory_llm()` (defaulting to `llama-3.3-70b-versatile` via LiteLLM Router), and the aggregate score determines one of three verdicts: **CORRECT**, **AMBIGUOUS**, or **INCORRECT**. Based on the verdict, the pipeline either proceeds with the good documents, supplements them with web search results, or discards them entirely and falls back to web search via the Tavily API.
 
 This mechanism prevents the RAG pipeline from generating hallucinated answers grounded in irrelevant retrieved context — a critical failure mode in production RAG systems.
 
@@ -20,7 +20,7 @@ This mechanism prevents the RAG pipeline from generating hallucinated answers gr
 flowchart TD
     A["Retrieved Docs<br/>(from Hybrid Search)"] --> B["CRAGEvaluator.evaluate"]
 
-    subgraph Scoring["Per-Chunk GPT-4o-mini Scoring"]
+    subgraph Scoring["Per-Chunk `get_memory_llm()` Scoring"]
         B --> C["Score chunk 1<br/>(0.0 – 1.0)"]
         B --> D["Score chunk 2<br/>(0.0 – 1.0)"]
         B --> E["Score chunk N<br/>(0.0 – 1.0)"]
@@ -103,7 +103,7 @@ else:
 
 Defined in [web_search.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/crag/web_search.py):
 
-1. **Query Rewriting:** GPT-4o-mini reformulates the user's question into a focused web-search query (6–14 keywords)
+1. **Query Rewriting:** `get_memory_llm()` (via `WebQuery` structured output) reformulates the user's question into a focused web-search query (6–14 keywords)
 2. **Tavily Search:** Calls Tavily Search API with `max_results=5` (configurable via `settings.tavily_max_results`)
 3. **Result Parsing:** Each web result is converted to a LangChain `Document` with structured metadata
 

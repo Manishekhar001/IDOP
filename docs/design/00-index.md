@@ -2,7 +2,7 @@
 
 **Project:** Intelligent Data Operations Platform (IDOP)
 **Version:** 0.1.1
-**Stack:** FastAPI · LangGraph · LiteLLM Router · Groq Llama 3.3 70B · Qdrant · Supabase · PostgreSQL · Redis · S3 · Voyage AI · Nomic
+**Stack:** FastAPI · LangGraph · LiteLLM Router · Groq Llama 3.3 70B (primary) / GPT-4o-mini (fallback) · Qdrant (dense + BM25 sparse) · Supabase · PostgreSQL · Redis (Upstash) · S3 · Voyage AI · Nomic · fastembed · Opik
 
 ---
 
@@ -70,7 +70,7 @@ All five paths share one LangGraph state machine, one 5-class LLM semantic route
 ```
 User Query
     ↓
-FastAPI Gateway (auth middleware)
+FastAPI Gateway (JWT auth middleware + rate limiting)
     ↓
 LangGraph Engine (IDOPEngine.aquery)
     ↓

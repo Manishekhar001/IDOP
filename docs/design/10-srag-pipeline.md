@@ -109,7 +109,7 @@ The `revise_answer` method rewrites the answer to improve factual grounding:
 - Removes or qualifies claims not backed by context
 - Does NOT add new information
 - Keeps the answer concise and helpful
-- Uses GPT-4o-mini with the `_REVISE_PROMPT`
+- Uses `get_memory_llm()` (defaults to `llama-3.3-70b-versatile`) with the `_REVISE_PROMPT`
 
 ---
 
@@ -123,7 +123,7 @@ Defined in [nodes.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/
 def route_after_support(state) -> Literal["revise_answer", "verify_usefulness"]:
     issup = state.get("issup", "fully_supported")
     retries = state.get("retries", 0)
-    if issup != "fully_supported" and retries < settings.srag_max_retries:  # max=2
+    if issup != "fully_supported" and retries < get_settings().srag_max_retries:  # max=2
         return "revise_answer"
     return "verify_usefulness"
 ```
@@ -136,7 +136,7 @@ Defined in [nodes.py](file:///c:/Users/manis/Downloads/Agentic-AI/IDOP/app/core/
 def route_after_usefulness(state) -> Literal["rewrite_question", "stm_summarize"]:
     isuse = state.get("isuse", "useful")
     rewrite_tries = state.get("rewrite_tries", 0)
-    if isuse == "not_useful" and rewrite_tries < settings.max_rewrite_tries:  # max=2
+    if isuse == "not_useful" and rewrite_tries < get_settings().max_rewrite_tries:  # max=2
         return "rewrite_question"
     return "stm_summarize"
 ```
@@ -250,8 +250,8 @@ route_after_support
 | **Support check latency** | ~0.5–1.0s |
 | **Usefulness check latency** | ~0.3–0.8s |
 | **Answer revision latency** | ~0.8–1.5s |
-| **Max support retries** | 2 (configurable: `settings.srag_max_retries`) |
-| **Max question rewrites** | 2 (configurable: `settings.max_rewrite_tries`) |
+| **Max support retries** | 2 (configurable: `get_settings().srag_max_retries`) |
+| **Max question rewrites** | 2 (configurable: `get_settings().max_rewrite_tries`) |
 | **Worst-case total loops** | 4 (2 revisions + 2 rewrites) |
 | **Error fallback** | Defaults to `fully_supported` / `useful` on LLM errors |
 | **Recursion limit** | 80 (set in `CSRAGEngine._RECURSION_LIMIT`) |

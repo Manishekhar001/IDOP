@@ -161,18 +161,21 @@ Source: [document_processor.py](../../app/core/document_processor.py) (lines 90�
 
 ### Sparse Vector Generation (`SparseVectorService`)
 
-The BM25-style sparse vector generator:
+The BM25-style sparse vector generator uses **fastembed's `Qdrant/bm25`** model:
 
-1. **Tokenize** — lowercase, regex extract `[a-z0-9]+` tokens, remove stop words
-2. **Hash** — deterministic `abs(hash(token)) % (2^32)` mapping to sparse indices
-3. **Count** — term frequency as float values
+1. **Tokenize** — deterministically tokenizes text using Qdrant's BM25 tokenizer
+2. **IDF scoring** — Inverse Document Frequency weighting (pre-trained statistical model)
+3. **Format** — returns `SparseVector(indices=[...], values=[...])` — Qdrant-native format
 
 ```python
-SparseVector(indices=[...], values=[...])  # Qdrant-native format
+# Uses fastembed SparseTextEmbedding — deterministic across Python processes
+SparseVector(indices=[42981, ...], values=[2.0, ...])  # Qdrant-native format
 ```
 
-- No external model dependency — runs entirely in-process
-- Produces variable-length sparse vectors proportional to unique terms
+- **Deterministic**: Unlike the previous `Python hash()` approach (which varied per process due to `PYTHONHASHSEED`), fastembed's BM25 model produces identical vectors regardless of Python process
+- **No neural forward pass**: BM25 is a statistical model (IDF lookup + tokenization), not a neural model
+- **Minimal memory**: ~30-50 MB memory footprint
+- **Migration note**: A one-time Qdrant collection deletion is triggered at application startup to purge stale hash()-based vectors
 - Source: [sparse_vector_service.py](../../app/core/sparse_vector_service.py)
 
 ### Qdrant Dual-Vector Upsert
@@ -205,7 +208,12 @@ PointStruct(
 
 ### Cache Persistence
 
-After successful Qdrant upsert, chunks and embeddings are cached:
+After successful Qdrant upsert, chunks and embeddings are cached. The cache key incorporates chunking parameters to avoid collisions:
+
+```python
+cache_key_input = f"{doc_id}:{file_ext}:cs{chunk_size}:co{chunk_overlap}"
+cache_id = hashlib.sha256(cache_key_input.encode()).hexdigest()
+```
 
 | Artifact | Format | Storage |
 |---|---|---|
@@ -218,11 +226,11 @@ After successful Qdrant upsert, chunks and embeddings are cached:
 | Environment | Backend | Configuration |
 |---|---|---|
 | Production | S3 | `storage_backend=s3`, bucket: `idop-cache-docs` |
-| Development | Local | `storage_backend=local`, dir: `data/cached_chunks` |
+| Development | Local | `storage_backend=local`, dir: `data/cached_chunks` (configurable via `CACHE_DIR`) |
 | S3 failure (non-prod) | Local fallback | Automatic downgrade with warning log |
-| S3 failure (production) | **Error** | Raises `RuntimeError` — cache is required in prod |
+| S3 failure (production) | **Local fallback** | Falls back to local storage with critical log |
 
-Source: [cache_service.py](../../app/services/cache_service.py) (lines 76–104)
+Source: [cache_service.py](../../app/services/cache_service.py)
 
 ---
 
