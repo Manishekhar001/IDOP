@@ -65,11 +65,18 @@ def register(body: RegisterRequest):
         )
     try:
         user = create_user(body.email, body.password, body.role)
+    except RuntimeError as exc:
+        # Database connection error - return 503 Service Unavailable
+        logger.error("Database unavailable for user creation: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database unavailable: {exc}",
+        ) from exc
     except Exception as exc:
         logger.error("Failed to create user %s: %s", body.email, exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user",
+            detail=f"Failed to create user: {exc}",
         ) from exc
 
     logger.info("User created: %s", user["email"])

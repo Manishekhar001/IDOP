@@ -175,48 +175,119 @@ def run_authentication():
         "password": SMOKE_USER_PASSWORD,
         "role": "admin",
     }
-    try:
-        response = requests.post(register_endpoint, json=register_payload, timeout=15)
-        if response.status_code == 201:
-            print("   ✅ Smoke test user registered successfully")
-        elif response.status_code == 400 and "already registered" in response.text:
-            print("   INFO: Smoke test user already exists — proceeding to login")
-        else:
-            print(
-                f"   ⚠️ Registration returned status {response.status_code}: {response.text}"
-            )
-            print("   📋 Continuing to login attempt...")
-    except Exception as e:
-        print(f"   ⚠️ Registration request failed: {e}")
-        print("   📋 Continuing to login attempt...")
 
-    # Step 2: Login to get JWT token
-    login_endpoint = f"{API_URL}/auth/login"
-    try:
-        response = requests.post(
-            login_endpoint,
-            data={"username": SMOKE_USER_EMAIL, "password": SMOKE_USER_PASSWORD},
-            timeout=15,
-        )
-        if response.status_code == 200:
-            token_data = response.json()
-            SMOKE_USER_TOKEN = token_data.get("access_token")
-            if SMOKE_USER_TOKEN:
-                print("   ✅ JWT token obtained successfully")
-                print(f"   🔑 Token prefix: {SMOKE_USER_TOKEN[:20]}...")
-                print("")
-                return True
-            else:
-                print("   ❌ Login returned 200 but no access_token in response")
-                return False
-        else:
-            print(
-                f"   ❌ Login failed with status {response.status_code}: {response.text}"
+    # Retry registration a few times in case DB/table creation is slow
+    max_register_retries = 3
+    register_ok = False
+    for attempt in range(1, max_register_retries + 1):
+        try:
+            response = requests.post(
+                register_endpoint, json=register_payload, timeout=15
             )
-            return False
-    except Exception as e:
-        print(f"   ❌ Login request failed: {e}")
-        return False
+            if response.status_code == 201:
+                print("   ✅ Smoke test user registered successfully")
+                register_ok = True
+                break
+            elif response.status_code == 400 and "already registered" in response.text:
+                print("   INFO: Smoke test user already exists — proceeding to login")
+                register_ok = True
+                break
+            elif response.status_code == 503:
+                # Service unavailable - DB might not be ready
+                print(
+                    f"   ⚠️ Registration attempt {attempt}/{max_register_retries} returned 503 (DB unavailable): {response.text}"
+                )
+                if attempt < max_register_retries:
+                    print("   ⏳ Waiting 10s before retry...")
+                    time.sleep(10)
+                    continue
+                else:
+                    print(
+                        "   📋 All registration attempts failed, continuing to login attempt..."
+                    )
+            elif response.status_code == 500:
+                # Server error - might be transient DB issue
+                print(
+                    f"   ⚠️ Registration attempt {attempt}/{max_register_retries} returned 500: {response.text}"
+                )
+                if attempt < max_register_retries:
+                    print("   ⏳ Waiting 5s before retry...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print(
+                        "   📋 All registration attempts failed, continuing to login attempt..."
+                    )
+            else:
+                print(
+                    f"   ⚠️ Registration returned status {response.status_code}: {response.text}"
+                )
+                print("   📋 Continuing to login attempt...")
+                break
+        except Exception as e:
+            print(
+                f"   ⚠️ Registration attempt {attempt}/{max_register_retries} request failed: {e}"
+            )
+            if attempt < max_register_retries:
+                print("   ⏳ Waiting 5s before retry...")
+                time.sleep(5)
+            else:
+                print(
+                    "   📋 All registration attempts failed, continuing to login attempt..."
+                )
+
+    if not register_ok:
+        print("   ❌ Registration failed after retries")
+
+    # Step 2: Login to get JWT token (with retries)
+    login_endpoint = f"{API_URL}/auth/login"
+    max_login_retries = 3
+    for attempt in range(1, max_login_retries + 1):
+        try:
+            response = requests.post(
+                login_endpoint,
+                data={"username": SMOKE_USER_EMAIL, "password": SMOKE_USER_PASSWORD},
+                timeout=15,
+            )
+            if response.status_code == 200:
+                token_data = response.json()
+                SMOKE_USER_TOKEN = token_data.get("access_token")
+                if SMOKE_USER_TOKEN:
+                    print("   ✅ JWT token obtained successfully")
+                    print(f"   🔑 Token prefix: {SMOKE_USER_TOKEN[:20]}...")
+                    print("")
+                    return True
+                else:
+                    print("   ❌ Login returned 200 but no access_token in response")
+                    return False
+            elif response.status_code == 401:
+                print(
+                    f"   ⚠️ Login attempt {attempt}/{max_login_retries} failed: Invalid credentials (user may not exist yet)"
+                )
+                if attempt < max_login_retries:
+                    print("   ⏳ Waiting 5s before retry...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print("   ❌ Login failed after retries")
+                    return False
+            else:
+                print(
+                    f"   ❌ Login failed with status {response.status_code}: {response.text}"
+                )
+                return False
+        except Exception as e:
+            print(
+                f"   ⚠️ Login attempt {attempt}/{max_login_retries} request failed: {e}"
+            )
+            if attempt < max_login_retries:
+                print("   ⏳ Waiting 5s before retry...")
+                time.sleep(5)
+            else:
+                print("   ❌ Login failed after retries")
+                return False
+
+    return False
 
 
 def run_health_check():
