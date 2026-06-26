@@ -5,9 +5,10 @@ IDOP Post-Deployment Integration Smoke Test
 This script verifies the live deployment of the IDOP (Intelligent Data Operations Platform)
 by executing real integration tests against the live API endpoints:
   1. Health check (/health)
-  2. Vector collection info (/documents/info)
-  3. Document ingestion (/documents/upload)
-  4. Multi-agent query & RAG reasoning (/chat)
+  2. Authentication (register + login)
+  3. Vector collection info (/documents/info)
+  4. Document ingestion (/documents/upload)
+  5. Multi-agent query & RAG reasoning (/chat)
 """
 
 import os
@@ -22,6 +23,11 @@ import requests
 # Retrieve API base target URL from environment variable (injected by cd.yml)
 API_URL = os.getenv("API_TARGET_URL", "http://localhost:8000").rstrip("/")
 
+# Smoke test user credentials (auto-created during auth test)
+SMOKE_USER_EMAIL = "smoke-test@idop-deploy.local"
+SMOKE_USER_PASSWORD = f"SmokeTest-{uuid.uuid4().hex[:8]}"
+SMOKE_USER_TOKEN = None  # Set after successful login
+
 
 # Global variables for testing flow
 test_filename = f"smoke-test-{uuid.uuid4().hex[:8]}.txt"
@@ -34,6 +40,13 @@ test_doc_content = (
 )
 thread_id = str(uuid.uuid4())
 user_id = "integration-smoke-test-user"
+
+
+def _auth_headers():
+    """Return Authorization headers if a token is available."""
+    if SMOKE_USER_TOKEN:
+        return {"Authorization": f"Bearer {SMOKE_USER_TOKEN}"}
+    return {}
 
 
 def run_security_group_check():
@@ -147,8 +160,67 @@ def run_security_group_check():
         return True
 
 
+def run_authentication():
+    """
+    Register a smoke test user and login to obtain a JWT token.
+    All subsequent tests will use this token for authentication.
+    """
+    global SMOKE_USER_TOKEN
+    print("🧪 Test 1: Verifying Authentication (register + login)...")
+
+    # Step 1: Register the smoke test user
+    register_endpoint = f"{API_URL}/auth/register"
+    register_payload = {
+        "email": SMOKE_USER_EMAIL,
+        "password": SMOKE_USER_PASSWORD,
+        "role": "admin",
+    }
+    try:
+        response = requests.post(register_endpoint, json=register_payload, timeout=15)
+        if response.status_code == 201:
+            print("   ✅ Smoke test user registered successfully")
+        elif response.status_code == 400 and "already registered" in response.text:
+            print("   INFO: Smoke test user already exists — proceeding to login")
+        else:
+            print(
+                f"   ⚠️ Registration returned status {response.status_code}: {response.text}"
+            )
+            print("   📋 Continuing to login attempt...")
+    except Exception as e:
+        print(f"   ⚠️ Registration request failed: {e}")
+        print("   📋 Continuing to login attempt...")
+
+    # Step 2: Login to get JWT token
+    login_endpoint = f"{API_URL}/auth/login"
+    try:
+        response = requests.post(
+            login_endpoint,
+            data={"username": SMOKE_USER_EMAIL, "password": SMOKE_USER_PASSWORD},
+            timeout=15,
+        )
+        if response.status_code == 200:
+            token_data = response.json()
+            SMOKE_USER_TOKEN = token_data.get("access_token")
+            if SMOKE_USER_TOKEN:
+                print("   ✅ JWT token obtained successfully")
+                print(f"   🔑 Token prefix: {SMOKE_USER_TOKEN[:20]}...")
+                print("")
+                return True
+            else:
+                print("   ❌ Login returned 200 but no access_token in response")
+                return False
+        else:
+            print(
+                f"   ❌ Login failed with status {response.status_code}: {response.text}"
+            )
+            return False
+    except Exception as e:
+        print(f"   ❌ Login request failed: {e}")
+        return False
+
+
 def run_health_check():
-    print("🧪 Test 1: Verifying System Health...")
+    print("🧪 Test 2: Verifying System Health...")
     endpoint = f"{API_URL}/health"
     try:
         response = requests.get(endpoint, timeout=30)
@@ -253,10 +325,10 @@ def run_health_check():
 
 
 def run_collection_info():
-    print("🧪 Test 2: Verifying Vector Store Collection Info...")
+    print("🧪 Test 3: Verifying Vector Store Collection Info...")
     endpoint = f"{API_URL}/documents/info"
     try:
-        response = requests.get(endpoint, timeout=30)
+        response = requests.get(endpoint, headers=_auth_headers(), timeout=30)
         print(f"   HTTP Status: {response.status_code}")
 
         if response.status_code != 200:
@@ -282,7 +354,7 @@ def run_collection_info():
 
 
 def run_document_upload():
-    print(f"🧪 Test 3: Uploading Temp Document ({test_filename})...")
+    print(f"🧪 Test 4: Uploading Temp Document ({test_filename})...")
     endpoint = f"{API_URL}/documents/upload"
 
     # Create temporary text file locally
@@ -293,7 +365,9 @@ def run_document_upload():
         # Perform multipart file upload
         with open(test_filename, "rb") as f:
             files = {"file": (test_filename, f, "text/plain")}
-            response = requests.post(endpoint, files=files, timeout=45)
+            response = requests.post(
+                endpoint, files=files, headers=_auth_headers(), timeout=45
+            )
 
         print(f"   HTTP Status: {response.status_code}")
 
@@ -339,10 +413,10 @@ def run_cache_stats():
     After a document upload, the cache should report at least 1 cached document.
     This confirms the storage backend (S3) is actively caching ingested documents.
     """
-    print("🧪 Test 4: Verifying S3 Document Cache is Operational...")
+    print("🧪 Test 5: Verifying S3 Document Cache is Operational...")
     endpoint = f"{API_URL}/cache/stats"
     try:
-        response = requests.get(endpoint, timeout=30)
+        response = requests.get(endpoint, headers=_auth_headers(), timeout=30)
         print(f"   HTTP Status: {response.status_code}")
 
         if response.status_code != 200:
@@ -382,7 +456,7 @@ def run_cache_stats():
 
 
 def run_chat_query():
-    print("🧪 Test 5: Querying LangGraph RAG Multi-Agent Pipeline...")
+    print("🧪 Test 6: Querying LangGraph RAG Multi-Agent Pipeline...")
     endpoint = f"{API_URL}/chat"
 
     # Construct ChatRequest schema body
@@ -399,7 +473,9 @@ def run_chat_query():
 
     try:
         start_time = time.time()
-        response = requests.post(endpoint, json=payload, timeout=60)
+        response = requests.post(
+            endpoint, json=payload, headers=_auth_headers(), timeout=60
+        )
         latency = (time.time() - start_time) * 1000
 
         print(f"   HTTP Status: {response.status_code}")
@@ -463,6 +539,7 @@ def run_tests():
     # Execute the tests sequentially
     tests = [
         run_security_group_check,
+        run_authentication,
         run_health_check,
         run_collection_info,
         run_document_upload,
