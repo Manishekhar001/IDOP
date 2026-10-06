@@ -101,23 +101,6 @@ def _build_litellm_router() -> Any:
         )
         logger.info(f"  Groq deployment {i + 1}: groq/{model}")
 
-    # Add OpenAI as a fallback deployment within the same model group.
-    # If all Groq deployments fail (e.g. invalid/expired keys, rate limits),
-    # the Router will automatically fall through to this OpenAI deployment.
-    openai_api_key = settings.openai_api_key
-    if openai_api_key and str(openai_api_key).strip():
-        fallback_model = "gpt-4o-mini"
-        model_list.append(
-            {
-                "model_name": model_group,
-                "litellm_params": {
-                    "model": f"openai/{fallback_model}",
-                    "api_key": openai_api_key,
-                },
-                "rpm": settings.openai_rpm,  # OpenAI fallback configured RPM
-            }
-        )
-        logger.info(f"  Fallback deployment: openai/{fallback_model}")
 
     # Configure the Router with cooldown and retry settings
     router = Router(
@@ -208,30 +191,11 @@ def get_chat_llm(
         else:
             logger.warning("No Groq keys configured.")
 
-    # ── Option 3: OpenAI fallback ───────────────────────────────────────
-    openai_api_key = settings.openai_api_key
-    if openai_api_key and str(openai_api_key).strip():
-        openai_model = "gpt-4o-mini"  # Cost-effective fallback model
-        try:
-            from langchain_openai import ChatOpenAI
-
-            logger.info(
-                f"Creating ChatOpenAI: model={openai_model}, "
-                f"temperature={resolved_temp} (final fallback)"
-            )
-            return ChatOpenAI(
-                model=openai_model, temperature=resolved_temp, api_key=openai_api_key
-            )
-        except ImportError:
-            logger.warning("langchain-openai not installed. No LLM provider available.")
-        except Exception as e:
-            logger.warning(f"OpenAI fallback failed: {e}")
-
     # ── No provider available ───────────────────────────────────────────
     raise ValueError(
         f"No LLM provider available. Check LLM_PROVIDER={provider} and ensure "
-        f"the required API keys are configured in .env. Tried: LiteLLM Router, "
-        f"ChatGroq, and ChatOpenAI fallback."
+        f"the required API keys are configured in .env. Tried: LiteLLM Router "
+        f"and ChatGroq."
     )
 
 

@@ -582,8 +582,8 @@ jobs:
 
             # Providers & Models Configuration
             LLM_PROVIDER=${LLM_PROVIDER:-litellm}
-            LLM_MODEL=${LLM_MODEL:-llama-3.3-70b-versatile}
-            MEMORY_LLM_MODEL=${MEMORY_LLM_MODEL:-llama-3.1-8b-instant}
+            LLM_MODEL=${LLM_MODEL:-qwen/qwen3.8-27b}
+            MEMORY_LLM_MODEL=${MEMORY_LLM_MODEL:-qwen/qwen3.8-27b}
             EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-nomic}
             VOYAGE_EMBEDDING_MODEL=${VOYAGE_EMBEDDING_MODEL:-voyage-3}
             NOMIC_EMBEDDING_MODEL=${NOMIC_EMBEDDING_MODEL:-nomic-embed-text-v1.5}
