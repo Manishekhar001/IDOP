@@ -83,9 +83,9 @@ class Settings(BaseSettings):
     groq_api_key_4: str | None = None
 
     llm_provider: str = "litellm"  # "litellm" or "groq"
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_model: str = "qwen/qwen3.8-27b"
     llm_temperature: float = 0.0
-    memory_llm_model: str = "llama-3.3-70b-versatile"
+    memory_llm_model: str = "qwen/qwen3.8-27b"
     memory_llm_temperature: float = 0.0
     vanna_llm_model: str = "gpt-4o-mini"
 
