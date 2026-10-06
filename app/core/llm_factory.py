@@ -101,7 +101,6 @@ def _build_litellm_router() -> Any:
         )
         logger.info(f"  Groq deployment {i + 1}: groq/{model}")
 
-
     # Configure the Router with cooldown and retry settings
     router = Router(
         model_list=model_list,
