@@ -28,7 +28,9 @@ from scripts import deploy_smoke
 def reset_globals():
     """Reset module-level globals before each test to prevent cross-test pollution."""
     deploy_smoke.API_URL = "http://test-deploy.example.com"
+    deploy_smoke.SMOKE_USER_TOKEN = None
     yield
+    deploy_smoke.SMOKE_USER_TOKEN = None
 
 
 @pytest.fixture
@@ -442,3 +444,51 @@ class TestHTTPErrors:
         with patch.object(deploy_smoke.requests, "get", return_value=resp):
             result = deploy_smoke.run_health_check()
             assert result is False
+
+
+# =========================================================================
+# Authentication Tests
+# =========================================================================
+
+
+class TestAuthentication:
+    """Tests for run_authentication() in deploy_smoke.py."""
+
+    def test_registration_and_login_success(self, mock_response):
+        """Registration succeeds (201) and login succeeds (200) → returns True and sets token."""
+        reg_resp = mock_response(201, {"message": "User created"})
+        login_resp = mock_response(200, {"access_token": "valid-jwt-token-123"})
+
+        with patch.object(deploy_smoke.requests, "post", side_effect=[reg_resp, login_resp]):
+            result = deploy_smoke.run_authentication()
+            assert result is True
+            assert deploy_smoke.SMOKE_USER_TOKEN == "valid-jwt-token-123"
+
+    def test_user_already_exists_login_success(self, mock_response):
+        """Registration returns 400 'already registered' and login succeeds (200) → returns True."""
+        reg_resp = mock_response(400, {"detail": "Email already registered"})
+        login_resp = mock_response(200, {"access_token": "existing-user-jwt"})
+
+        with patch.object(deploy_smoke.requests, "post", side_effect=[reg_resp, login_resp]):
+            result = deploy_smoke.run_authentication()
+            assert result is True
+            assert deploy_smoke.SMOKE_USER_TOKEN == "existing-user-jwt"
+
+    def test_login_failure_after_retries(self, mock_response):
+        """Registration succeeds or exists, but login fails (401) on all retries → returns False."""
+        reg_resp = mock_response(201, {"message": "User created"})
+        login_resp_401 = mock_response(401, {"detail": "Invalid credentials"})
+
+        with (
+            patch.object(deploy_smoke.requests, "post", side_effect=[reg_resp, login_resp_401, login_resp_401, login_resp_401]),
+            patch("time.sleep", return_value=None),
+        ):
+            result = deploy_smoke.run_authentication()
+            assert result is False
+            assert deploy_smoke.SMOKE_USER_TOKEN is None
+
+    def test_smoke_user_email_has_unique_format(self):
+        """Verify smoke test email is formatted uniquely per run."""
+        assert "@idop-deploy.local" in deploy_smoke.SMOKE_USER_EMAIL
+        assert len(deploy_smoke.SMOKE_USER_EMAIL) > len("smoke-test-@idop-deploy.local")
+

@@ -23,9 +23,16 @@ import requests
 # Retrieve API base target URL from environment variable (injected by cd.yml)
 API_URL = os.getenv("API_TARGET_URL", "http://localhost:8000").rstrip("/")
 
-# Smoke test user credentials (auto-created during auth test)
-SMOKE_USER_EMAIL = "smoke-test@idop-deploy.local"
-SMOKE_USER_PASSWORD = f"SmokeTest-{uuid.uuid4().hex[:8]}"
+# Unique run identifier for this smoke test execution
+_SMOKE_RUN_ID = uuid.uuid4().hex[:8]
+
+# Smoke test user credentials (unique per run to avoid collision with persistent DB)
+SMOKE_USER_EMAIL = os.getenv(
+    "SMOKE_USER_EMAIL", f"smoke-test-{_SMOKE_RUN_ID}@idop-deploy.local"
+)
+SMOKE_USER_PASSWORD = os.getenv(
+    "SMOKE_USER_PASSWORD", f"SmokeTest-{_SMOKE_RUN_ID}"
+)
 SMOKE_USER_TOKEN = None  # Set after successful login
 
 
@@ -167,6 +174,7 @@ def run_authentication():
     """
     global SMOKE_USER_TOKEN
     print("🧪 Test 1: Verifying Authentication (register + login)...")
+    print(f"   👤 Smoke Test User : {SMOKE_USER_EMAIL}")
 
     # Step 1: Register the smoke test user
     register_endpoint = f"{API_URL}/auth/register"
