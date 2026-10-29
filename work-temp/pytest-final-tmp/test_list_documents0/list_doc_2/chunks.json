@@ -1,0 +1,18 @@
+[
+  {
+    "text": "IDOP is an enterprise-grade intelligent data operations platform.",
+    "metadata": {
+      "page": 1,
+      "tokens": 10,
+      "chunk_index": 0
+    }
+  },
+  {
+    "text": "It combines NL-to-SQL, document mutations, and advanced RAG.",
+    "metadata": {
+      "page": 1,
+      "tokens": 12,
+      "chunk_index": 1
+    }
+  }
+]
