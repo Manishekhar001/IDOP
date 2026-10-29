@@ -1,0 +1,6 @@
+Northstar Outfitters — Inventory and Pricing Guidance (Synthetic Demo)
+Effective date: 2026-01-01
+
+Inventory counts below 8 units are considered low stock and should be reviewed for replenishment. A stock count must never be negative. Product price changes require a second-person review before they are applied to the catalog. The price shown in the product catalog is the current unit list price; it is not necessarily the amount paid on an order because orders may include multiple items, discounts, or shipping.
+
+The demo schema does not contain product line items, supplier lead times, purchase orders, or a price-history table. Use it to find current low-stock products and explain the policy; do not infer which products were included in a particular order.

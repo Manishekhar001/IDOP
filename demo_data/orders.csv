@@ -1,0 +1,21 @@
+id,customer_id,order_date,total_amount,status,shipping_address
+1001,1,2026-08-03,189.99,Delivered,100 Example Avenue Toronto ON Canada
+1002,2,2026-08-06,129.00,Delivered,20 Sample Street Denver CO United States
+1003,3,2026-08-12,214.49,Processing,5 Demo Road Zurich Switzerland
+1004,4,2026-08-17,1240.00,Delivered,8 Fictional Lane London United Kingdom
+1005,5,2026-08-22,899.50,Pending,42 Sample Boulevard Ottawa ON Canada
+1006,6,2026-09-01,59.99,Delivered,1 Example Court Toronto ON Canada
+1007,7,2026-09-04,159.49,Cancelled,7 Demo Piazza Milan Italy
+1008,8,2026-09-10,279.00,Processing,9 Fictional Road Bengaluru India
+1009,1,2026-09-14,304.00,Delivered,100 Example Avenue Toronto ON Canada
+1010,2,2026-09-18,84.99,Pending,20 Sample Street Denver CO United States
+1011,3,2026-09-21,189.00,Delivered,5 Demo Road Zurich Switzerland
+1012,4,2026-09-26,558.00,Processing,8 Fictional Lane London United Kingdom
+1013,5,2026-10-02,74.50,Delivered,42 Sample Boulevard Ottawa ON Canada
+1014,6,2026-10-05,34.00,Delivered,1 Example Court Toronto ON Canada
+1015,7,2026-10-09,219.00,Pending,7 Demo Piazza Milan Italy
+1016,8,2026-10-13,115.00,Delivered,9 Fictional Road Bengaluru India
+1017,1,2026-10-16,399.00,Processing,100 Example Avenue Toronto ON Canada
+1018,2,2026-10-19,159.49,Cancelled,20 Sample Street Denver CO United States
+1019,4,2026-10-23,279.00,Delivered,8 Fictional Lane London United Kingdom
+1020,5,2026-10-27,84.99,Pending,42 Sample Boulevard Ottawa ON Canada

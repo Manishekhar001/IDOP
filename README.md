@@ -1,251 +1,112 @@
-# IDOP — Intelligent Data Operations Platform
+# IDOP — E-commerce Data and Policy Assistant
 
 [![CI](https://github.com/Manishekhar001/IDOP/actions/workflows/ci.yml/badge.svg)](https://github.com/Manishekhar001/IDOP/actions/workflows/ci.yml)
 
-**IDOP** is a production-grade, multi-agent LLM platform that handles natural-language data operations across three domains: **Text-to-SQL**, **Spreadsheet Mutations**, and **Retrieval-Augmented Generation**. Built with LangGraph and deployed on AWS EC2, IDOP routes each query through the appropriate execution path, enforces safety gates, and returns auditable, grounded answers.
+IDOP is a staff-facing assistant for exploring e-commerce records and finding answers in internal policy documents. Staff can ask questions in natural language, retrieve relevant policy guidance, and stage supported spreadsheet changes for review and approval.
 
----
+It is a prototype intended for evaluation and controlled demos. It is not an autonomous order-management system and should not be connected to production data without a separate security, reliability, and operational review.
 
-## Architecture
+## What it demonstrates
 
-```
-                              ┌─────────────────────────────────────────┐
-                              │           User Query (REST API)          │
-                              └────────────────────┬────────────────────┘
-                                                   │
-                                                   ▼
-                              ┌─────────────────────────────────────────┐
-                              │   LLM Semantic Router  (5-class)         │
-                              │   SQL · MUTATION · RAG · CHAT · HYBRID   │
-                              └──┬──────────┬──────────┬────────┬───────┘
-                                 │          │          │        │
-              ┌──────────────────┘          │          │        └──────────────────┐
-              ▼                             ▼          ▼                           ▼
-   ┌──────────────────┐       ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-   │   SQL Path       │       │  MUTATION Path   │  │   CHAT Path      │  │  HYBRID Path     │
-   │                  │       │                  │  │                  │  │  (SQL + RAG)     │
-   │ Vanna 2.0        │       │ Col Mapping      │  │ Direct LLM       │  │ Combines both    │
-   │ NL → SQL         │       │ (LLM-assisted)   │  │ + STM/LTM        │  │ pipelines        │
-   │      ↓           │       │      ↓           │  │   Memory         │  └──────────────────┘
-   │ Safety Validator │       │ Rule Validation  │  └──────────────────┘
-   │      ↓           │       │ (business_rules/ │
-   │ LLM Judge        │       │  rules.json)     │
-   │      ↓           │       │      ↓           │
-   │ Approval Gate    │       │ LLM Audit        │
-   │ (token_hex)      │       │      ↓           │
-   │      ↓           │       │ Approval Gate    │
-   │ Supabase Write   │       │      ↓           │
-   │ + Audit Log      │       │ PostgreSQL TX    │
-   └──────────────────┘       │ (auto-rollback)  │
-                              └──────────────────┘
+| Capability | Example | Current boundary |
+| --- | --- | --- |
+| Business data questions | “How many customers are in each segment?” “Which products are low on stock?” | Read-only SQL over `customers`, `products`, and `orders` |
+| Policy lookup | “What is the return window?” “How are delayed orders handled?” | Retrieves from the policy documents loaded into the configured Qdrant collection |
+| Combined answers | “What is the return policy, and how many delivered orders are there?” | Can combine document retrieval and supported read-only data queries |
+| Spreadsheet-assisted updates | Upload a supported change sheet, review its proposed changes, then approve | Only fields covered by `business_rules/rules.json`; approval flow is required |
 
-                                    RAG Path (CSRAG)
-                              ┌─────────────────────────────────────────┐
-                              │ HyDE — 3 hypothetical document queries   │
-                              │               ↓                          │
-                              │ Hybrid Search — BM25 + Dense (RRF)       │
-                              │               ↓                          │
-                              │ Voyage AI Cross-Encoder Reranking         │
-                              │               ↓                          │
-                              │ CRAG Evaluation                          │
-                              │  ├─ CORRECT   → proceed                  │
-                              │  ├─ AMBIGUOUS → web fallback (Tavily)    │
-                              │  └─ INCORRECT → web fallback (Tavily)    │
-                              │               ↓                          │
-                              │ SRAG Verification (support + usefulness) │
-                              │  └─ Revise if needed (≤ 2 retries)       │
-                              │               ↓                          │
-                              │ Answer Generation                        │
-                              └─────────────────────────────────────────┘
-```
+The demo does not issue refunds, contact customers, modify payment records, or execute arbitrary natural-language writes.
 
----
+## Synthetic demo data
 
-## RAGAS Ablation Study
+The repository includes a small, fictional dataset for safe demonstrations:
 
-Benchmark: **30 queries** across 5 categories — Version Conflicts, Out-of-Document Knowledge, Regional Policies, Multi-hop Synthesis, Ambiguous Queries. Evaluated on 7 benchmark files (48 chunks in Qdrant).
+- 8 customers, 10 products, and 20 orders in `demo_data/`.
+- Three sample policy documents in `demo_data/policies/` covering returns, shipping, and inventory/pricing.
+- All people, addresses, prices, orders, and policies are invented. The policy text is illustrative and is not legal or operational advice.
 
-### Pipeline Configurations
+Orders in the current schema do not contain line items or delivery timestamps. This dataset can demonstrate basic customer, product, order-status, order-total, and policy questions; it cannot support product-level sales attribution or verify whether an individual order qualifies for a refund.
 
-| # | Config | Search | HyDE | Reranking | CRAG | SRAG |
-|---|--------|--------|------|-----------|------|------|
-| 1 | Dense Only (baseline) | dense | ✗ | ✗ | ✗ | ✗ |
-| 2 | Hybrid (RRF) | hybrid | ✗ | ✗ | ✗ | ✗ |
-| 3 | Hybrid + HyDE | hybrid | ✓ | ✗ | ✗ | ✗ |
-| 4 | Hybrid + Reranking | hybrid | ✗ | ✓ | ✗ | ✗ |
-| 5 | Full CSRAG | hybrid | ✓ | ✓ | ✓ | ✓ |
+## Run the demo
 
-### Performance Metrics
+### 1. Prepare dedicated demo services
 
-| Configuration | Faithfulness | Context Precision | Answer Relevancy | Overall | Δ |
-|--------------|:-----------:|:-----------------:|:---------------:|:-------:|:--:|
-| Dense Only (baseline) | 0.5834 | 0.5923 | 0.6012 | **0.5783** | — |
-| + Hybrid Search | 0.6210 | 0.6345 | 0.6418 | 0.6324 | +9.4% |
-| + HyDE | 0.6542 | 0.6789 | 0.6821 | 0.6717 | +16.1% |
-| + Reranking | 0.7123 | 0.7345 | 0.7456 | 0.7308 | +26.4% |
-| **Full CSRAG** | **0.7891** | **0.8012** | **0.8234** | **0.7941** | **+37.3%** |
+You need Python 3.11+, PostgreSQL (a dedicated Supabase project or local PostgreSQL database), a dedicated Qdrant project for policy vectors, and credentials for the configured LLM and embedding providers.
 
-### Ablation: Component Impact
+Copy `.env.demo.example` to `.env`, then replace the placeholder API keys and endpoints. Set `DATABASE_URL`, `SUPABASE_DB_URL`, and `IDOP_DEMO_DATABASE_URL` to the same **dedicated demo database**. Do not point the seed command at a production or shared database. The sample local PostgreSQL URL works with the `postgres` service in `docker-compose.yml` after starting it with `docker compose up -d postgres`.
 
-| Component Removed | Overall Drop | Rank |
-|------------------|:-----------:|:----:|
-| Hybrid Search | −0.1107 | 🏆 Highest |
-| CRAG | −0.0762 | 🥈 Second |
-| Reranking | −0.0633 | 🥉 Third |
-| HyDE | −0.0418 | 4th |
-| SRAG | −0.0395 | 5th |
+Set `QDRANT_URL` and `QDRANT_API_KEY` to a demo Qdrant project. The seed script uses the separate `idop_demo_documents` collection; configure `COLLECTION_NAME=idop_demo_documents` so the application reads those demo policy vectors.
 
-**Key findings:**
-- Full CSRAG achieves **0.7941 overall** — a **+37.3% improvement** over the dense-only baseline (0.5783)
-- Hybrid search is the single highest-impact component (−0.1107 when removed); it is the foundation everything else builds on
-- CRAG is second (−0.0762): corrective evaluation + Tavily web fallback is the key reliability differentiator
-
----
-
-## Features
-
-### Feature 1 — Text-to-SQL with Human Approval
-
-1. Natural language → SQL generation via **Vanna 2.0**
-2. Safety validator rejects destructive or schema-altering statements
-3. LLM Judge scores the query for correctness and intent alignment
-4. Cryptographic approval gate — user-signed token (`secrets.token_hex`) required for execution
-5. Execution against **Supabase** with full per-query audit log
-6. `/explain` endpoint returns row-level reasoning
-
-### Feature 2 — Spreadsheet Mutation Pipeline
-
-1. Parse uploaded Excel/CSV file and extract column schema
-2. LLM-assisted column mapping to internal schema headers
-3. Auto-classify operation type: **INSERT / UPDATE / DELETE**
-4. Rule validation against `business_rules/rules.json`
-5. LLM audit verifies operation intent matches data payload
-6. Approval gate before execution
-7. Atomic **PostgreSQL transaction** — automatic rollback on any constraint violation
-
-### Feature 3 — Corrective Self-Reflective RAG (CSRAG)
-
-| Step | Component | Detail |
-|------|-----------|--------|
-| 1 | **HyDE** | Generate 3 hypothetical document answers for query expansion |
-| 2 | **Hybrid Search** | Dense (Nomic) + Sparse (BM25) with Reciprocal Rank Fusion |
-| 3 | **Reranking** | Voyage AI Cross-Encoder for precision refinement |
-| 4 | **CRAG** | Per-chunk relevance scoring; triggers Tavily web search on AMBIGUOUS/INCORRECT |
-| 5 | **SRAG** | Verifies factual support and answer usefulness; revises up to 2 times |
-| 6 | **Context Enrichment** | Neighbouring chunk window to preserve surrounding context |
-
-### Feature 4 — Memory System
-
-- **STM (Short-Term Memory):** Per-session conversation summarisation via `AsyncPostgresSaver`
-- **LTM (Long-Term Memory):** Persistent user facts via `AsyncPostgresStore` (LangGraph PostgresStore)
-
----
-
-## Infrastructure & Observability
-
-### Caching (Redis — 4 tiers)
-
-| Tier | TTL | Key |
-|------|-----|-----|
-| SQL generation | 24 h | SHA-256(query) |
-| Embeddings | 7 d | SHA-256(text chunk) |
-| RAG chunk results | 1 h | SHA-256(query + collection) |
-| Final results | 15 min | SHA-256(query + context) |
-
-SHA-256 deduplication prevents redundant chunk storage across uploads.
-
-### LLM Routing
-
-- Chat, routing, memory and verification use Groq through `LLM_PROVIDER=groq` or the LiteLLM Groq key pool (`LLM_PROVIDER=litellm`). The default model is `qwen/qwen3.8-27b`.
-- The current `get_chat_llm()` implementation does not provide an automatic OpenAI fallback. Configure at least one Groq API key for these paths.
-- OpenAI remains separately used by Vanna and some feature-specific judges; set `OPENAI_API_KEY` for those components.
-
-### CI/CD Pipeline (GitHub Actions)
-
-```
-Push to main
-    ↓
-Ruff lint + pytest (unit + integration)
-    ↓
-Docker build → push to AWS ECR
-    ↓
-SSH into EC2 → pull latest image
-    ↓
-Health-check probe (3 retries, 10s interval)
-    ↓
-Zero-downtime rollback if health-check fails
-```
-
-### Observability
-
-- **Opik** — full LLM trace logging (prompt, completion, latency, token cost) per request
-
----
-
-## Tech Stack
-
-| Layer | Technologies |
-|-------|-------------|
-| Orchestration | LangGraph, LangChain |
-| LLM | Groq `qwen/qwen3.8-27b` through ChatGroq or the LiteLLM multi-key router; no automatic OpenAI fallback in the current LLM factory |
-| Embeddings | Configurable: Nomic `nomic-embed-text-v1.5` (768-dim) or Voyage AI `voyage-3` (1024-dim) via `EMBEDDING_PROVIDER`; Voyage AI `rerank-2.5` (reranking) |
-| Vector Store | Qdrant (hybrid: dense + sparse) |
-| Databases | PostgreSQL 16 (checkpointer + store) + Supabase (business data), Upstash Redis (cache) |
-| Backend | FastAPI, Pydantic |
-| RAG Evaluation | RAGAS, In-house LLM-based evaluator |
-| Observability | Opik |
-| Cloud | AWS EC2, AWS ECR, AWS S3 |
-| DevOps | Docker Compose, GitHub Actions, Nginx |
-
----
-
-## Project Structure
-
-```
-IDOP/
-├── app/                    # FastAPI routes and LangGraph agent entrypoints
-├── business_rules/         # rules.json for mutation validation
-├── docs/                   # Architecture diagrams and API docs
-├── scripts/                # Utility and benchmark scripts
-├── tests/                  # Unit and integration tests (pytest)
-├── .github/workflows/      # CI/CD GitHub Actions
-├── docker-compose.yml
-├── Dockerfile
-├── pyproject.toml
-└── requirements.txt
-```
-
----
-
-## Quickstart
+### 2. Install and seed
 
 ```bash
-# Clone
-git clone https://github.com/Manishekhar001/IDOP.git
-cd IDOP
-
-# Configure environment
-cp .env.example .env
-# Fill in: OPENAI_API_KEY (Vanna/judges), GROQ_API_KEY (chat LLM), QDRANT_URL, SUPABASE_DB_URL, DATABASE_URL, etc.
-
-# Run with Docker Compose
-docker compose up --build
-
-# API docs available at
-open http://localhost:8000/docs
+python -m venv .venv
+# Activate the virtual environment, then:
+pip install -r requirements.txt
+python scripts/seed_demo_data.py
 ```
 
----
+The script requires the explicit `IDOP_DEMO_SEED_CONFIRM` value shown in `.env.demo.example`. It creates the supported business tables if needed, inserts the CSV data only when those tables are empty, and skips the SQL seed when this dataset has already been recorded. It does not drop tables or delete a Qdrant collection. `python scripts/seed_demo_data.py --database-only` skips policy indexing.
 
-## Live Deployment
+The script reads service credentials from `.env`, but this repository does not include credentials and does not seed any hosted service automatically.
 
-| Resource | URL |
-|----------|-----|
-| Live API (Swagger) | http://54.159.245.29/docs |
-| CI/CD Runs | [GitHub Actions](https://github.com/Manishekhar001/IDOP/actions) |
+### 3. Start the API
 
----
+```bash
+uvicorn app.main:app --reload
+```
+
+Open `http://localhost:8000/docs` for the interactive API documentation. Register or sign in using the authentication routes before calling protected endpoints. For Docker, configure `.env` first and run `docker compose up --build`.
+
+## Example demo questions
+
+- “How many customers are in each segment?”
+- “Show products with fewer than 20 units in stock.”
+- “How many orders are delivered, pending, or cancelled?”
+- “What does the sample policy say about return requests?”
+- “Summarize low-stock products and the sample inventory guidance.”
+
+Answers depend on the configured model, database contents, indexed documents, and the user's access. Review generated SQL and staged changes through the application's approval flow.
+
+## How it works
+
+1. The chat workflow classifies a question as a data query, document question, combined request, or general conversation.
+2. Data questions use the relational schema and read-only SQL controls.
+3. Document questions retrieve relevant passages from Qdrant and use them as context for an answer.
+4. Supported spreadsheet changes are mapped, checked against business rules, and presented for approval before execution.
+
+The API is built with FastAPI. PostgreSQL stores business data and application state; Qdrant stores document vectors. Provider and database settings are configured through environment variables in `.env`.
+
+## Repository map
+
+```text
+app/                 API, authentication, chat workflows, SQL and document services
+business_rules/      Rules for supported spreadsheet changes
+config/               Application configuration and schema-related assets
+demo_data/            Fictional CSV records and sample policy documents
+scripts/              Database utilities and the opt-in demo seed command
+tests/                Automated test suite
+```
+
+## Safety and demo data
+
+- Seed only a dedicated, empty demo database. The seed script refuses to populate non-empty business tables unless its own dataset marker is present.
+- Use dedicated demo credentials for the database, Qdrant, and model providers. Never commit `.env` or real customer data.
+- Seeded customers and policies are fictional. Do not present sample policy text as an organization's actual policy.
+- The application has authorization and approval flows, but that does not by itself establish production readiness. Review access controls, audit requirements, backups, monitoring, rate limits, and failure handling before any real deployment.
+
+## Current limitations
+
+- The included data model covers customers, products, and orders; it is not a complete commerce schema.
+- Orders lack line items, delivery events, payment records, and return/refund state.
+- The policy documents are examples. Retrieval quality depends on the documents and services configured by the operator.
+- Spreadsheet changes are limited to the columns and validation rules implemented in `business_rules/rules.json`.
+- This repository does not provide a hosted demo account or bundled credentials.
+
+## Development
+
+Install dependencies with `pip install -r requirements.txt`. Run the test suite with `pytest`. Keep secrets in local environment configuration and use synthetic data for development.
 
 ## License
 
-MIT
+See [LICENSE](LICENSE) for license terms.

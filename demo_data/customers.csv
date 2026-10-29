@@ -1,0 +1,9 @@
+id,name,email,segment,country
+1,Northstar Trail Supply,ops@northstar.example.com,SMB,Canada
+2,Cedar Summit Retail,inventory@cedarsummit.example.com,SMB,United States
+3,Alpine Ridge Outfitters,orders@alpineridge.example.com,SMB,Switzerland
+4,Urban Trail Collective,buying@urbantrail.example.com,Enterprise,United Kingdom
+5,SummitWorks Group,procurement@summitworks.example.com,Enterprise,Canada
+6,Maya Chen,maya.chen@example.com,Individual,Canada
+7,Luca Rossi,luca.rossi@example.com,Individual,Italy
+8,Asha Patel,asha.patel@example.com,Individual,India

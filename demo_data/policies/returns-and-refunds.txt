@@ -1,0 +1,6 @@
+Northstar Outfitters — Returns and Refunds Policy (Synthetic Demo)
+Effective date: 2026-01-01
+
+Unused physical products may be returned within 30 calendar days after delivery when the customer can provide an order number. Items marked final sale are not eligible for a change-of-mind return. A product that arrives damaged should be reported within 7 calendar days of delivery with a description of the damage. Approved refunds are returned to the original payment method; allow 5 to 7 business days after approval for processing. Original shipping charges are refundable only when the company shipped the wrong item or the item arrived damaged.
+
+This document describes general policy only. Eligibility for a specific order requires checking the actual delivery date, product condition, and item-level order details, which are not all represented in the demo database.
