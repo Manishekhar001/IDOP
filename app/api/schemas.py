@@ -535,8 +535,8 @@ class ChatRequest(BaseModel):
     user_id: str = Field(
         ...,
         description=(
-            "User identifier for Long-Term Memory. Facts and profile insights extracted "
-            "from interactions are indexed against this user ID for personalization."
+            "Legacy compatibility field. The server derives memory ownership from the "
+            "authenticated JWT subject and ignores this client-supplied value."
         ),
     )
     include_sources: bool = Field(

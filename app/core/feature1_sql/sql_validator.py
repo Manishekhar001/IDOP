@@ -40,7 +40,16 @@ class SQLValidator:
         if not sql or not sql.strip():
             return False, "SQL query is empty"
 
-        cleaned_sql = sql.strip().upper()
+        statement = sql.strip()
+        cleaned_sql = statement.upper()
+
+        # Only allow one statement. A trailing semicolon is valid; any later
+        # non-whitespace content is rejected before it reaches the database.
+        without_trailing_semicolon = (
+            statement[:-1] if statement.endswith(";") else statement
+        )
+        if ";" in without_trailing_semicolon:
+            return False, "Only one SQL statement is permitted."
 
         # Simple security parsing — use word-boundary regex to avoid false positives
         for command in self.FORBIDDEN_COMMANDS:

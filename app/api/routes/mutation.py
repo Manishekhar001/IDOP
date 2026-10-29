@@ -137,15 +137,19 @@ async def upload_mutation(
     parsed_skip_validation = False
     if skip_validation is not None:
         val = str(skip_validation).strip().lower()
-        if val == "true":
+        if val in {"true", "1", "yes", "on"}:
+            if _user.get("role") != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only administrators may skip business-rule validation.",
+                )
             parsed_skip_validation = True
-        elif val == "false" or val == "":
+        elif val in {"false", "0", "no", "off", ""}:
             parsed_skip_validation = False
         else:
-            try:
-                parsed_skip_validation = bool(int(val))
-            except ValueError:
-                parsed_skip_validation = False
+            raise HTTPException(
+                status_code=400, detail="skip_validation must be a boolean value."
+            )
 
     logger.info(
         f"Mutation upload request. Table: {table_name}, Intent: {request_intent}, PK: {primary_key}, AutoMap: {parsed_auto_map}"
@@ -234,6 +238,7 @@ async def upload_mutation(
             "updates": updates,
             "ids": ids,
             "token": token,
+            "owner": _user["sub"],
         }
 
         return MutationResponse(
@@ -302,6 +307,14 @@ async def approve_mutation(
     logger.info(
         f"Mutation approval request for ID: {body.mutation_id}, Approved: {body.approved}"
     )
+
+    # Pending approvals are private to the authenticated requester. Legacy
+    # sessions without an owner are intentionally rejected rather than exposed.
+    if body.mutation_id not in shared_pending_mutations:
+        raise HTTPException(status_code=404, detail="Mutation session not found.")
+    session_info = shared_pending_mutations[body.mutation_id]
+    if session_info.get("owner") != _user["sub"]:
+        raise HTTPException(status_code=404, detail="Mutation session not found.")
 
     # 1. Verify Cryptographic Token
     if body.approved:
@@ -396,4 +409,5 @@ async def get_pending(_user: dict = Depends(get_current_user)) -> list[dict]:
             "op_type": info["op_type"],
         }
         for mid, info in shared_pending_mutations.items()
+        if info.get("owner") == _user["sub"]
     ]

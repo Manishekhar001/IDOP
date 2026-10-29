@@ -2,7 +2,7 @@
 Shared LLM Factory — uses LiteLLM Router for multi-provider, multi-key load balancing.
 
 Supports:
-  - Multiple Groq API keys with automatic failover via LiteLLM Router
+  - Multiple Groq API keys with rate-limit-aware routing via LiteLLM Router
   - Direct Groq connection for single-key setups
 
 All components (CRAG, SRAG, HyDE, RAGAS, graph nodes, memory services) import
@@ -18,13 +18,13 @@ Usage:
     chain = prompt | llm.with_structured_output(MyModel)
 
 Configuration (in .env):
-    LLM_PROVIDER=litellm       # "litellm" or "groq" (default: "openai")
-    LLM_MODEL=gpt-4o            # Model name or model group (for LiteLLM)
+    LLM_PROVIDER=litellm       # "litellm" or "groq"
+    LLM_MODEL=qwen/qwen3.8-27b
     LLM_TEMPERATURE=0.0
 
     # For LiteLLM with multiple Groq keys:
     LLM_PROVIDER=litellm
-    LLM_MODEL=llama-3.3-70b-versatile
+    LLM_MODEL=qwen/qwen3.8-27b
     GROQ_API_KEY_1=gsk_abc...
     GROQ_API_KEY_2=gsk_def...
     GROQ_API_KEY_3=gsk_ghi...
@@ -32,7 +32,7 @@ Configuration (in .env):
     # For direct Groq (single key):
     LLM_PROVIDER=groq
     GROQ_API_KEY=gsk_abc...
-    LLM_MODEL=llama-3.3-70b-versatile
+    LLM_MODEL=qwen/qwen3.8-27b
 
 """
 
@@ -126,9 +126,9 @@ def get_chat_llm(
     Return a configured chat LLM based on settings.
 
     Priority:
-      1. If LLM_PROVIDER=litellm → use ChatLiteLLMRouter (multi-key load balancing)
-      2. If LLM_PROVIDER=groq → use ChatGroq (single key)
-      3. Raise ValueError if neither is available
+      1. If LLM_PROVIDER=litellm → use ChatLiteLLMRouter (Groq key pool)
+      2. If LLM_PROVIDER=groq → use ChatGroq
+      3. Raise ValueError if Groq configuration is unavailable
 
     The result is cached via @lru_cache so the same LLM instance is reused.
     """

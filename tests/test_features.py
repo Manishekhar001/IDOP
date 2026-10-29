@@ -33,6 +33,11 @@ class TestSQLValidator:
         assert is_valid is True
         assert error == ""
 
+    def test_rejects_multiple_sql_statements(self, validator):
+        is_valid, error = validator.validate("SELECT 1; SELECT 2")
+        assert is_valid is False
+        assert error == "Only one SQL statement is permitted."
+
     def test_valid_select_with_join(self, validator):
         """Test that a SELECT query with JOINs passes validation."""
         sql = """

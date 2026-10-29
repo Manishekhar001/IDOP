@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         if not getattr(self, "supabase_db_url", None):
             self.supabase_db_url = self.database_url or ""
 
-        for attr in ["database_url", "supabase_db_url"]:
+        for attr in ["database_url", "supabase_db_url", "sql_readonly_db_url"]:
             if hasattr(self, attr):
                 val = getattr(self, attr)
                 if val:
@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     groq_api_key_3: str | None = None
     groq_api_key_4: str | None = None
 
-    llm_provider: str = "litellm"  # "litellm" or "groq"
+    llm_provider: str = "litellm"  # "litellm" (Groq key pool) or "groq" (single key)
     llm_model: str = "qwen/qwen3.8-27b"
     llm_temperature: float = 0.0
     memory_llm_model: str = "qwen/qwen3.8-27b"
@@ -140,6 +140,7 @@ class Settings(BaseSettings):
     # Relational Database Configuration
     database_url: str
     supabase_db_url: str = ""
+    sql_readonly_db_url: str | None = None
 
     # Storage Backend Configuration (for bulk document ingestion cache)
     storage_backend: str = (

@@ -1,3 +1,4 @@
+import hashlib
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -27,6 +28,12 @@ def get_engine(request: Request) -> CSRAGEngine:
 
 def get_checkpointer(request: Request):
     return request.app.state.checkpointer
+
+
+def _scoped_thread_id(user_id: str, thread_id: str) -> str:
+    """Give each authenticated user an isolated checkpoint namespace."""
+    owner = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+    return f"{owner}:{thread_id}"
 
 
 def _build_chat_response(
@@ -88,15 +95,15 @@ async def chat(
     _user: dict = Depends(get_current_user),
 ) -> ChatResponse:
     logger.info(
-        f"Chat — thread={body.thread_id}, user={body.user_id}, q='{body.question[:80]}'"
+        f"Chat — thread={body.thread_id}, user={_user['sub']}, q='{body.question[:80]}'"
     )
     start_time = time.time()
 
     try:
         result = await engine.aquery(
             question=body.question,
-            thread_id=body.thread_id,
-            user_id=body.user_id,
+            thread_id=_scoped_thread_id(_user["sub"], body.thread_id),
+            user_id=_user["sub"],
             search_mode=body.search_mode,
             top_k=body.top_k,
             enable_hyde=body.enable_hyde,
@@ -155,7 +162,7 @@ async def chat_stream(
     _user: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     logger.info(
-        f"Chat stream — thread={body.thread_id}, user={body.user_id}, "
+        f"Chat stream — thread={body.thread_id}, user={_user['sub']}, "
         f"q='{body.question[:80]}'"
     )
 
@@ -163,8 +170,8 @@ async def chat_stream(
         try:
             async for chunk in engine.astream(
                 question=body.question,
-                thread_id=body.thread_id,
-                user_id=body.user_id,
+                thread_id=_scoped_thread_id(_user["sub"], body.thread_id),
+                user_id=_user["sub"],
                 search_mode=body.search_mode,
                 top_k=body.top_k,
                 enable_hyde=body.enable_hyde,
@@ -200,7 +207,11 @@ async def get_chat_history(
     checkpointer = get_checkpointer(request)
 
     try:
-        config = {"configurable": {"thread_id": thread_id}}
+        config = {
+            "configurable": {
+                "thread_id": _scoped_thread_id(_user["sub"], thread_id)
+            }
+        }
         checkpoint_tuple = await checkpointer.aget_tuple(config)
     except Exception as e:
         logger.error(f"History retrieval failed: {e}", exc_info=True)

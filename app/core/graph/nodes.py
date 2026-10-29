@@ -82,7 +82,9 @@ async def router_node(state: CSRAGState) -> dict:
 
 
 @track(name="graph_sql_generation")
-async def sql_generation_node(state: CSRAGState) -> dict:
+async def sql_generation_node(
+    state: CSRAGState, config: RunnableConfig | None = None
+) -> dict:
     """Generates SQL query, performs validation, runs LLM Judge, and creates approval session."""
     question = state["question"]
     logger.info(f"Feature 1 SQL Node triggered: '{question}'")
@@ -133,6 +135,7 @@ async def sql_generation_node(state: CSRAGState) -> dict:
             "sql": sql,
             "status": "pending_approval",
             "token": token,
+            "owner": (config or {}).get("configurable", {}).get("user_id", ""),
         }
 
         return {
@@ -159,7 +162,9 @@ async def sql_generation_node(state: CSRAGState) -> dict:
 
 
 @track(name="graph_mutation")
-async def mutation_node(state: CSRAGState) -> dict:
+async def mutation_node(
+    state: CSRAGState, config: RunnableConfig | None = None
+) -> dict:
     """Process mutation requests through the full validation pipeline.
 
     .. note::
@@ -260,6 +265,7 @@ async def mutation_node(state: CSRAGState) -> dict:
             "updates": updates,
             "ids": ids,
             "token": token,
+            "owner": (config or {}).get("configurable", {}).get("user_id", ""),
         }
 
         return {

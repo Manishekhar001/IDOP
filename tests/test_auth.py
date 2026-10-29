@@ -232,3 +232,24 @@ class TestRBAC:
             await checker(user)
         assert exc_info.value.status_code == 403
         assert "editor, admin" in exc_info.value.detail
+
+
+class TestRegistrationRoles:
+    def test_public_registration_cannot_assign_admin_role(self, monkeypatch):
+        from app.api.routes import auth_routes
+
+        calls = []
+        monkeypatch.setattr(auth_routes, "get_user_by_email", lambda email: None)
+
+        def record_create_user(email, password, role="user"):
+            calls.append((email, password, role))
+            return {"email": email, "role": role}
+
+        monkeypatch.setattr(auth_routes, "create_user", record_create_user)
+        body = auth_routes.RegisterRequest(
+            email="new@example.com", password="secret", role="admin"
+        )
+
+        auth_routes.register(body)
+
+        assert calls == [("new@example.com", "secret", "user")]

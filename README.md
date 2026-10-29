@@ -154,10 +154,11 @@ Benchmark: **30 queries** across 5 categories — Version Conflicts, Out-of-Docu
 
 SHA-256 deduplication prevents redundant chunk storage across uploads.
 
-### LLM Routing (LiteLLM)
+### LLM Routing
 
-- Primary: Groq API × 4 rotating keys (rate-limit aware)
-- Fallback: OpenAI GPT-4o
+- Chat, routing, memory and verification use Groq through `LLM_PROVIDER=groq` or the LiteLLM Groq key pool (`LLM_PROVIDER=litellm`). The default model is `qwen/qwen3.8-27b`.
+- The current `get_chat_llm()` implementation does not provide an automatic OpenAI fallback. Configure at least one Groq API key for these paths.
+- OpenAI remains separately used by Vanna and some feature-specific judges; set `OPENAI_API_KEY` for those components.
 
 ### CI/CD Pipeline (GitHub Actions)
 
@@ -186,7 +187,7 @@ Zero-downtime rollback if health-check fails
 | Layer | Technologies |
 |-------|-------------|
 | Orchestration | LangGraph, LangChain |
-| LLM | LiteLLM Router (primary: Groq `llama-3.3-70b-versatile` w/ multi-key load balancing; fallback: OpenAI `gpt-4o-mini`) |
+| LLM | Groq `qwen/qwen3.8-27b` through ChatGroq or the LiteLLM multi-key router; no automatic OpenAI fallback in the current LLM factory |
 | Embeddings | Configurable: Nomic `nomic-embed-text-v1.5` (768-dim) or Voyage AI `voyage-3` (1024-dim) via `EMBEDDING_PROVIDER`; Voyage AI `rerank-2.5` (reranking) |
 | Vector Store | Qdrant (hybrid: dense + sparse) |
 | Databases | PostgreSQL 16 (checkpointer + store) + Supabase (business data), Upstash Redis (cache) |
@@ -225,7 +226,7 @@ cd IDOP
 
 # Configure environment
 cp .env.example .env
-# Fill in: OPENAI_API_KEY, GROQ_API_KEY, QDRANT_URL, SUPABASE_URL, REDIS_URL, etc.
+# Fill in: OPENAI_API_KEY (Vanna/judges), GROQ_API_KEY (chat LLM), QDRANT_URL, SUPABASE_DB_URL, DATABASE_URL, etc.
 
 # Run with Docker Compose
 docker compose up --build

@@ -12,6 +12,7 @@ from app.api.schemas import (
 )
 from app.core.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
+from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature1_sql.shared import sql_service
 from app.opik import track
 from app.services.pending_store import pending_queries as shared_pending_queries
@@ -69,6 +70,9 @@ async def generate_sql(
             vanna_seed=body.vanna_seed,
             vanna_top_p=body.vanna_top_p,
         )
+        is_safe, error_message = SQLValidator().validate(res["sql"])
+        if not is_safe:
+            raise HTTPException(status_code=400, detail=error_message)
 
         # Crypto gate generation (synchronous psycopg2 — offload to thread)
         token = await asyncio.to_thread(gate.generate_session, res["query_id"])
@@ -80,6 +84,7 @@ async def generate_sql(
             "sql": res["sql"],
             "status": "pending_approval",
             "token": token,
+            "owner": _user["sub"],
         }
 
         return SQLResponse(
@@ -91,6 +96,8 @@ async def generate_sql(
             cache_hit=res["cache_hit"],
             token=token,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"SQL generation endpoint failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -137,6 +144,14 @@ async def approve_sql(
     logger.info(
         f"SQL approval request for Query ID: {body.query_id}, Approved: {body.approved}"
     )
+
+    # Pending approvals are private to the authenticated requester. Legacy
+    # sessions without an owner are intentionally rejected rather than exposed.
+    if body.query_id not in shared_pending_queries:
+        raise HTTPException(status_code=404, detail="Query session not found.")
+    query_info = shared_pending_queries[body.query_id]
+    if query_info.get("owner") != _user["sub"]:
+        raise HTTPException(status_code=404, detail="Query session not found.")
 
     # 1. Verify Cryptographic Token
     if body.approved:
@@ -209,4 +224,8 @@ async def get_pending(_user: dict = Depends(get_current_user)) -> list[dict]:
     Returns:
         list[dict]: List of pending query objects with query_id, question, sql, and status fields.
     """
-    return [{"query_id": qid, **info} for qid, info in shared_pending_queries.items()]
+    return [
+        {"query_id": qid, **{key: value for key, value in info.items() if key != "owner"}}
+        for qid, info in shared_pending_queries.items()
+        if info.get("owner") == _user["sub"]
+    ]

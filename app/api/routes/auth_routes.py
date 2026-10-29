@@ -34,7 +34,6 @@ logger = get_logger(__name__)
 class RegisterRequest(BaseModel):
     email: str
     password: str
-    role: str = "user"
 
 
 class TokenResponse(BaseModel):
@@ -64,7 +63,8 @@ def register(body: RegisterRequest):
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
     try:
-        user = create_user(body.email, body.password, body.role)
+        # Public registration must never allow callers to grant themselves roles.
+        user = create_user(body.email, body.password, role="user")
     except RuntimeError as exc:
         # Database connection error - return 503 Service Unavailable
         logger.error("Database unavailable for user creation: %s", exc)
