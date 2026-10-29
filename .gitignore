@@ -138,3 +138,8 @@ tomorrow.log
 var/
 venv/
 wheels/
+# GitHub Actions test reports and local test-run scratch files
+junit.xml
+work-temp/metrics-summary.md
+work-temp/pytest-of-*/
+work-temp/uv-setuptools-*.lock

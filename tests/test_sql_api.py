@@ -56,7 +56,10 @@ class TestSQLApiEndpoints:
     ):
         """Test that /sql/generate creates a session, returns the token, and updates pending_queries."""
         # Override auth to return a test user
-        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "test@example.com",
+            "role": "user",
+        }
 
         try:
             # Setup mocks

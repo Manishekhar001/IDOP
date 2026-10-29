@@ -1,41 +1,40 @@
-.PHONY: install test lint run seed clean help
+.PHONY: install test lint format run run-prod seed clean help docker-up docker-down
 
 help:
 	@echo "IDOP Development Tasks"
 	@echo "======================"
-	@echo "make install    - Install dependencies from requirements.txt"
+	@echo "make install    - Sync locked dependencies and development tools with uv"
 	@echo "make test       - Run unit tests (offline mocks)"
-	@echo "make lint       - Run linters (ruff check + black check)"
-	@echo "make format     - Auto-format code with black"
-	@echo "make run        - Start dev server with hot-reload"
-	@echo "make run-prod   - Start production server (no hot-reload)"
-	@echo "make seed       - Initialize database and seed benchmark docs"
-	@echo "make clean      - Remove __pycache__, .pyc, and temp files"
-	@echo "make docker-up  - Start infrastructure (Postgres + dependencies)"
+	@echo "make lint       - Run Ruff and Black checks"
+	@echo "make format     - Format Python code with Black"
+	@echo "make run        - Start the local API with hot reload"
+	@echo "make run-prod   - Start the API without hot reload"
+	@echo "make seed       - Initialize the database and seed benchmark docs"
+	@echo "make clean      - Remove Python caches and temporary test files"
+	@echo "make docker-up  - Start local PostgreSQL"
 
 install:
-	pip install -r requirements.txt
-	pip install litellm langchain-litellm langchain-voyageai langchain-nomic langchain-groq
+	uv sync --locked --extra dev
 
 test:
-	pytest -xvs
+	uv run pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
 
 lint:
-	ruff check app/ tests/ scripts/
-	black --check app/ tests/ scripts/
+	uv run ruff check app/ tests/ scripts/
+	uv run black --check app/ tests/ scripts/
 
 format:
-	black app/ tests/ scripts/
+	uv run black app/ tests/ scripts/
 
 run:
-	python run.py
+	uv run python run.py
 
 run-prod:
-	python run.py --prod
+	uv run python run.py --prod
 
 seed:
-	python scripts/init_db.py
-	python scripts/seed_benchmark_docs.py
+	uv run python scripts/init_db.py
+	uv run python scripts/seed_benchmark_docs.py
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

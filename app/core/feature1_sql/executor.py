@@ -46,9 +46,7 @@ class SQLExecutor:
         except Exception as exc:
             conn.rollback()
             conn.close()
-            self._write_audit(
-                query_id, question, sql, f"FAILED: {exc!s}"
-            )
+            self._write_audit(query_id, question, sql, f"FAILED: {exc!s}")
             logger.error(f"SQL Execution failed: {exc}")
             raise ValueError(f"Failed to execute approved SQL: {exc!s}") from exc
         else:
@@ -65,9 +63,7 @@ class SQLExecutor:
         finally:
             conn.close()
 
-    def _write_audit(
-        self, query_id: str, question: str, sql: str, status: str
-    ) -> None:
+    def _write_audit(self, query_id: str, question: str, sql: str, status: str) -> None:
         conn = psycopg2.connect(self.conn_str)
         try:
             self.audit.log(conn, query_id, question, sql, status)

@@ -12,8 +12,8 @@ from app.api.schemas import (
 )
 from app.core.approval_gate import approval_gate as gate
 from app.core.feature1_sql.executor import SQLExecutor
-from app.core.feature1_sql.sql_validator import SQLValidator
 from app.core.feature1_sql.shared import sql_service
+from app.core.feature1_sql.sql_validator import SQLValidator
 from app.opik import track
 from app.services.pending_store import pending_queries as shared_pending_queries
 from app.utils.logger import get_logger
@@ -225,7 +225,10 @@ async def get_pending(_user: dict = Depends(get_current_user)) -> list[dict]:
         list[dict]: List of pending query objects with query_id, question, sql, and status fields.
     """
     return [
-        {"query_id": qid, **{key: value for key, value in info.items() if key != "owner"}}
+        {
+            "query_id": qid,
+            **{key: value for key, value in info.items() if key != "owner"},
+        }
         for qid, info in shared_pending_queries.items()
         if info.get("owner") == _user["sub"]
     ]

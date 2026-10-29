@@ -133,7 +133,10 @@ class TestEnhancedApiEndpoints:
         from app.api.routes.chat import get_engine
 
         # Override auth to return a test user
-        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "test@example.com",
+            "role": "user",
+        }
         app.dependency_overrides[get_engine] = lambda: mock_engine
 
         try:
@@ -207,7 +210,10 @@ class TestEnhancedApiEndpoints:
         from app.api.routes.documents import get_vector_store
 
         # Override auth to return a test user
-        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "test@example.com",
+            "role": "user",
+        }
         app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
 
         try:
@@ -250,7 +256,10 @@ class TestEnhancedApiEndpoints:
         mock_gate.generate_session.return_value = "gate-token-xyz"
 
         # Override auth to return a test user
-        app.dependency_overrides[get_current_user] = lambda: {"sub": "test@example.com", "role": "user"}
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "test@example.com",
+            "role": "admin",
+        }
 
         try:
             file_data = {"file": ("mut.csv", b"id,name\n1,Prod1", "text/csv")}
@@ -273,5 +282,30 @@ class TestEnhancedApiEndpoints:
             mock_validator.validate_rows.assert_not_called()
             # Verify auto_map was false (semantic mapping should not be called)
             mock_mapper.get_semantic_mapping.assert_not_called()
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    def test_mutation_upload_rejects_validation_skip_for_non_admin(self, client):
+        """Only administrators may bypass business-rule validation."""
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "staff@example.com",
+            "role": "user",
+        }
+
+        try:
+            response = client.post(
+                "/mutation/upload",
+                files={"file": ("mut.csv", b"id,name\n1,Prod1", "text/csv")},
+                data={
+                    "table_name": "products",
+                    "request_intent": "Insert some products",
+                    "skip_validation": "true",
+                },
+            )
+
+            assert response.status_code == 403
+            assert response.json()["detail"] == (
+                "Only administrators may skip business-rule validation."
+            )
         finally:
             app.dependency_overrides.pop(get_current_user, None)

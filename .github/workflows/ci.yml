@@ -93,31 +93,21 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 4: SETUP PYTHON RUNTIME + INSTALL DEPENDENCIES
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Step 4/7: Setup Python 3.12"
-        uses: actions/setup-python@v5
+      - name: "Step 4/7: Install uv and Python 3.12"
+        uses: astral-sh/setup-uv@v10.3.2
         with:
+          version: "0.11.28"
           python-version: "3.12"
-          cache: 'pip'
+          enable-cache: true
 
       - name: "Step 4b/7: Install system libraries"
         run: |
-          echo "📦 Installing system dependencies..."
+          echo "Installing system dependencies..."
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends libmagic1
-          echo "✅ System libraries installed!"
-          echo ""
 
-      - name: "Step 4c/7: Install Python dependencies"
-        run: |
-          echo "📦 Upgrading pip and installing workspace packages..."
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-mock pytest-asyncio ruff black
-          echo ""
-          echo "✅ Python dependencies installed!"
-          echo "   Python version: $(python --version)"
-          echo "   Pip version:    $(pip --version)"
-          echo ""
+      - name: "Step 4c/7: Sync locked dependencies"
+        run: uv sync --locked --extra dev
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 5: CODE QUALITY CHECKS (RUFF + BLACK)
@@ -125,14 +115,14 @@ jobs:
       - name: "Step 5/7: Lint with Ruff"
         run: |
           echo "🔍 Running Ruff code quality audit..."
-          ruff check app/
+          uv run ruff check app/ tests/ scripts/
           echo "✅ Ruff audit complete."
           echo ""
 
       - name: "Step 5b/7: Format check with Black"
         run: |
           echo "🔍 Checking code formatting with Black..."
-          black --check app/
+          uv run black --check app/ tests/ scripts/
           echo "✅ Black format check complete."
           echo ""
 
@@ -148,10 +138,71 @@ jobs:
           echo "=========================================="
           echo "   ENV_STATE: testing (all API calls mocked)"
           echo ""
-          pytest tests/ -v --tb=short
+          uv run pytest tests/ -v --tb=short --junitxml=junit.xml --cov=app --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
           echo ""
           echo "✅ All tests passed!"
           echo ""
+
+      - name: "Step 6b/7: Publish test metrics to GitHub"
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          lines = ["## IDOP quality metrics", ""]
+
+          if Path("junit.xml").exists():
+              root = ET.parse("junit.xml").getroot()
+              cases = root.findall(".//testcase")
+              failures = root.findall(".//failure")
+              errors = root.findall(".//error")
+              skipped = root.findall(".//skipped")
+              passed = len(cases) - len(failures) - len(errors) - len(skipped)
+              lines.extend([
+                  "| Test suite | Result |",
+                  "| --- | ---: |",
+                  f"| Passed | {passed} |",
+                  f"| Failed or errored | {len(failures) + len(errors)} |",
+                  f"| Skipped | {len(skipped)} |",
+                  f"| Total | {len(cases)} |",
+                  "",
+              ])
+          else:
+              lines.extend(["Test results were not produced.", ""])
+
+          if Path("coverage.xml").exists():
+              coverage = ET.parse("coverage.xml").getroot()
+              covered = int(coverage.attrib["lines-covered"])
+              valid = int(coverage.attrib["lines-valid"])
+              percent = 100 * covered / valid if valid else 0
+              lines.extend([
+                  "| Application line coverage | Value |",
+                  "| --- | ---: |",
+                  f"| Covered lines | {covered} / {valid} |",
+                  f"| Coverage | {percent:.1f}% |",
+                  "",
+                  "Coverage is reported as a baseline; no threshold is enforced yet.",
+                  "",
+              ])
+          else:
+              lines.extend(["Coverage report was not produced.", ""])
+
+          summary.open("a", encoding="utf-8").write("\n".join(lines))
+          PY
+
+      - name: "Step 6c/7: Archive test and coverage reports"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: idop-quality-reports-${{ github.run_number }}
+          path: |
+            junit.xml
+            coverage.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 7: CI COMPLETION SUMMARY

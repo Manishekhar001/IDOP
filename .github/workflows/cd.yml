@@ -103,7 +103,10 @@ jobs:
   deploy:
     name: Build → ECR → Deploy EC2
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' }}
 
     steps:
       # ─────────────────────────────────────────────────────────────────────
@@ -155,6 +158,8 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       - name: "Step 2/13: Checkout code"
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: "Step 2b/13: Resolve ECR Registry Variables"
         run: |
@@ -185,7 +190,7 @@ jobs:
           echo "=========================================="
           echo ""
           echo "📋 Git & Trigger Info:"
-          echo "  Commit SHA : ${{ github.sha }}"
+          echo "  Commit SHA : ${{ github.event.workflow_run.head_sha }}"
           echo "  Author     : ${{ github.actor }}"
           echo "  Repository : ${{ github.repository }}"
           echo "  Run Number : ${{ github.run_number }}"
@@ -262,10 +267,10 @@ jobs:
           push: true
           platforms: linux/amd64
           build-args: |
-            GIT_COMMIT_SHA=${{ github.sha }}
+            GIT_COMMIT_SHA=${{ github.event.workflow_run.head_sha }}
           tags: |
             ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:latest
-            ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
             ${{ env.RESOLVED_ECR_REGISTRY }}/${{ env.RESOLVED_ECR_REPOSITORY }}:stable
 
       # ─────────────────────────────────────────────────────────────────────
@@ -279,7 +284,7 @@ jobs:
           echo "=========================================="
           echo "  Registry     : $RESOLVED_ECR_REGISTRY"
           echo "  Repository   : $RESOLVED_ECR_REPOSITORY"
-          echo "  Tags         : latest, ${{ github.sha }}"
+          echo "  Tags         : latest, ${{ github.event.workflow_run.head_sha }}"
           echo "  Architecture : linux/amd64"
           echo "  Digest       : $DIGEST"
           echo "=========================================="
@@ -335,7 +340,7 @@ jobs:
           RESOLVED_ECR_REPOSITORY: ${{ env.RESOLVED_ECR_REPOSITORY }}
           EC2_PROJECT_PATH: ${{ env.EC2_PROJECT_PATH }}
           AWS_REGION: ${{ env.AWS_REGION }}
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha }}
           IMAGE_DIGEST: ${{ env.IMAGE_DIGEST }}
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -1065,19 +1070,22 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP 12: POST-DEPLOYMENT SMOKE TESTS
       # ─────────────────────────────────────────────────────────────────────
+      - name: "Step 12a/13: Set up uv for deployment smoke tests"
+        uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+
       - name: "Step 12/13: Run post-deployment smoke tests"
         env:
-          EXPECTED_GIT_SHA: ${{ github.sha }}
+          EXPECTED_GIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           echo "=========================================="
           echo "🧪 DEPLOYMENT INTEGRATION SMOKE TESTS"
           echo "=========================================="
           echo "   Target: ${{ secrets.EC2_HOST }}"
-          echo "   SHA:    ${{ github.sha }}"
+          echo "   SHA:    ${{ github.event.workflow_run.head_sha }}"
           echo ""
-
-          python -m pip install --upgrade pip --break-system-packages
-          pip install requests pydantic boto3 --break-system-packages
 
           if [ -n "${{ secrets.DOMAIN_NAME }}" ]; then
             export API_TARGET_URL="https://${{ secrets.DOMAIN_NAME }}"
@@ -1087,7 +1095,7 @@ jobs:
 
           echo "📡 API Target URL: $API_TARGET_URL"
           echo ""
-          python scripts/deploy_smoke.py
+          uv run --no-project --with requests --with pydantic --with boto3 python scripts/deploy_smoke.py
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP 12b: DEPLOYMENT COMPLETION SUMMARY
@@ -1100,7 +1108,7 @@ jobs:
           echo "=========================================="
           echo ""
           echo "📋 Deployment Summary:"
-          echo "  Commit      : ${{ github.sha }}"
+          echo "  Commit      : ${{ github.event.workflow_run.head_sha }}"
           echo "  Author      : ${{ github.actor }}"
           echo "  ECR Image   : $RESOLVED_ECR_REGISTRY/$RESOLVED_ECR_REPOSITORY:latest"
           echo "  EC2 Host    : ${{ secrets.EC2_HOST }}"

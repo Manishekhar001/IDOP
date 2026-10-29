@@ -208,9 +208,7 @@ async def get_chat_history(
 
     try:
         config = {
-            "configurable": {
-                "thread_id": _scoped_thread_id(_user["sub"], thread_id)
-            }
+            "configurable": {"thread_id": _scoped_thread_id(_user["sub"], thread_id)}
         }
         checkpoint_tuple = await checkpointer.aget_tuple(config)
     except Exception as e:

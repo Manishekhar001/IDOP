@@ -30,9 +30,7 @@ _SMOKE_RUN_ID = uuid.uuid4().hex[:8]
 SMOKE_USER_EMAIL = os.getenv(
     "SMOKE_USER_EMAIL", f"smoke-test-{_SMOKE_RUN_ID}@idop-deploy.local"
 )
-SMOKE_USER_PASSWORD = os.getenv(
-    "SMOKE_USER_PASSWORD", f"SmokeTest-{_SMOKE_RUN_ID}"
-)
+SMOKE_USER_PASSWORD = os.getenv("SMOKE_USER_PASSWORD", f"SmokeTest-{_SMOKE_RUN_ID}")
 SMOKE_USER_TOKEN = None  # Set after successful login
 
 
